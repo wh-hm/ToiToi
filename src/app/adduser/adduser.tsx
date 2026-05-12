@@ -1,4 +1,4 @@
-export default function LoginPage() {
+export default function AddUser() {
   return (
     <div style={{ padding: "40px" }}>
       <h1>ユーザー名登録</h1>
