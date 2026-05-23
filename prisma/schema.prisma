@@ -14,7 +14,7 @@ datasource db {
 // 1. ユーザマスタ (users)
 model User {
   id              String            @id @db.VarChar(255) // UUID
-  google_id       String            @db.VarChar(255)
+  google_id       String            @unique @db.VarChar(255)
   username        String?            @db.VarChar(50)
   created_at      DateTime          @default(now()) @db.Timestamp
   delete_flag     Int               @default(0)
@@ -117,7 +117,7 @@ model QuestionMessage {
   delete_flag Int      @default(0)
   space_id    Int
   image_url   String?  @db.VarChar(255)
-  stamp       String?  @db.VarChar(255)npx prisma migrate
+  stamp       String?  @db.VarChar(255)
 
   // 外部キーとの紐付け
   question    Question @relation(fields: [question_id], references: [id])
