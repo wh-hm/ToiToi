@@ -9,6 +9,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // 1. ユーザマスタ (users)
@@ -30,7 +31,7 @@ model User {
 
 // 2. スペースマスタ (spaces)
 model Space {
-  id           Int               @id @default(autoincrement()) // SERIAL
+  id           Int            @id @default(autoincrement()) // SERIAL
   user_id      String            @db.VarChar(255)
   name         String            @db.VarChar(100)
   created_at   DateTime?         @default(now()) @db.Timestamp

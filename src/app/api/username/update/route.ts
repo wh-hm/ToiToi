@@ -6,7 +6,7 @@ import { ERRORS } from "@/constants/messages";
 
 export async function POST(request: Request) {
     try {
-        const { google_id, email, username } = await request.json();
+        const { google_id, username } = await request.json();
 
         if (!username) {
         return NextResponse.json({ error: ERRORS.E1001("ユーザー名") }, { status: 400 });

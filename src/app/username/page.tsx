@@ -27,6 +27,8 @@ export default function Username() {
       username: formData.name       // 入力された名前
     }),
   });
+
+  
   const data = await res.json();
     if (!res.ok) {
       setError(data.error); // ここにメッセージが表示される！
@@ -38,12 +40,33 @@ export default function Username() {
   };
 
   useEffect(() => {
-    // ステータスが "unauthenticated"（未ログイン）なら強制的にトップへ飛ばす
+    // 1. 未ログインならトップへ
     if (status === "unauthenticated") {
-      router.push("/"); 
+      router.push("/");
+      return;
     }
-  }, [status, router]);
 
+    // 2. ログイン済みなら、すでにユーザー名があるかチェック
+    const checkUsername = async () => {
+      if (!session?.user?.id) return;
+
+      try {
+        const res = await fetch(`/api/username/exists?googleId=${session.user.id}`);
+        const data = await res.json();
+        
+        // ユーザー名がすでにあるならダッシュボードへ飛ばす
+        if (data.hasUsername) {
+          router.push("/dashboard");
+        }
+      } catch (error) {
+        console.error("チェック失敗", error);
+      }
+    };
+
+    if (status === "authenticated") {
+      checkUsername();
+    }
+  }, [status, session, router]);
   // 読み込み中は何も表示しない、またはローディング画面を出す
   if (status === "loading") {
     return <div>読み込み中...</div>;

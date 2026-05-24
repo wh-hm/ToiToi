@@ -17,6 +17,14 @@ export const getUsername = async (google_id: string): Promise<string | null> => 
   return user ? user.username : null;
 };
 
+//ユーザidを取得
+export const getUserId= async (google_id: string): Promise<string | null> => {
+  const user = await prisma.user.findFirst({
+    where: { google_id },
+  });
+  return user ? user.id : null;
+};
+
 //ユーザ作成
 // ユーザー作成（存在しない場合）
 export const registerUsername = async (google_id: string, email: string) => {
@@ -51,15 +59,3 @@ export const updateUsername = async (google_id: string, username: string): Promi
   }
 };
 
-
-// 全ユーザーを取得する関数
-export async function getAllUsers() {
-    return await prisma.user.findMany();
-}
-
-
-
-// ユーザーを新しく登録する関数
-export async function createUser(data: { email: string; name: string }) {
-    // return await prisma.user.create({ data });
-}
