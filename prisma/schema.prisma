@@ -9,7 +9,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // 1. ユーザマスタ (users)
@@ -20,7 +19,7 @@ model User {
   created_at      DateTime          @default(now()) @db.Timestamp
   delete_flag     Int               @default(0)
   email           String?            @db.VarChar(255) // phase2で必要
-  updated_at      DateTime?          @default(now()) @updatedAt @db.Timestamp
+  updated_at      DateTime?          @updatedAt
 
   // リレーション関係
   spaces           Space[]
@@ -38,12 +37,13 @@ model Space {
   delete_flag  Int?              @default(0)
   space_type   Int               @default(0)
   favorite_flag Int?             @default(0)
+  updated_at  DateTime?         @updatedAt
 
   // 外部キーとの紐付け
   user         User              @relation(fields: [user_id], references: [id])
   
   // リレーション関係
-  messages         Message[]
+  chats         Chat[]
   tasks            Task[]
   questions        Question[]
 
@@ -51,7 +51,7 @@ model Space {
 }
 
 // 3. メッセージマスタ (messages)
-model Message {
+model Chat {
   id            Int      @id @default(autoincrement()) // SERIAL
   space_id      Int      
   user_id       String   @db.VarChar(255)
@@ -62,11 +62,12 @@ model Message {
   favorite_flag Int?      @default(0)
   stamp         String?   @db.VarChar(255)
   background    Int?      @default(0)
+   updated_at  DateTime?         @updatedAt
 
   // 外部キーとの紐付け
   space         Space    @relation(fields: [space_id], references: [id])
 
-  @@map("messages")
+  @@map("chats")
 }
 
 // 4. タスクマスタ (tasks)
@@ -80,7 +81,7 @@ model Task {
   delete_flag Int?       @default(0)
   space_id    Int      
   tag         Int       @default(0)
-
+   updated_at  DateTime?         @updatedAt
   // 外部キーとの紐付け
   space       Space     @relation(fields: [space_id], references: [id])
 
@@ -98,32 +99,33 @@ model Question {
   user_id     String    @db.VarChar(255)
   question    String    @db.VarChar(255)
   tag         Int?       @default(0)
+   updated_at  DateTime?         @updatedAt
 
   // 外部キーとの紐付け
   space       Space     @relation(fields: [space_id], references: [id])
   
   // リレーション関係
-  questionMessages QuestionMessage[]
+  questionChats QuestionChats[]
 
   @@map("questions")
 }
 
-// 6. 質問メッセージマスタ (question_messages)
-model QuestionMessage {
+// 6. 質問メッセージマスタ (question_chats)
+model QuestionChats {
   id          Int      @id @default(autoincrement()) // SERIAL
   question_id Int      
   user_id     String   @db.VarChar(255)
   content     String?   @db.Text
   created_at  DateTime @default(now()) @db.Timestamp
   delete_flag Int      @default(0)
-  space_id    Int
   image_url   String?  @db.VarChar(255)
   stamp       String?  @db.VarChar(255)
+   updated_at  DateTime?         @updatedAt
 
   // 外部キーとの紐付け
   question    Question @relation(fields: [question_id], references: [id])
 
-  @@map("question_messages")
+  @@map("question_chats")
 }
 
 // 7. ログイン管理マスタ (login_management)
@@ -133,6 +135,7 @@ model LoginManagement {
   total_login_days Int      @default(1)
   current_streak   Int      @default(0)
   delete_flag      Int      @default(0)
+  
 
   // 外部キーとの紐付け
   user             User     @relation(fields: [user_id], references: [id])

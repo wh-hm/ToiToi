@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { existsUser, registerUsername, updateUsername } from "@/services/UserService";
+import {  registerUser } from "@/services/UserService";
 
 export async function POST(request: Request) {
     try {
@@ -9,15 +9,16 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "IDが必要です" }, { status: 400 });
         }
 
-        // 1. ユーザーが存在するかチェック
-        const existingId = await existsUser(google_id);
+        // 2. 「登録または復活」をサービスに任せる
+        // registerUser はサービス側で「削除済みなら復活、新規なら作成」を判定しています
+        const user = await registerUser(google_id, email || "");
         
-        if (!existingId) {
-        // 2. 存在しなければ初期作成（emailが必須と仮定）
-        await registerUsername(google_id, email || "");
-        return NextResponse.json({ message: "新規登録しました", created: true }, { status: 201 });
-        }
-        return NextResponse.json({ message: "ユーザーは既に存在します", created: false }, { status: 200 });
+        // 3. 結果を返す
+        return NextResponse.json({ 
+            message: "ユーザーを準備しました", 
+            user: user 
+        }, { status: 200 });
+        
     } catch (error) {
         console.error("API Error:", error);
         return NextResponse.json({ error: "サーバーエラーが発生しました" }, { status: 500 });

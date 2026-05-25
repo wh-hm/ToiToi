@@ -39,6 +39,8 @@ export default function Username() {
     
   };
 
+
+  
   useEffect(() => {
     // 1. 未ログインならトップへ
     if (status === "unauthenticated") {

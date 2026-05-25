@@ -26,6 +26,11 @@ function TopPageContent() {
                         router.push("/username");
                     } else {
                         // 失敗したらアラートやコンソールで通知
+                        console.log("Status Code:", res.status);
+  
+                        // レスポンスの本文をテキストとして取得して表示
+                        const errorText = await res.text();
+                        console.error("API Error Response Body:", errorText);
                         console.error("API Error Detail:", res);
                         alert("登録処理に失敗しました。");
                     }
