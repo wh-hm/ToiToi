@@ -1,47 +1,69 @@
 "use client";
-import  Header  from "@/components/Header"
-import  Footer  from "@/components/Footer"
+
+import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 
 export default function MyPage() {
+  const router = useRouter();
+
+  // 1. リクエスト処理関数
+  const handleRequest = async (action: string, method: string = "POST", data: any = null) => {
+    if (method !== "PATCH" && !confirm(`${action}を実行しますか？`)) return;
+
+    const options: RequestInit = {
+      method: method,
+      headers: { "Content-Type": "application/json" },
+    };
+
+    if (data) {
+      options.body = JSON.stringify(data);
+    }
+
+    try {
+      const res = await fetch(`/api/myPage/${action}`, options);
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result.error || "処理に失敗しました");
+      }
+
+      alert(result.message);
+
+      // 2. 成功後の遷移処理
+      if (action === "delete/account") {
+        // アカウント削除ならセッションを破棄してログインへ
+        await signOut({ callbackUrl: "/" });
+      } else if (action === "user/logout") {
+        await signOut({ callbackUrl: "/" });
+      } else {
+        // その他の操作なら画面更新
+        router.refresh();
+      }
+    } catch (error: any) {
+      alert("エラー: " + error.message);
+    }
+  };
+
   return (
-    <>
-        <Header/>
-    <section className="max-w-md mx-auto p-6 space-y-8">
+    <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "10px", maxWidth: "300px" }}>
+      <h2>マイページ設定</h2>
+      
+      <input type="text" placeholder="新しいユーザー名" id="newNameInput" />
+      <button onClick={() => {
+        const input = document.getElementById("newNameInput") as HTMLInputElement;
+        handleRequest("user/changeUsername", "PATCH", { newName: input.value });
+      }}>
+        ユーザー名変更
+      </button>
 
-      {/* プロフィール */}
-      <div className="flex flex-col items-center space-y-3">
-        <div className="w-20 h-20 bg-gray-300 rounded-full" />
-        <h2 className="text-xl font-bold">ユーザー名</h2>
+      <hr style={{ width: "100%" }} />
 
-        <div className="w-full bg-gray-100 p-4 rounded-lg flex justify-between items-center">
-          <span>現在のユーザー名</span>
-          <button className="text-blue-600 font-semibold">ユーザー名変更</button>
-        </div>
-      </div>
-
-      {/* データ削除 */}
-      <div className="bg-red-50 p-4 rounded-lg space-y-3">
-        <button className="w-full bg-red-500 text-white py-2 rounded">ToDo全削除</button>
-        <button className="w-full bg-red-500 text-white py-2 rounded">チャット全削除</button>
-        <button className="w-full bg-red-500 text-white py-2 rounded">質問全削除</button>
-
-        <p className="text-red-600 text-sm text-center">
-          注意：この操作は取り消せません。
-        </p>
-      </div>
-
-      {/* アカウント操作 */}
-      <div className="space-y-3">
-        <button className="w-full bg-red-600 text-white py-2 rounded">
-          アカウント削除
-        </button>
-        <button className="w-full bg-gray-300 py-2 rounded">
-          ログアウト
-        </button>
-      </div>
-
-    </section>
-    <Footer/>
-    </>
+      <button onClick={() => handleRequest("delete/task", "DELETE")}>ToDo全削除</button>
+      <button onClick={() => handleRequest("delete/chat", "DELETE")}>チャット全削除</button>
+      <button onClick={() => handleRequest("delete/question", "DELETE")}>質問全削除</button>
+      <button onClick={() => handleRequest("delete/space", "DELETE")}>スペース全削除</button>
+      <button onClick={() => handleRequest("delete/account", "DELETE")}>アカウント削除</button>
+      <button onClick={() => handleRequest("user/logout", "POST")}>ログアウト</button>
+    </div>
   );
 }
