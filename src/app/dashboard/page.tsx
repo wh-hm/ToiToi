@@ -9,11 +9,6 @@ import { useSession } from "next-auth/react";
 import SpaceList from "@/components/SpaceList"
 
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
-
 export default function DashboardPage() {
   const router = useRouter();
 
