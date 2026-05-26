@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { deleteAccount, getUserId } from "@/services/UserService";
+import { deleteUser, getUserId } from "@/services/UserService";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
@@ -18,7 +18,7 @@ export async function DELETE(
     
 
     // 3. 論理削除の実行
-    const success = await deleteAccount(user_id);
+    const success = await deleteUser(user_id);
     if (!success) {
       return NextResponse.json({ error: "削除失敗または権限なし" }, { status: 404 });
     }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { updateUsername } from "@/services/UserService";
+import { getUserId, updateUsername } from "@/services/UserService";
 import { ERRORS } from "@/constants/messages";
 
 
@@ -29,9 +29,12 @@ export async function POST(request: Request) {
         if (!google_id) {
         return NextResponse.json({ error: "IDが必要です" }, { status: 400 });
         }
-
+        const user_id = await getUserId(google_id);
+        if(!user_id){
+            return NextResponse.json({ error: "ユーザIDが必要です" }, { status: 400 });
+        }
         // ユーザー名を更新
-        const isUpdated = await updateUsername(google_id, username);
+        const isUpdated = await updateUsername(user_id, username);
 
         if (!isUpdated) {
             return NextResponse.json({ error: "更新失敗" }, { status: 500 });
