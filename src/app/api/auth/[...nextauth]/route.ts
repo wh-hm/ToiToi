@@ -1,4 +1,4 @@
-import NextAuth, { NextAuthOptions, DefaultSession, User } from "next-auth";
+import NextAuth, { NextAuthOptions, DefaultSession } from "next-auth";
 import { JWT } from "next-auth/jwt";
 import GoogleProvider from "next-auth/providers/google";
 
@@ -18,8 +18,13 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   secret: process.env.NEXTAUTH_SECRET,
+
+  // ★★★ これが無いとセッションが作られない ★★★
+  session: {
+    strategy: "jwt",
+  },
+
   callbacks: {
-    // 引数に :any を付与して型エラーを回避
     async jwt({ token, user }: { token: JWT; user: any }) {
       if (user) {
         token.id = user.id;
