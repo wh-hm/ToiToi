@@ -2,66 +2,66 @@
 import { useRouter } from "next/navigation"
 import { useState, useEffect } from "react"; 
 import { useSession } from "next-auth/react";
-
+import toast from "react-hot-toast";
+import { MESSAGES } from "@/constants/messages"; // メッセージ定数をインポート
 
 export default function Username() {
   const [formData, setFormData] = useState({ name: '', email: '' });
-  const [error, setError] = useState<string | null>(null);
-  const { data: session, status } = useSession(); // セッションの現在の状態を取得
+  const { data: session, status } = useSession(); 
   const router = useRouter();
 
-  const handleChange = (e: any) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
   };
 
-  //ユーザ名登録
+  // ユーザー名登録
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const res = await fetch('/api/username/update', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      google_id: session?.user?.id, // セッションからIDを自動取得
-      username: formData.name       // 入力された名前
-    }),
-  });
-
+  e.preventDefault();
   
-  const data = await res.json();
+  try {
+    const res = await fetch('/api/users/username', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        google_id: session?.user?.id,
+        username: formData.name
+      }),
+    });
+
+    const data = await res.json(); // APIからの返答を取得
+
     if (!res.ok) {
-      setError(data.error); // ここにメッセージが表示される！
+      // APIで設定したエラーメッセージをそのまま表示する！
+      toast.error(data.error || MESSAGES.E2002("ユーザー名")); 
       return;
     }
-    // 成功時、ダッシュボードへ
+    toast.success(MESSAGES.S1002("ユーザー名"));
     router.push("/dashboard");
-    
-  };
-
-
+  } catch (error) {
+    toast.error(MESSAGES.E2002("ユーザー名"));
+  }
+};
   
   useEffect(() => {
-    // 1. 未ログインならトップへ
     if (status === "unauthenticated") {
       router.push("/");
       return;
     }
 
-    // 2. ログイン済みなら、すでにユーザー名があるかチェック
     const checkUsername = async () => {
       if (!session?.user?.id) return;
 
       try {
-        const res = await fetch(`/api/username/exists?googleId=${session.user.id}`);
-        const data = await res.json();
+        const res = await fetch(`/api/users/username/check?googleId=${session.user.id}`);
+        if (!res.ok) throw new Error();
         
-        // ユーザー名がすでにあるならダッシュボードへ飛ばす
+        const data = await res.json();
         if (data.hasUsername) {
           router.push("/dashboard");
         }
       } catch (error) {
-        console.error("チェック失敗", error);
+        toast.error(MESSAGES.E2003("ユーザー名"));
       }
     };
 
@@ -69,16 +69,15 @@ export default function Username() {
       checkUsername();
     }
   }, [status, session, router]);
-  // 読み込み中は何も表示しない、またはローディング画面を出す
+
   if (status === "loading") {
     return <div>読み込み中...</div>;
   }
 
   return(
-    <>
-      <section>
-        <div>ユーザ名変更よ</div>
-        <form onSubmit={handleSubmit}>
+    <section>
+      <div>ユーザ名変更よ</div>
+      <form onSubmit={handleSubmit}>
         <input 
           name="name" 
           value={formData.name} 
@@ -86,9 +85,7 @@ export default function Username() {
           placeholder="ユーザー名を入力" 
         />
         <button type="submit">保存する</button>
-        {error && <p style={{ color: "red" }}>{error}</p>}
       </form>
-      </section>
-    </>
+    </section>
   );
 }

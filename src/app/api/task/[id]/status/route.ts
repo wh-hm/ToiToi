@@ -1,51 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { prisma } from "@/lib/prisma";
 import { updateStatusTask } from "@/services/TaskService";
-import { getUserId } from "@/services/UserService";
+import { getAuthContext } from "@/lib/auth-guard";
+import { MESSAGES } from "@/constants/messages";
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await getAuthContext();
+  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
   try {
     const { id } = await params;
-    const taskId = parseInt(id);
+    const taskId = Number(id);
+    
+    // ボディからの値取得
+    const body = await request.json();
+    const { status, space_id } = body;
 
-    // 1. セッションとユーザーID確認
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) return NextResponse.json({ error: "認証なし" }, { status: 401 });
-    const user_id = await getUserId(session.user.id);
-
-    // 2. Bodyの読み込み（失敗したら空オブジェクトにする）
-    let body = {};
-    try {
-      body = await request.json();
-    } catch (e) {
-      console.error("JSON読み込み失敗:", e);
+    // 必須チェック (statusとspace_idは更新に必須とする)
+    if (status === undefined || !space_id) {
+      return NextResponse.json({ error: MESSAGES.E1001("ステータスまたはスペースID") }, { status: 400 });
     }
 
-    // 3. データの取り出し (bodyがundefinedでも落ちないように)
-    // フロントから送られてきた値を優先し、なければDBから今の値を取得する
-    const status = (body as any)?.status;
-    let space_id = (body as any)?.space_id;
+    // 更新処理
+    const updated = await updateStatusTask(
+      taskId,
+      space_id,
+      auth.user_id,
+      status
+    );
 
-    if (!space_id) {
-      const existingTask = await prisma.task.findUnique({ where: { id: taskId } });
-      space_id = existingTask?.space_id;
+    if (!updated) {
+      return NextResponse.json({ error: MESSAGES.E2002("タスクステータス") }, { status: 500 });
     }
-
-    // 4. 更新処理
-    const updated = await updateStatusTask(taskId, {
-      user_id: user_id,
-      space_id: space_id,
-      status: status,
-    });
 
     return NextResponse.json(updated);
   } catch (error) {
-    console.error("ステータス更新エラーの詳細:", error);
-    return NextResponse.json({ error: "サーバーエラー" }, { status: 500 });
+    console.error("ステータス更新エラー:", error);
+    return NextResponse.json({ error: MESSAGES.E2002("タスクステータス") }, { status: 500 });
   }
 }

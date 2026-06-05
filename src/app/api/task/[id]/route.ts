@@ -1,87 +1,66 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserId } from "@/services/UserService";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { updateTask, deleteTask } from "@/services/TaskService";
+import { getAuthContext } from "@/lib/auth-guard";
+import { MESSAGES } from "@/constants/messages";
+const safeRegex = /^[a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]+$/;
 
-// ★関数名を PATCH に修正
+// 1. PATCH: タスク更新
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> } // Promise型にする
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await getAuthContext();
+  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
   try {
+    const { id } = await params;
+    const taskId = Number(id);
+    const { title, description, due_date, space_id, tag, is_allday, priority, status } = await request.json();
 
-    // 1. params を await でアンラップする
-    const resolvedParams = await params;
-    const id = parseInt(resolvedParams.id);
+    // --- 単体チェック ---
+    if (!title) return NextResponse.json({ error: MESSAGES.E1001("タスク名") }, { status: 400 });
+    if (!due_date) return NextResponse.json({ error: MESSAGES.E1001("期限") }, { status: 400 });
+    if (!description) return NextResponse.json({ error: MESSAGES.E1001("詳細") }, { status: 400 });
 
-    if (isNaN(id)) {
-      return NextResponse.json({ error: "IDが無効です" }, { status: 400 });
+    if (title.length > 20) return NextResponse.json({ error: MESSAGES.E1002("タスク名", 20) }, { status: 400 });
+    if (description.length > 100) return NextResponse.json({ error: MESSAGES.E1002("詳細", 100) }, { status: 400 });
+
+    if (safeRegex.test(title) || safeRegex.test(description)) {
+      return NextResponse.json({ error: MESSAGES.E1003("タスク名または詳細", "記号") }, { status: 400 });
     }
 
-    // 1. セッションとユーザーIDの確認
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "認証されていません" }, { status: 401 });
+    if (isNaN(new Date(due_date).getTime())) {
+      return NextResponse.json({ error: MESSAGES.E1004 }, { status: 400 });
     }
 
-    const user_id = await getUserId(session.user.id);
-    if (!user_id) {
-      return NextResponse.json({ error: "ユーザーが見つかりません" }, { status: 404 });
-    }
-
-    // 2. IDとボディの取得
-    if (isNaN(id)) {
-      return NextResponse.json({ error: "IDが無効です" }, { status: 400 });
-    }
-
-    const body = await request.json();
-
-    // 3. 更新処理の実行
-    const updated = await updateTask(id, {
-      user_id: user_id,
-      title: body.title,
-      due_date: body.due_date,
-      space_id: parseInt(body.space_id), // ボディから取得
-      tag: body.tag,
-      status: body.status,
-    });
-
+    const updated = await updateTask(taskId, auth.user_id, title, description, due_date, space_id, tag, is_allday, priority, status);
     return NextResponse.json(updated);
   } catch (error) {
-    console.error("タスク更新エラー:", error);
-    return NextResponse.json({ error: "サーバーエラー" }, { status: 500 });
+    return NextResponse.json({ error: MESSAGES.E2002("タスク") }, { status: 500 });
   }
 }
 
+// 2. DELETE: タスク削除
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await getAuthContext();
+  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
   try {
     const { id } = await params;
-    const body = await request.json();
-    console.log("削除リクエスト受信:", { id, body }); // ★まずはここを見る
-    // 1. セッションとユーザーIDの取得
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) return NextResponse.json({ error: "認証なし" }, { status: 401 });
-    
-    const user_id = await getUserId(session.user.id);
-    if (!user_id) return NextResponse.json({ error: "ユーザー不明" }, { status: 404 });
+    // DELETEメソッドではボディを読み取らないのが安全なため、クエリパラメータから取得を推奨します
+    const { searchParams } = new URL(request.url);
+    const spaceId = Number(searchParams.get("space_id"));
 
-    // 2. リクエストボディから space_id を取得
-    // ※ 削除時に space_id がボディに入っている前提です
+    if (!spaceId || isNaN(spaceId)) return NextResponse.json({ error: MESSAGES.E1001("スペースID") }, { status: 400 });
 
-    // 3. 論理削除の実行
-    const success = await deleteTask(Number(id), user_id, body.space_id.toString());
+    const success = await deleteTask(Number(id), auth.user_id, spaceId);
+    if (!success) return NextResponse.json({ error: MESSAGES.E2004("タスク") }, { status: 500 });
 
-    if (!success) {
-      return NextResponse.json({ error: "削除失敗または権限なし" }, { status: 404 });
-    }
-
-    return NextResponse.json({ message: "削除しました" });
+    return NextResponse.json({ message: MESSAGES.S1003("タスク") });
   } catch (error) {
-    console.error("【詳細なエラー発生】", error);
-    return NextResponse.json({ error: "サーバーエラー" }, { status: 500 });
+    return NextResponse.json({ error: MESSAGES.E2004("タスク") }, { status: 500 });
   }
 }

@@ -1,154 +1,198 @@
+import { User } from '@prisma/client';
+import * as crypto from 'crypto'; // 新規登録時の UUID 生成用
 import { prisma } from "@/lib/prisma";
-import { registerLoginManagement, deleteLoginManagement } from "@/services/LoginManagementService";
-import { deleteSpaces } from "@/services/SpaceService";
+import { updateGoal, deleteGoal} from './GoalService';
+import { updateLoginManagement, deleteLoginManagement } from './LoginManagementService';
+import { deleteSpaces } from './SpaceService';
 
-
-// ユーザーが存在するかチェック
-export const existsUser = async (google_id: string): Promise<string | null> => {
-  const user = await prisma.user.findFirst({
-    where: { 
-      google_id,
-      delete_flag:0
-     },
-  });
-  return user ? user.id : null;
-};
-
-//ユーザ名を取得
-export const getUsername = async (user_id: string): Promise<string | null> => {
-  const user = await prisma.user.findFirst({
-    where: { 
-      id:user_id,
-      delete_flag:0
-     },
-  });
-  return user ? user.username : null;
-};
-
-export const getUser = async (user_id: string) => {
-  return await prisma.user.findUnique({
-    where: { id: user_id },
-    select: {
-      id: true,
-      username: true,
-      // 必要になったらここに追加していけばOK
-      // email: true,
-      // created_at: true,
-    }
-  });
-  
-};
-
-
-//ユーザidを取得
-export const getUserId= async (google_id: string): Promise<string | null> => {
-  const user = await prisma.user.findFirst({
-    where: { 
-      google_id,
-    delete_flag:0
-   },
-  });
-  return user ? user.id : null;
-};
-
-
-// ユーザー作成（存在しない場合は作成、削除済みなら復活）
-export const registerUser = async (google_id: string, email: string) => {
-  // 1. 既存ユーザーを探す
-  const existingUser = await prisma.user.findFirst({
-    where: { google_id, delete_flag: 0 },
-  });
-
-  // 既存ユーザーがいる場合、メールアドレスをチェックする
-  if (existingUser) {
-    if (existingUser.email !== email) {
-      console.log("メールアドレスの変更を検知しました。更新します...");
-      // メールアドレスが異なれば更新
-      await updateEmail(existingUser.id, email);
-      // 更新後の最新データを返したい場合はここで再度取得するか、
-      // 戻り値として更新後のオブジェクトを返すように updateEmail を調整する
-      return { ...existingUser, email }; 
-    }
-    return existingUser;
-  }
-
-  // 2. 新規または復活（既存ユーザーがいなかった場合）
-  return await prisma.$transaction(async (tx) => {
-    return await tx.user.upsert({
-      where: { google_id },
-      update: {
-        delete_flag: 0,
-        email: email, // 復活時にもメールを最新に更新
-        created_at: new Date(),
-      },
-      create: {
-        id: crypto.randomUUID(),
-        google_id: google_id,
-        email: email,
-      },
-    });
-  });
-};
-
-// メールアドレスの更新
-export const updateEmail = async (userId: string, newEmail: string): Promise<boolean> => {
-  try {
-    // 既存のユーザーが存在するか確認してから更新
-    await prisma.user.update({
-      where: { 
-        id: userId,
-        delete_flag: 0
-      },
-      data: { 
-        email: newEmail 
-      },
-    });
-    return true;
-  } catch (e) {
-    console.error("メールアドレス更新エラー:", e);
-    return false;
-  }
-};
-
-// ユーザ名を更新（google_id からユーザーを特定して更新）
-export const updateUsername = async (user_id: string, newUsername: string): Promise<{ success: boolean; error?: string }> => {
-  try{
-    // 3. DB更新
-    await prisma.user.update({
-      where: { id: user_id },
-      data: { username: newUsername },
-    });
-
-    return { success: true };
-  } catch (e) {
-    console.error("ユーザ名更新エラー:", e);
-    return { success: false, error: "予期せぬエラーが発生しました。" };
-  }
-};
 
 
 /**
- * ユーザーアカウントとその関連データを論理削除する
+ * メソッド名称：getUser
+ * 概要：ユーザー情報を取得
  */
-export const deleteUser = async (user_id: string): Promise<boolean> => {
+export async function getUser(id: string): Promise<User> {
   try {
-    // トランザクションを使って、全ての関連データを一括で論理削除します
-    await prisma.$transaction(async (tx) => {
-      
-      // 1. 各関連テーブルの論理削除 (タスク、チャット、スペースなど)
-      // ※ モデル定義に合わせて `isDeleted: true` などを設定してください
-      await deleteSpaces(user_id, prisma)
-
-      // 2. ユーザー自身の論理削除
-      await tx.user.update({
-        where: { id: user_id },
-        data: { delete_flag: 1 }
-      });
+    // 引数の id をキーとして、ユーザーテーブル（users）から該当するレコード1件を一件検索（findUnique）する。
+    const user = await prisma.user.findUnique({
+      where: {
+        id: id,
+        // ※ Prismaの findUnique で複合ユニーク（id と delete_flag の組み合わせ等）がない場合は、
+        // findFirst を使用して delete_flag: 0 を担保するのが確実です。
+      },
     });
 
-    return true; // 全て成功したら true
+    // 検索条件：delete_flag = 0 
+    if (!user || user.delete_flag !== 0) {
+    }
+
+    // 検索完了後、特定されたユーザーの登録情報のデータを丸ごと返却する。
+    return user as User;
   } catch (error) {
-    console.error("deleteAccount failed:", error);
-    return false; // エラーが発生したら false
+    // 例外処理：データベース接続エラー等の例外発生時は、呼び出し元にエラーをそのまま返す
+    throw error;
   }
-};
+}
+
+
+// ... (getUser, updateUsername, getUsername, updateEmail, getUserId は現行のままで問題ありません)
+
+/**
+ * メソッド名称：registerUser
+ * 概要：ユーザーの登録（論理削除済みからの復活・新規作成）
+ */
+export async function registerUser(google_id: string, email: string): Promise<User> {
+  try {
+    const existingUser = await prisma.user.findFirst({
+      where: { google_id: google_id },
+    });
+
+    if (existingUser && existingUser.delete_flag === 0) {
+      if (existingUser.email !== email) {
+        return await updateEmail(existingUser.id, google_id, email);
+      }
+      return existingUser;
+    }
+
+    return await prisma.$transaction(async (tx) => {
+      const newUuid = crypto.randomUUID();
+      const user = await tx.user.upsert({
+        where: { google_id: google_id },
+        update: { delete_flag: 0, email: email, created_at: new Date() },
+        create: {
+          id: newUuid,
+          google_id: google_id,
+          email: email,
+          delete_flag: 0,
+          created_at: new Date(),
+        },
+      });
+
+      // 論理削除済みユーザーの復活時の連携処理
+      if (existingUser && existingUser.delete_flag === 1) {
+        // 目標管理の復活
+        await updateGoal(user.id, "", 0); 
+        // ログイン管理の復活 (設計書の引数順序: user_id, total, delete_flag, tx)
+        await updateLoginManagement(user.id, 1, 0, tx);
+      }
+      return user;
+    });
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * メソッド名称：deleteUser
+ * 概要：アカウント削除（関連データ一括論理削除）
+ */
+export async function deleteUser(user_id: string): Promise<boolean> {
+  try {
+    await prisma.$transaction(async (tx) => {
+      // 各サービスの論理削除関数が tx を受け取れる前提
+      await deleteSpaces(user_id, "ALL", tx);
+      await deleteLoginManagement(user_id, tx);
+      await deleteGoal(user_id, tx);
+
+      await tx.user.update({
+        where: { id: user_id },
+        data: { delete_flag: 1 },
+      });
+    });
+    return true;
+  } catch (error) {
+    console.error("退会処理エラー:", error);
+    return false;
+  }
+}
+/**
+ * メソッド名称：updateUsername
+ * 概要：ユーザー名の更新
+ */
+export async function updateUsername(id: string, username: string): Promise<User> {
+  try {
+    const updatedUser = await prisma.user.update({
+      where: {
+        id: id,
+        delete_flag: 0, // 条件：有効なユーザーのみ
+      },
+      data: {
+        username: username, // ※DBカラム名に合わせて適宜変更（例: name など）
+      },
+    });
+    return updatedUser as User;
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * メソッド名称：getUsername
+ * 概要：ユーザ名の取得
+ */
+export async function getUsername(id: string): Promise<string | null> {
+  try {
+    const user = await prisma.user.findFirst({
+      where: {
+        id: id,
+        delete_flag: 0,
+      },
+      select: {
+        username: true, // ユーザー名のみを取得して返却する
+      },
+    });
+
+    // user が存在しない場合は null を返す
+    if (!user) {
+      return null;
+    }
+
+    // ユーザーが存在すればその username (または null) を返す
+    return user.username;
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * メソッド名称：updateEmail
+ * 概要：メールアドレスの更新
+ */
+export async function updateEmail(id: string, google_id: string, email: string): Promise<User> {
+  try {
+    const updatedUser = await prisma.user.update({
+      where: {
+        id: id,
+        google_id: google_id,
+        delete_flag: 0,
+      },
+      data: {
+        email: email,
+      },
+    });
+    return updatedUser as User;
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * メソッド名称：getUserId
+ * 概要：ユーザIDの取得
+ */
+export async function getUserId(google_id: string): Promise<string | null> {
+  try {
+    const user = await prisma.user.findFirst({
+      where: {
+        google_id: google_id,
+        delete_flag: 0,
+      },
+    });
+
+    // 条件に一致するレコードが存在する場合：特定されたユーザーの「id」のみを返却する
+    // 条件に一致するレコードが存在しない場合：nullを返却する
+    return user ? user.id : null;
+  } catch (error) {
+    throw error;
+  }
+}
