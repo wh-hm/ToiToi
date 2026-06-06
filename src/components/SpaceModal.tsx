@@ -49,17 +49,85 @@ export default function SpaceModal({ isOpen, onClose, spaceType, onSuccess, edit
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content">
-        <h2>{editingSpace ? `${title}の編集` : `${title}を新規作成`}</h2>
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100vw",
+        height: "100vh",
+        background: "rgba(0,0,0,0.4)",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 1000
+      }}
+    >
+      <div
+        style={{
+          width: "400px",
+          background: "white",
+          padding: "25px",
+          borderRadius: "8px",
+          boxShadow: "0 2px 10px rgba(0,0,0,0.2)"
+        }}
+      >
+        <h2
+          style={{
+            fontSize: "22px",
+            fontWeight: "bold",
+            marginBottom: "20px"
+          }}
+        >
+          {editingSpace ? `${title}の編集` : `${title}を新規作成`}
+        </h2>
+
         <input
           type="text"
           placeholder={`${title}の名前`}
           value={name}
           onChange={(e) => setName(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "10px",
+            fontSize: "16px",
+            border: "1px solid #ddd",
+            borderRadius: "6px",
+            marginBottom: "20px"
+          }}
         />
-        <button onClick={handleSave}>保存</button>
-        <button onClick={onClose}>キャンセル</button>
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+          <button
+            onClick={handleSave}
+            style={{
+              padding: "10px 20px",
+              background: "#2563eb",
+              color: "white",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontSize: "16px"
+            }}
+          >
+            保存
+          </button>
+
+          <button
+            onClick={onClose}
+            style={{
+              padding: "10px 20px",
+              background: "#aaa",
+              color: "white",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontSize: "16px"
+            }}
+          >
+            キャンセル
+          </button>
+        </div>
       </div>
     </div>
   );
