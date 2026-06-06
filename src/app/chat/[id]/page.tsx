@@ -51,7 +51,7 @@ const [editValue, setEditValue] = useState("");
     };
 
     try {
-      const response = await fetch(`/api/chat/${id}`, {
+      const response = await fetch(`/api/chats/${id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -69,15 +69,26 @@ const [editValue, setEditValue] = useState("");
   const [messages, setMessages] = useState([]);
 
   // メッセージの取得処理
-  const fetchMessages = async () => {
-    const { id } = await params;
-    const res = await fetch(`/api/chat/${id}`);
-    const data = await res.json();
-    if (Array.isArray(data) && data.length > 0) {
-    setSpaceId(data[0].space_id); // データがある場合のみセット
+const fetchMessages = async () => {
+  const { id } = await params;
+  const res = await fetch(`/api/chats?spaceId=${id}`);
+
+  // 1. ステータスコードを確認する
+  if (!res.ok) {
+    console.error("API Error:", res.status, res.statusText);
+    return; // ここで中断する
   }
-    setMessages(data);
-  };
+
+  // 2. 空のレスポンス対策（念のため）
+  const text = await res.text();
+  if (!text) return; 
+
+  const data = JSON.parse(text);
+
+  if (Array.isArray(data) && data.length > 0) {
+    setSpaceId(data[0].space_id);
+  }
+};
 
   
 //編集

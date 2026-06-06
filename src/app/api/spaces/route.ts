@@ -20,7 +20,7 @@ export async function POST(request: Request) {
 
         // 3. 不適切文字チェック (E1003: 記号制限)
         const safeRegex = /^[a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]+$/;
-        if (safeRegex.test(name)) {
+        if (!safeRegex.test(name)) {
             return NextResponse.json({ error: MESSAGES.E1003("スペース名", "記号") }, { status: 400 });
         }
 

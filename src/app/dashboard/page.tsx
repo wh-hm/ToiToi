@@ -63,7 +63,7 @@ export default function Dashboard() {
     if (!session?.user?.id) return;
     setIsLoading(true); // ロード中表示
     try {
-      const res = await fetch(`/api/dashboard/spaces?userId=${session.user.id}`);
+      const res = await fetch(`/api/dashboard/?userId=${session.user.id}`);
       const data = await res.json();
       setSpaces(data);
     } catch (error) {

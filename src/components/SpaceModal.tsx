@@ -26,7 +26,7 @@ export default function SpaceModal({ isOpen, onClose, spaceType, onSuccess, edit
   const handleSave = async () => {
     if (!name.trim()) return;
 
-    const url = editingSpace ? `/api/dashboard/spaces/${editingSpace.id}` : "/api/dashboard/spaces/create";
+    const url = editingSpace ? `/api/spaces/${editingSpace.id}` : "/api/spaces";
     const method = editingSpace ? "PATCH" : "POST";
 
     try {
