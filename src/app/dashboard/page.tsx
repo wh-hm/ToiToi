@@ -251,7 +251,7 @@ export default function Dashboard() {
   if (!confirm("本当に削除しますか？")) return;
 
   try {
-    const res = await fetch(`/api/dashboard/spaces/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/dashboard/${id}`, { method: "DELETE" });
     if (res.ok) {
       fetchSpaces(); // 再取得して画面を更新
     }
@@ -270,7 +270,7 @@ export default function Dashboard() {
     if (!session?.user?.id) return;
     setIsLoading(true); // ロード中表示
     try {
-      const res = await fetch(`/api/dashboard/spaces?userId=${session.user.id}`);
+      const res = await fetch(`/api/dashboard/?userId=${session.user.id}`);
       const data = await res.json();
       setSpaces(data);
     } catch (error) {
