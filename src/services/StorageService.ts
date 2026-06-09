@@ -7,41 +7,28 @@ import { prisma } from "@/lib/prisma";
  */
 export async function getImageCount(user_id: string): Promise<number> {
   try {
-    // 1. チャットサービス getChats を実行し、image_url が空でないものを取得
-    // ※ サービス関数を呼び出すパターン、または直接Prismaで件数をカウントするロジックで再現します。
-    const chatImageCount = await prisma.chat.count({
-      where: {
-        user_id: user_id,
-        delete_flag: 0, // 有効な投稿のみ
-        image_url: {
-          not: "",     // 空文字でない
-          notIn: [null as any], // かつ NULL でない
-        },
-      },
-    });
+    // 共通のフィルタ条件
+    // image_url が "" でもなく、かつ null でもないデータを取得する
+    const filter = {
+      user_id: user_id,
+      delete_flag: 0,
+      NOT: [
+        { image_url: "" },
+        { image_url: null }
+      ]
+    };
 
-    // 2. 質問チャットサービス getQuestionChats を実行し、image_url が空でないものを取得
-    const questionChatImageCount = await prisma.questionChats.count({
-      where: {
-        user_id: user_id,
-        delete_flag: 0, // 有効な投稿のみ
-        image_url: {
-          not: "",     // 空文字でない
-          notIn: [null as any], // かつ NULL でない
-        },
-      },
-    });
+    // 1. チャットの画像をカウント
+    const chatImageCount = await prisma.chat.count({ where: filter });
 
-    // 3. 取得した二つのデータの合計値を返す
-    const totalImageCount = chatImageCount + questionChatImageCount;
+    // 2. 質問チャットの画像をカウント
+    const questionChatImageCount = await prisma.questionChats.count({ where: filter });
 
-    return totalImageCount;
+    return chatImageCount + questionChatImageCount;
   } catch (error) {
-    // 例外処理：データベース接続エラー等の例外発生時は、呼び出し元にエラーをそのまま返す
     throw error;
   }
 }
-
 export async function deleteImage(image_url: string){
 
 }

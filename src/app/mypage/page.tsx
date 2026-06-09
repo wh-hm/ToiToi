@@ -1,335 +1,166 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
-import  Header  from "@/components/Header"
-import  Footer  from "@/components/Footer"
+import { Trash2, User, Settings, Loader2 } from "lucide-react";
+import toast from "react-hot-toast";
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, useDisclosure } from "@nextui-org/react";
 
 export default function MyPage() {
   const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [spaces, setSpaces] = useState({ type1: [], type2: [], type3: [] });
+  const [username, setUsername] = useState("");
+  const [imageCount, setImageCount] = useState(0);
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const [newName, setNewName] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
-  // 1. リクエスト処理関数
-  const handleRequest = async (action: string, method: string = "POST", data: any = null) => {
-    if (method !== "PATCH" && !confirm(`${action}を実行しますか？`)) return;
-
-    const options: RequestInit = {
-      method: method,
-      headers: { "Content-Type": "application/json" },
-    };
-
-    if (data) {
-      options.body = JSON.stringify(data);
+  // データ再取得用の関数を useCallback で定義
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await fetch("/api/user/account");
+      if (!res.ok) throw new Error("取得失敗");
+      const json = await res.json();
+      setUsername(json.user?.username || "ユーザー");
+      setSpaces(json.spaces || { type1: [], type2: [], type3: [] });
+      setImageCount(json.imageCount || 0);
+    } catch (e) {
+      toast.error("データ取得に失敗しました");
+    } finally {
+      setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      setNewName(username);
+    }
+  }, [isOpen, username]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const handleAction = async (action: string, label: string) => {
+    if (!confirm(`${label}を実行しますか？`)) return;
 
     try {
-      const res = await fetch(`/api/myPage/${action}`, options);
+      const res = await fetch(`/api/spaces/${action}`, { method: "DELETE" });
       const result = await res.json();
-
-      if (!res.ok) {
-        throw new Error(result.error || "処理に失敗しました");
-      }
-
-      alert(result.message);
-
-      // 2. 成功後の遷移処理
-      if (action === "delete/account") {
-        // アカウント削除ならセッションを破棄してログインへ
-        await signOut({ callbackUrl: "/" });
-      } else if (action === "user/logout") {
+      if (!res.ok) throw new Error(result.error);
+      
+      toast.success(result.message);
+      
+      if (action === "user/delete") {
         await signOut({ callbackUrl: "/" });
       } else {
-        // その他の操作なら画面更新
-        router.refresh();
+        // 削除成功後にデータを再取得してUIを更新（ボタンが自動的に非活性になる）
+        await fetchData();
       }
-    } catch (error: any) {
-      alert("エラー: " + error.message);
+    } catch (e: any) {
+      toast.error(e.message);
     }
   };
 
-  // return (
-  //   <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "10px", maxWidth: "300px" }}>
-  //     <h2>マイページ設定</h2>
+  const handleUpdateUsername = async () => {
+    if (!newName.trim()) return toast.error("ユーザー名を入力してください");
+    
+    setIsSaving(true);
+    try {
+      const res = await fetch("/api/user/username", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: newName }),
+      });
       
-  //     <input type="text" placeholder="新しいユーザー名" id="newNameInput" />
-  //     <button onClick={() => {
-  //       const input = document.getElementById("newNameInput") as HTMLInputElement;
-  //       handleRequest("user/changeUsername", "PATCH", { newName: input.value });
-  //     }}>
-  //       ユーザー名変更
-  //     </button>
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "更新に失敗しました");
 
-  //     <hr style={{ width: "100%" }} />
+      toast.success("ユーザー名を変更しました");
+      setUsername(newName);
+      onClose();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-  //     <button onClick={() => handleRequest("delete/task", "DELETE")}>ToDo全削除</button>
-  //     <button onClick={() => handleRequest("delete/chat", "DELETE")}>チャット全削除</button>
-  //     <button onClick={() => handleRequest("delete/question", "DELETE")}>質問全削除</button>
-  //     <button onClick={() => handleRequest("delete/space", "DELETE")}>スペース全削除</button>
-  //     <button onClick={() => handleRequest("delete/account", "DELETE")}>アカウント削除</button>
-  //     <button onClick={() => handleRequest("user/logout", "POST")}>ログアウト</button>
-  //   </div>
-  // );
-  //コメントアウトは、細川の書いたやつ、以下はるかのやつ
+  if (loading) return (
+    <div className="flex justify-center items-center h-screen">
+      <Loader2 className="animate-spin w-8 h-8 text-blue-500" />
+    </div>
+  );
 
   return (
-    <>
-        <Header/>
-    <section className="max-w-md mx-auto p-6 space-y-8">
-
-      {/* プロフィール */}
-      <div className="flex flex-col items-center space-y-3">
-        <div className="w-20 h-20 bg-gray-300 rounded-full" />
-        <h2 className="text-xl font-bold">ユーザー名</h2>
-
-        <div className="w-full bg-gray-100 p-4 rounded-lg flex justify-between items-center">
-          <span>現在のユーザー名</span>
-          <button className="text-blue-600 font-semibold">ユーザー名変更</button>
+    <section className="max-w-xl mx-auto p-6 space-y-10 min-h-[calc(100vh-112px)] flex flex-col justify-center">
+      {/* 1. プロフィール */}
+      <div>
+        <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-gray-700">
+          <User className="w-5 h-5" /> ユーザー設定
+        </h2>
+        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex justify-between items-center">
+          <span className="text-gray-600 font-medium">{username}</span>
+          <button onClick={onOpen} className="text-blue-600 font-bold hover:underline">変更する</button>
         </div>
       </div>
 
-      {/* データ削除 */}
-      <div className="bg-red-50 p-4 rounded-lg space-y-3">
-        <button className="w-full bg-red-500 text-white py-2 rounded">ToDo全削除</button>
-        <button className="w-full bg-red-500 text-white py-2 rounded">チャット全削除</button>
-        <button className="w-full bg-red-500 text-white py-2 rounded">質問全削除</button>
+      {/* モーダル */}
+      <Modal isOpen={isOpen} onClose={onClose}>
+        <ModalContent>
+          <form onSubmit={(e) => { e.preventDefault(); handleUpdateUsername(); }}>
+            <ModalHeader>ユーザー名の変更</ModalHeader>
+            <ModalBody>
+              <Input 
+                autoFocus 
+                label="新しいユーザー名" 
+                value={newName} // ステートをバインド
+                onChange={(e) => setNewName(e.target.value)} 
+              />
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="flat" onPress={onClose}>キャンセル</Button>
+              <Button color="primary" type="submit" isLoading={isSaving}>保存</Button>
+            </ModalFooter>
+          </form>
+        </ModalContent>
+      </Modal>
 
-        <p className="text-red-600 text-sm text-center">
-          注意：この操作は取り消せません。
-        </p>
+      {/* 2. データ削除エリア */}
+      <div>
+        <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-gray-700">
+          <Settings className="w-5 h-5" /> データ管理
+        </h2>
+        <div className="grid gap-3">
+          {[
+            { label: "チャット全削除", action: "chats", count: spaces?.type1?.length ?? 0 },
+            { label: "タスク全削除", action: "tasks", count: spaces?.type2?.length ?? 0 },
+            { label: "質問全削除", action: "questions", count: spaces?.type3?.length ?? 0 },
+            { label: "画像全削除", action: "delete/images", count: imageCount },
+          ].map((item) => (
+            <button 
+              key={item.action}
+              disabled={item.count === 0}
+              onClick={() => handleAction(item.action, item.label)}
+              className={`w-full flex items-center justify-between p-4 rounded-xl font-medium transition-all ${
+                item.count === 0
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed" 
+                  : "bg-white border border-gray-200 hover:border-red-300 hover:bg-red-50 text-gray-700 hover:text-red-600"
+              }`}
+            >
+              {item.label}
+              <Trash2 className="w-4 h-4" />
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* アカウント操作 */}
-      <div className="space-y-3">
-        <button className="w-full bg-red-600 text-white py-2 rounded">
-          アカウント削除
-        </button>
-        <button className="w-full bg-gray-300 py-2 rounded">
-          ログアウト
-        </button>
+      {/* 3. アカウント操作 */}
+      <div className="pt-8 border-t border-gray-100 space-y-4">
+        <button onClick={() => signOut({ callbackUrl: "/" })} className="w-full bg-gray-100 hover:bg-gray-200 py-3 rounded-xl font-bold transition-all">ログアウト</button>
+        <button onClick={() => handleAction("user/delete", "アカウント削除")} className="w-full text-red-500 hover:bg-red-50 font-medium py-3 rounded-xl transition-all">アカウントを削除</button>
       </div>
-
     </section>
-    <Footer/>
-    </>
   );
-
 }
-
-// 以下、るか
-// "use client";
-
-// import { useState } from "react";
-// import { useRouter } from "next/navigation";
-// import Header from "@/components/Header";
-// import Footer from "@/components/Footer";
-
-// export default function DashboardPage() {
-//   const router = useRouter();
-
-//   const [chats, setChats] = useState<string[]>([]);
-//   const [todos, setTodos] = useState<string[]>([]);
-//   const [questions, setQuestions] = useState<string[]>([]);
-
-//   const [modalType, setModalType] = useState<"edit" | "delete" | null>(null);
-//   const [targetItem, setTargetItem] = useState<string | null>(null);
-
-//   // ★ 新規作成モーダルの開閉
-//   const [createModalOpen, setCreateModalOpen] = useState(false);
-
-//   const openModal = (type: "edit" | "delete", item: string) => {
-//     setModalType(type);
-//     setTargetItem(item);
-//   };
-
-//   const closeModal = () => {
-//     setModalType(null);
-//     setTargetItem(null);
-//   };
-
-//   return (
-//     <>
-//       <Header />
-
-//       <section className="max-w-md mx-auto p-6 space-y-8">
-
-//         <DropdownCategory
-//           title="チャット"
-//           items={chats}
-//           onClickItem={(item) => router.push(`/chat/${item}`)}
-//           onEdit={(item) => openModal("edit", item)}
-//           onDelete={(item) => openModal("delete", item)}
-//         />
-
-//         <DropdownCategory
-//           title="ToDoリスト"
-//           items={todos}
-//           onClickItem={(item) => router.push(`/todo/${item}`)}
-//           onEdit={(item) => openModal("edit", item)}
-//           onDelete={(item) => openModal("delete", item)}
-//         />
-
-//         <DropdownCategory
-//           title="質問"
-//           items={questions}
-//           onClickItem={(item) => router.push(`/question/${item}`)}
-//           onEdit={(item) => openModal("edit", item)}
-//           onDelete={(item) => openModal("delete", item)}
-//         />
-
-//         {/* ★ 新規作成ボタン */}
-//         <button
-//           className="w-full bg-blue-600 text-white py-2 rounded"
-//           onClick={() => setCreateModalOpen(true)}
-//         >
-//           新規作成
-//         </button>
-//       </section>
-
-//       <Footer />
-
-//       {/* 編集 / 削除モーダル */}
-//       {modalType && targetItem && (
-//         <Modal type={modalType} item={targetItem} onClose={closeModal} />
-//       )}
-
-//       {/* ★ 新規作成モーダル */}
-//       {createModalOpen && (
-//         <CreateSelectModal onClose={() => setCreateModalOpen(false)} />
-//       )}
-//     </>
-//   );
-// }
-
-// /* ▼▼▼ 以下コンポーネント ▼▼▼ */
-
-// function DropdownCategory({
-//   title,
-//   items,
-//   onClickItem,
-//   onEdit,
-//   onDelete,
-// }: {
-//   title: string;
-//   items: string[];
-//   onClickItem: (item: string) => void;
-//   onEdit: (item: string) => void;
-//   onDelete: (item: string) => void;
-// }) {
-//   const [open, setOpen] = useState(false);
-
-//   return (
-//     <div className="space-y-2">
-//       <button
-//         className="w-full flex justify-between items-center bg-gray-200 p-3 rounded"
-//         onClick={() => setOpen(!open)}
-//       >
-//         <span>{title}</span>
-//         <span>{open ? "▲" : "▼"}</span>
-//       </button>
-
-//       {open && (
-//         <div className="space-y-2">
-//           {items.length === 0 ? (
-//             <p className="text-gray-500 text-sm">まだありません</p>
-//           ) : (
-//             items.map((item) => (
-//               <div
-//                 key={item}
-//                 className="flex justify-between bg-white p-3 rounded shadow"
-//               >
-//                 <button
-//                   className="font-semibold"
-//                   onClick={() => onClickItem(item)}
-//                 >
-//                   {item}
-//                 </button>
-
-//                 <div className="space-x-3">
-//                   <button className="text-blue-600" onClick={() => onEdit(item)}>
-//                     編集
-//                   </button>
-//                   <button className="text-red-600" onClick={() => onDelete(item)}>
-//                     削除
-//                   </button>
-//                 </div>
-//               </div>
-//             ))
-//           )}
-//         </div>
-//       )}
-//     </div>
-//   );
-// }
-
-// function Modal({
-//   type,
-//   item,
-//   onClose,
-// }: {
-//   type: "edit" | "delete";
-//   item: string;
-//   onClose: () => void;
-// }) {
-//   return (
-//     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
-//       <div className="bg-white p-6 rounded shadow space-y-4 w-72">
-//         <h3 className="text-lg font-bold">
-//           {type === "edit" ? "編集" : "削除"}: {item}
-//         </h3>
-
-//         <p>
-//           {type === "delete"
-//             ? "本当に削除しますか？この操作は取り消せません。"
-//             : "編集内容を入力してください。"}
-//         </p>
-
-//         <div className="flex justify-end space-x-3">
-//           <button className="px-3 py-1 bg-gray-300 rounded" onClick={onClose}>
-//             キャンセル
-//           </button>
-//           <button className="px-3 py-1 bg-blue-600 text-white rounded">
-//             OK
-//           </button>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
-
-// function CreateSelectModal({ onClose }: { onClose: () => void }) {
-//   return (
-//     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
-//       <div className="bg-white p-6 rounded shadow space-y-4 w-72">
-//         <h3 className="text-lg font-bold">どれを作成する？</h3>
-
-//         <div className="space-y-3">
-//           <a
-//             href="/create/chat"
-//             className="block bg-blue-500 text-white p-2 rounded text-center"
-//           >
-//             チャット
-//           </a>
-//           <a
-//             href="/create/todo"
-//             className="block bg-green-500 text-white p-2 rounded text-center"
-//           >
-//             ToDo
-//           </a>
-//           <a
-//             href="/create/question"
-//             className="block bg-purple-500 text-white p-2 rounded text-center"
-//           >
-//             質問
-//           </a>
-//         </div>
-
-//         <button
-//           className="w-full bg-gray-300 py-2 rounded"
-//           onClick={onClose}
-//         >
-//           閉じる
-//         </button>
-//       </div>
-//     </div>
-//   );
-// }
-

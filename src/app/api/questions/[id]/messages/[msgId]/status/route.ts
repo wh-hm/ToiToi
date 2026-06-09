@@ -15,11 +15,10 @@ export async function PATCH(
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   try {
-    const { status } = await request.json();
 
     // 2. いいね状態の更新
     // status は boolean (true:いいね, false:解除) や 1/0 などで受け取る想定
-    const updatedStatus = await toggleLike(parseInt(id), parseInt(msgId), auth.user_id);
+    const updatedStatus = await toggleLike(parseInt(msgId), parseInt(id), auth.user_id);
 
     if (!updatedStatus) {
       return NextResponse.json({ error: "更新対象が見つかりません" }, { status: 404 });

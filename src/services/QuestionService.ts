@@ -32,7 +32,7 @@ export async function registerQuestion(
     const cleanQuestion = sanitizeHtml(question, sanitizeOptions);
 
     // 2. レコード登録
-    const newQuestion = await db.questions.create({
+    const newQuestion = await db.question.create({
       data: {
         space_id,
         user_id,
@@ -72,7 +72,7 @@ export async function updateQuestion(
     const cleanTitle = sanitizeHtml(title, sanitizeOptions);
     const cleanQuestion = sanitizeHtml(question, sanitizeOptions);
 
-    const result = await db.questions.updateMany({
+    const result = await db.question.updateMany({
       where: { id, space_id, user_id, delete_flag: 0 },
       data: {
         title: cleanTitle,
@@ -86,7 +86,7 @@ export async function updateQuestion(
       throw new Error("対象の質問が存在しないか、編集権限がありません。");
     }
 
-    return await db.questions.findUnique({ where: { id } });
+    return await db.question.findUnique({ where: { id } });
   } catch (error) {
     console.error(`question_id: ${id} の更新中にエラーが発生しました:`, error);
     throw error;
@@ -103,7 +103,7 @@ export async function getQuestions(
         const db = tx || prisma;
 
         // 1. 質問一覧の検索 (findMany)
-        const questions = await db.questions.findMany({
+        const questions = await db.question.findMany({
         where: {
             space_id: space_id, // space_id=引数のspace_id
             user_id: user_id,   // user_id=引数のuser_id
@@ -124,6 +124,32 @@ export async function getQuestions(
     }
 }
 
+export async function getQuestion(
+    question_id: number, // 引数: int
+    user_id: string,  // 引数: string
+    tx?: any
+    ): Promise<any[]> { // 戻り値: Question[]
+    try {
+        const db = tx || prisma;
+
+        // 1. 質問一覧の検索 (findMany)
+        const question = await db.question.findFirst({
+        where: {
+            id: question_id,
+            user_id: user_id,   // user_id=引数のuser_id
+            delete_flag: 0,     // delete_flag=0 (削除されていない、有効な質問のみ)
+        }
+        });
+
+        // 4. 戻り値の返却：条件に一致した質問レコードの配列
+        return question;
+    } catch (error) {
+        // 例外処理：データベース接続エラー等の例外発生時は、エラーをそのまま返し、画面側でのエラー表示処理に委ねる。
+        console.error(`space_id: ${question_id} の質問一覧取得中にエラーが発生しました:`, error);
+        throw error;
+    }
+}
+
 // 概要：質問情報の削除
 export async function deleteQuestion(
     id: number,
@@ -135,8 +161,8 @@ export async function deleteQuestion(
     const db = tx || prisma;
 
     // 1. 質問レコードの論理削除（update）：
-    // 質問マスタ（questions）から条件に一致するレコードの delete_flag を 1 に更新する。
-    const updatedQuestion = await db.questions.update({
+    // 質問マスタ（question）から条件に一致するレコードの delete_flag を 1 に更新する。
+    const updatedQuestion = await db.question.update({
       where: {
         id: id,
         space_id: space_id,
@@ -230,7 +256,7 @@ export async function updateQuestionStatus(
 
     // 1. 引数の id、space_id、user_id をキーとして対象の質問レコードを特定し、解決済みフラグ（is_resolved）のみをピンポイントで更新（update）する。
     // 検索・更新条件（where句）: id=引数のid, space_id=引数のspace_id, user_id=引数のuser_id, delete_flag=0
-    const result = await db.questions.updateMany({
+    const result = await db.question.updateMany({
       where: {
         id: id,
         space_id: space_id,
@@ -250,7 +276,7 @@ export async function updateQuestionStatus(
 
     // 2. 引数で渡された新しい is_resolved（0または1）を該当レコードの is_resolved カラムに反映（update）する。
     // 更新完了後、解決ステータスの変更が反映された最新の質問レコード1件分のデータを呼び出し元へ返却する。
-    const updatedRecord = await db.questions.findUnique({
+    const updatedRecord = await db.question.findUnique({
       where: { id: id },
     });
 
@@ -276,9 +302,9 @@ export async function getQuestionsCount(
   try {
     const db = tx || prisma;
 
-    // 1. 質問マスタ（questions）に対して、指定の条件を満たすレコードの集計（count）を要求する。
+    // 1. 質問マスタ（question）に対して、指定の条件を満たすレコードの集計（count）を要求する。
     // 検索・カウント条件（where句）
-    const count = await db.questions.count({
+    const count = await db.question.count({
       where: {
         space_id: space_id,     // space_id = 引数の space_id
         is_resolved: 0,         // is_resolved = 0（解決済みフラグが「未解決」の状態）

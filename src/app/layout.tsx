@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "react-hot-toast";
 import { Providers } from "@/app/providers";
+import LayoutWrapper from "@/components/LayoutWrapper"; // 追加
 import "@/app/css/globals.css";
-
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,7 +32,10 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <Providers>
-          {children}
+          {/* レイアウト制御をラッパーで行う */}
+          <LayoutWrapper>
+            {children}
+          </LayoutWrapper>
         </Providers>
         <Toaster />
       </body>

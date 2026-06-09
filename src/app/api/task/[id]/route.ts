@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { updateTask, deleteTask } from "@/services/TaskService";
 import { getAuthContext } from "@/lib/auth-guard";
 import { MESSAGES } from "@/constants/messages";
-const safeRegex = /^[a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]+$/;
+const safeRegex = /[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uFF01-\uFF5E]/;
 
 // 1. PATCH: タスク更新
 export async function PATCH(

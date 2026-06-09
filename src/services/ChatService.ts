@@ -1,18 +1,15 @@
 import { prisma } from "@/lib/prisma";
 import { Chat } from "@prisma/client";
 import { deleteImage } from "./StorageService";
-import sanitizeHtml from "sanitize-html"; // サニタイズ用ライブラリ
 
-// 共通設定：HTMLタグを全除去してテキストとして保持する
-const sanitizeOptions = {
-  allowedTags: [],
-  allowedAttributes: {},
-};
 
 export const getChats = async (user_id: string, space_id: number): Promise<Chat[]> => {
   try {
     return await prisma.chat.findMany({
       where: { user_id, delete_flag: 0, space_id },
+      orderBy: {
+        created_at: 'asc',
+      },
     });
   } catch (error) {
     throw error;
@@ -27,20 +24,17 @@ export const registerChat = async (data: {
   stamp?: string;
 }) => {
   try {
-    // メッセージがある場合のみサニタイズ実施
-    const cleanMessage = data.message ? sanitizeHtml(data.message, sanitizeOptions) : null;
 
     return await prisma.chat.create({
       data: {
         user_id: data.user_id,
-        message: cleanMessage, // サニタイズされたテキストを保存
+        message: data.message, // サニタイズされたテキストを保存
         image_url: data.image_url || null,
         stamp: data.stamp || null,
         space: { connect: { id: data.space_id } },
         delete_flag: 0,
         favorite_flag: 0,
         background: 0,
-        created_at: new Date(),
       },
     });
   } catch (error) {
@@ -55,12 +49,13 @@ export const updateChat = async (
   newMessage: string
 ) => {
   try {
-    // 更新時もサニタイズ実施
-    const cleanMessage = sanitizeHtml(newMessage, sanitizeOptions);
 
     return await prisma.chat.update({
       where: { id: chatId, space_id: spaceId, user_id: userId },
-      data: { message: cleanMessage }, // サニタイズされたテキストで更新
+      data: { 
+        message: newMessage,
+        updated_at: new Date()
+      }, // サニタイズされたテキストで更新
     });
   } catch (error) {
     throw error;

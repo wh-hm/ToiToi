@@ -13,8 +13,8 @@ export async function PATCH(
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   try {
-    const { content } = await request.json();
-    const updated = await updateQuestionChat(parseInt(id),parseInt(msgId), auth.user_id, content);
+    const { message } = await request.json();
+    const updated = await updateQuestionChat(parseInt(msgId),parseInt(id), auth.user_id, message);
     
     if (!updated) return NextResponse.json({ error: MESSAGES.E2001("チャット") }, { status: 404 });
     return NextResponse.json(updated);
@@ -26,14 +26,14 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: Promise<{ id: string; msgId: string }> }
+  { params }: { params: Promise<{ id: string; msgId: string }> } // [id] と [msgId] の両方が必要
 ) {
   const { id, msgId } = await params;
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   try {
-    const success = await deleteQuestionChat(parseInt(id), parseInt(msgId), auth.user_id);
+    const success = await deleteQuestionChat(parseInt(msgId), parseInt(id), auth.user_id);
     if (!success) return NextResponse.json({ error: MESSAGES.E2004("チャット")  }, { status: 404 });
     
     return NextResponse.json({ success: true });

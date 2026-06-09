@@ -4,7 +4,7 @@ import { getAuthContext } from "@/lib/auth-guard";
 import { getGoal, updateGoal } from "@/services/GoalService";
 import { MESSAGES } from "@/constants/messages";
 
-const safeRegex = /^[a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]+$/;
+const safeRegex = /[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uFF01-\uFF5E]/;
 
 
 // 1. 目標取得 (GET)

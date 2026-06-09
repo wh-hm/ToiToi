@@ -29,7 +29,6 @@ export async function POST(request: NextRequest) {
   // ... 認証処理などはそのまま
   const auth = await getAuthContext();
     if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
-
   try {
     const formData = await request.formData();
     const message = formData.get("message") as string;
@@ -37,6 +36,8 @@ export async function POST(request: NextRequest) {
     const space_id = Number(formData.get("space_id"));
     const stamp = formData.get("stamp") as string | null;
     let imageUrl: string | undefined;
+    
+    console.log("変換後のspace_id:", space_id);
     // 1. 必須チェック (E1001)
     if (!message && !file && !stamp) {
       return NextResponse.json({ error: MESSAGES.E1001("チャット内容") }, { status: 400 });
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
 
     
 
-    return NextResponse.json(newChat, { status: 201 });
+    return NextResponse.json({newChat}, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: MESSAGES.E2001("チャット") }, { status: 500 });
   }

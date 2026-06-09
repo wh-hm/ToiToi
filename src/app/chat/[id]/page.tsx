@@ -1,238 +1,146 @@
-// src/app/chat/[id]/page.tsx
-'use client';
-import { useState, useEffect } from "react";
-import ChatInput from "@/components/ChatInput";
+"use client";
+import { useState, useEffect, useRef } from "react";
+import toast from "react-hot-toast";
+import ChatInput from "@/components/chat/ChatInput";
+import ChatList from "@/components/chat/ChatList";
+import { ChatMessage } from "@/types/chat";
 
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState("");
-  const [space_id, setSpaceId] = useState("");
+  const [editValue, setEditValue] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-const [editValue, setEditValue] = useState("");
+  const [spaceId, setSpaceId] = useState<number | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [send, setSend] = useState(0);
 
+  useEffect(() => {
+    if (messages.length > 0 && scrollRef.current && send===0) {
+      // ここで直接高さを指定する
+      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+      setSend(1);
+    }
+  }, [messages]);
 
-  const handleSendStamp = async (stampUrl: string) => {
+  useEffect(() => {
+    params.then((p) => setSpaceId(Number(p.id)));
+  }, [params]);
+
+  const fetchMessages = async () => {
     const { id } = await params;
-    
-    const payload = {
-      content: stampUrl, // スタンプURLを送信
-      type: "stamp",     // ★これを追加
-    };
-
-    await fetch(`/api/chat/${id}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    const res = await fetch(`/api/chats?spaceId=${id}`);
+    if (res.ok) setMessages(await res.json());
   };
-  const handleUploadImage = async (file: File) => {
-    const { id } = await params; // ここでも await が必要
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
 
-      // パスにも id を使う
-      const res = await fetch(`/api/chat/${id}/upload`, {
-        method: "POST",
-        body: formData,
-      });
-      // ...以下略
-    } catch (error) {
-      console.error("画像送信エラー:", error);
+  const handleSend = async (stampId?: string, fileData?: File) => {
+    if (isSubmitting) return;
+    const { id } = await params;
+    if (!inputText.trim() && !stampId && !fileData) return;
+
+    setIsSubmitting(true);
+    const formData = new FormData();
+    formData.append("space_id", id);
+    if (inputText.trim()) formData.append("message", inputText);
+    if (stampId) formData.append("stamp", stampId);
+    if (fileData) formData.append("image", fileData);
+
+    try {
+      const res = await fetch(`/api/chats/`, { method: "POST", body: formData });
+      if (!res.ok) throw new Error("送信失敗");
+      setInputText("");
+      await fetchMessages();
+      setSend(0);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
- const handleSend = async () => {
-    const { id } = await params;
-    
-    // サーバー側の route.ts に合わせる
-    const payload = {
-      content: inputText, // サーバー側の content に入る
-      type: "text",       // ★重要：これがないとサーバー側で type === 'text' が判定できない！
-    };
-
+  const handleUpdate = async () => {
+    if (isSubmitting || !editingId || spaceId === null) return;
+    setIsSubmitting(true);
     try {
-      const response = await fetch(`/api/chats/${id}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (response.ok) {
-        setInputText("");
-      }
-      fetchMessages();
-    } catch (error) {
-      console.error("送信失敗:", error);
-    }
-  };
-
-  const [messages, setMessages] = useState([]);
-
-  // メッセージの取得処理
-const fetchMessages = async () => {
-  const { id } = await params;
-  const res = await fetch(`/api/chats?spaceId=${id}`);
-
-  // 1. ステータスコードを確認する
-  if (!res.ok) {
-    console.error("API Error:", res.status, res.statusText);
-    return; // ここで中断する
-  }
-
-  // 2. 空のレスポンス対策（念のため）
-  const text = await res.text();
-  if (!text) return; 
-
-  const data = JSON.parse(text);
-
-  if (Array.isArray(data) && data.length > 0) {
-    setSpaceId(data[0].space_id);
-  }
-};
-
-  
-//編集
-  const handleEditClick = async (chatId: number) => {
-  try {
-      const response = await fetch(`/api/chat/${chatId}/update`, {
+      const res = await fetch(`/api/chats/${editingId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          { space_id: space_id,
-            message: editValue,
-           }),
+        body: JSON.stringify({ message: editValue, space_id: spaceId }),
       });
-
-      if (response.ok) {
-        setInputText("");
-      }
-      fetchMessages();
-    } catch (error) {
-      console.error("送信失敗:", error);
+      if (!res.ok) throw new Error("更新失敗");
+      setEditingId(null);
+      setEditValue("");
+      await fetchMessages();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setIsSubmitting(false);
     }
-};
+  };
 
-//削除
-const handleDeleteClick = async (chatId: number) => { // id ではなくわかりやすく chatId に
-  if (!confirm("本当に削除しますか？")) return;
-
-  try {
-      // 1. URLには「チャットのID」を入れる
-      // 2. Bodyには「チャットを特定するために必要な情報（space_id）」を入れる
-      const response = await fetch(`/api/chat/${chatId}/delete`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ space_id: space_id }), // オブジェクト形式で送る
-      });
-
-      if (response.ok) {
-        fetchMessages();
-      } else {
-        const errorData = await response.json();
-        alert(`削除失敗: ${errorData.error}`);
-      }
-    } catch (error) {
-      console.error("送信失敗:", error);
-    }
-}
-
-const handleToggleFavorite = async (chatId: number, currentFlag: number) => {
-  try {
-    const response = await fetch(`/api/chat/${chatId}/favorite`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ 
-        favorite_flag: currentFlag === 1 ? 0 : 1, // 反転した値を送信
-        space_id: space_id 
-      }),
-    });
-
-    if (response.ok) {
-      fetchMessages(); // 再読み込み
-    }
-  } catch (error) {
-    console.error("お気に入り更新失敗:", error);
-  }
-};
-
-const changeBackground = async (chatId: number, background: number) => {
-  try {
-    const response = await fetch(`/api/chat/${chatId}/background`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ 
-        background: background, 
-        space_id: space_id // ここが正しい値か確認ポイント
-      }),
-    });
-
-    const result = await response.json();
-    
-    if (response.ok) {
-      console.log("成功:", result);
-      fetchMessages(); // 再取得
-    } else {
-      console.error("失敗:", result);
-      alert(`失敗: ${result.error}`);
-    }
-  } catch (error) {
-    console.error("通信エラー:", error);
-  }
-};
-
-// ページ読み込み時に実行
-  useEffect(() => {
+  // その他のハンドラはそのまま...
+  const handleDeleteClick = async (chatId: number, sId: number) => {
+    await fetch(`/api/chats/${chatId}?space_id=${sId}`, { method: "DELETE" });
     fetchMessages();
-  }, []);
+  };
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      <div style={{ flex: 1, overflowY: 'auto' }}>
-        {/* メッセージリストの表示エリア */}
-        <div>
-      {/* メッセージ一覧の表示 */}
-      {messages.map((msg: any) => (
-        <div key={msg.id}>
-          <p>{msg.message}</p>
-          {/* --- ★ここを追加（お気に入りボタン）--- */}
-    <button onClick={() => handleToggleFavorite(msg.id, msg.favorite_flag)}>
-      {msg.favorite_flag === 1 ? "★" : "☆"}
-    </button>
-          <input 
-            placeholder={msg.message}
-            onChange={(e) => setEditValue(e.target.value)} 
-          />
+  const handleToggleFavorite = async (chatId: number, current: number) => {
+    await fetch(`/api/chats/${chatId}/favorite`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ favorite_flag: current === 1 ? 0 : 1 }),
+    });
+    fetchMessages();
+  };
 
-          {/* テスト用の赤と青のボタン */}
-          <button 
-            onClick={() => changeBackground(msg.id, 1)} // 1にするボタン
-            style={{ backgroundColor: "red", color: "white", marginRight: "5px" }}
-          >
-            赤
-          </button>
-          <button 
-            onClick={() => changeBackground(msg.id, 2)} // 0にするボタン
-            style={{ backgroundColor: "blue", color: "white" }}
-          >
-            青
-          </button>
-          {/* 編集ボタン：msg.id を関数に渡す */}
-          <button onClick={() => handleEditClick(msg.id)}>編集</button>
-          
-          {/* 削除ボタン：msg.id を関数に渡す */}
-          <button onClick={() => handleDeleteClick(msg.id)}>削除</button>
-              </div>
-            ))}
-        </div>
-      </div>
+  const changeBackground = async (chatId: number, bg: number) => {
+    await fetch(`/api/chats/${chatId}/background`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ background: bg }),
+    });
+    fetchMessages();
+  };
 
-      <ChatInput 
-      value={inputText} 
-      onChange={setInputText} 
-      onSend={handleSend} 
-      onSendStamp={handleSendStamp} // ★これが必要です！
-      onUploadImage={handleUploadImage} // ★これらも忘れずに
-    />
+  useEffect(() => { fetchMessages(); }, []);
+
+  // ChatPage.tsx のリターン部分をこれに置き換えてください
+return (
+  <div className="flex flex-col h-[calc(100vh-64px)] w-full overflow-hidden bg-gray-50">
+    {/* 1. リストエリア：flex-1 でヘッダーと入力欄の間を埋め尽くす */}
+    <div className="flex-1 overflow-y-auto relative w-full">
+      <ChatList 
+        messages={messages}
+        spaceId={spaceId || 0}
+        isSubmitting={isSubmitting}
+        ref={scrollRef}
+        onToggleFavorite={handleToggleFavorite}
+        onEdit={setEditingId}
+        onDelete={handleDeleteClick}
+        onBackgroundChange={changeBackground}
+        setEditValue={setEditValue}
+        type="chat"
+      />
     </div>
-  );
+
+    {/* 2. 編集モード通知 */}
+    {editingId && (
+      <div className="flex-shrink-0 bg-blue-100 p-2 text-sm text-blue-800 px-4">
+        編集モード中
+      </div>
+    )}
+
+    {/* 3. 入力エリア：flex-shrink-0 で必ず最後に配置 */}
+    <div className="flex-shrink-0 w-full">
+      <ChatInput 
+        value={editingId ? editValue : inputText}
+        onChange={editingId ? setEditValue : setInputText} 
+        onSend={editingId ? handleUpdate : () => handleSend()}
+        onSendStamp={(s) => handleSend(s)} 
+        onUploadImage={(f) => handleSend(undefined, f)}
+        disabled={isSubmitting}
+      />
+    </div>
+  </div>
+);
 }

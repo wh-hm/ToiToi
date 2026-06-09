@@ -1,12 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { deleteImage } from "./StorageService";
-import sanitizeHtml from "sanitize-html"; // サニタイズ用ライブラリ
 
-// 共通設定：HTMLタグを全除去してテキストとして保持する
-const sanitizeOptions = {
-  allowedTags: [],
-  allowedAttributes: {},
-};
 
 /**
  * 1. 全メッセージ取得
@@ -15,8 +9,8 @@ export const getQuestionChats = async (question_id: number, user_id: string, tx?
   try {
     const db = tx || prisma;
 
-    const questionExists = await db.questions.findFirst({
-      where: { id: question_id, delete_flag: 0 },
+    const questionExists = await db.question.findFirst({
+      where: { id: question_id, delete_flag: 0, user_id: user_id },
     });
 
     if (!questionExists) {
@@ -24,7 +18,7 @@ export const getQuestionChats = async (question_id: number, user_id: string, tx?
     }
 
     return await db.questionChats.findMany({
-      where: { question_id: question_id, delete_flag: 0 },
+      where: { question_id: question_id, delete_flag: 0, user_id: user_id },
       orderBy: { created_at: 'asc' },
     });
   } catch (error) {
@@ -39,7 +33,7 @@ export const getQuestionChats = async (question_id: number, user_id: string, tx?
 export async function registerQuestionChat(
   question_id: number,
   user_id: string,
-  content: string | null,
+  message: string | null,
   image_url?: string | null,
   stamp?: string | null
 ) {
@@ -47,14 +41,12 @@ export async function registerQuestionChat(
     throw new Error("Invalid question_id");
   }
 
-  // サニタイズ実施
-  const cleanContent = content ? sanitizeHtml(content, sanitizeOptions) : null;
 
   return await prisma.questionChats.create({
     data: {
       question_id,
       user_id,
-      content: cleanContent,
+      message: message,
       image_url,
       stamp,
       delete_flag: 0,
@@ -71,18 +63,17 @@ export async function updateQuestionChat(
   id: number,
   question_id: number,
   user_id: string,
-  content: string,
+  message: string,
   tx?: any
 ): Promise<any> {
   try {
     const db = tx || prisma;
 
-    // サニタイズ実施
-    const cleanContent = sanitizeHtml(content, sanitizeOptions);
-
     const result = await db.questionChats.updateMany({
       where: { id, question_id, user_id, delete_flag: 0 },
-      data: { content: cleanContent },
+      data: { 
+        message: message,
+        updated_at: new Date() },
     });
 
     if (result.count === 0) {
