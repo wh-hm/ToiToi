@@ -32,6 +32,7 @@ export async function getImageCount(user_id: string): Promise<number> {
 export async function deleteImage(image_url: string){
 
 }
+
 // --- 💡 もし「すでに別で getChats / getQuestionChats という関数がある」場合の別パターン表記 ---
 // 既存の関数が配列を返す仕様であれば、以下のように length や filter を組み合わせる形でもスマートに実装可能です。
 /*
@@ -66,6 +67,6 @@ export async function uploadImage(image: File, user_id: string, space_id: string
 }
 
 
-export async function deleteImages(image_url: string){
+export async function deleteImages(image_url: string[]){
 
 }

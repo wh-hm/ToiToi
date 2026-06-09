@@ -198,7 +198,7 @@ export async function updateStatusTask(
 // 概要：未完了のタスクの個数を取得
 export async function getTasksCount(
   user_id: string,
-  space_id: number
+  space_id?: number
 ): Promise<number> {
   try {
     // 1. 所有者・権限チェック：
@@ -219,7 +219,7 @@ export async function getTasksCount(
     const count = await prisma.task.count({
       where: {
         user_id: user_id,
-        space_id: space_id,
+        ...(space_id ? { space_id: space_id } : {}),
         status: 0,      // status = 0（未完了状態のタスクのみを対象とする）
         delete_flag: 0, // delete_flag = 0（削除されていない有効なタスクのみを対象とする）
       },

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { Chat } from "@prisma/client";
 import { deleteImage } from "./StorageService";
+import { AnyAaaaRecord } from "dns";
 
 
 export const getChats = async (user_id: string, space_id: number): Promise<Chat[]> => {
@@ -62,8 +63,9 @@ export const updateChat = async (
   }
 };
 
+
 // 以下、削除やフラグ変更系はそのまま
-export const deleteChat = async (chatId: number, userId: string, spaceId: number) => {
+export const deleteChat = async (chatId: number, userId: string, spaceId: number, tx?: any) => {
   try {
     const chat = await prisma.chat.findUnique({ where: { id: chatId } });
     if (!chat) throw new Error("チャットが見つかりません");
@@ -71,8 +73,9 @@ export const deleteChat = async (chatId: number, userId: string, spaceId: number
     if (chat.image_url) {
       await deleteImage(chat.image_url);
     }
+    const db = tx || prisma;
 
-    return await prisma.chat.update({
+    return await db.chat.update({
       where: { id: chatId, space_id: spaceId, user_id: userId },
       data: { delete_flag: 1 },
     });

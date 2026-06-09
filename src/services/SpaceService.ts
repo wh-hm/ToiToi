@@ -3,6 +3,7 @@ import { Space } from "@prisma/client";
 import { deleteChat } from "./ChatService";
 import { deleteTask } from "./TaskService";
 import { deleteQuestion } from "./QuestionService";
+import { deleteImages } from "@/services/StorageService";
 
 // 概要：ユーザーに紐づく有効なスペース一覧を取得する
 export async function getSpaces(
@@ -195,44 +196,50 @@ export async function deleteSpaces(
 export async function deleteSpaceChat(
   space_id: number,
   user_id: string,
-  tx?: any // 上位のトランザクションを引き継げるように設計
+  tx?: any
 ): Promise<boolean> {
-  try {
-    // トランザクションオブジェクトがある場合はそれを使用し、ない場合は通常のprismaクライアントを使用
-    const db = tx || prisma;
+  const db = tx || prisma;
 
-    // 1. 全IDの抽出（メソッド内で完結）：
-    // チャットサービス（またはchatsテーブル）から、対象 space_id に紐づく有効な（delete_flag=0）レコードをすべて検索する。
+  try {
+    // 1. 削除対象のチャットと画像URLを先に全件取得
     const chats = await db.chat.findMany({
-      where: {
-        space_id: space_id,
-        user_id: user_id, // セキュリティ担保のため、user_id も条件に含める
-        delete_flag: 0,
-      },
-      // 取得した全レコードから「IDのリスト（chatIds）」を抽出するため、idのみを選択
-      select: {
-        id: true,
-      },
+      where: { space_id, user_id, delete_flag: 0 },
+      select: { id: true, image_url: true } // 画像パスも一緒に取得
     });
 
-    const chatIdList = chats.map((chat: { id: number }) => chat.id);
+    if (chats.length === 0) return true; // 対象なし
 
-    // 2. ループ処理開始 ＆ 3. 個別の削除実行：
-    // 抽出した chatIds 配列の各要素（chatId）に対して、処理を繰り返す。
-    for (const chatId of chatIdList) {
-      // deleteChat(chatId, space_id, user_id) を呼び出す。
-      // ※ これにより、各レコードごとの「画像削除判定」および「論理削除フラグ更新」が確実に行われる。
-      await deleteChat(chatId, user_id, space_id);
+    type ChatRecord = {
+      id: number;
+      image_url: string | null | undefined;
+    };
+
+
+    // 2. URLだけを確実に抽出する関数（バリデーション付き）
+    const getValidImageUrls = (chats: ChatRecord[]): string[] => {
+      return chats
+        .map((c) => c.image_url)
+        .filter((url): url is string => typeof url === 'string' && url.length > 0);
+    };
+
+    const chatIdList = chats.map(c => c.id);
+    const imageUrlList = getValidImageUrls(chats);
+
+
+    // 2. まずDBの論理削除を一括で実行（更新範囲を確定）
+    await db.chat.updateMany({
+      where: { id: { in: chatIdList } },
+      data: { delete_flag: 1 }
+    });
+
+    // 3. ストレージから画像を一括削除
+    if (imageUrlList.length > 0) {
+      const imagesDeleted = await deleteImages(imageUrlList);
+      
     }
-
-    // 4. 戻り値の返却：
-    // すべての処理が正常に完了した場合は「true」を返す。
     return true;
   } catch (error) {
-    // 例外処理：
-    // 発生時の動作：データベース操作または画像削除においてエラーが発生した場合、try-catch にて捕捉する。
-    console.error(`space_id: ${space_id} のチャット一括削除中にエラーが発生しました:`, error);
-    // 呼び出し元の司令塔に異常を伝えるため、または設計書の戻り値型(bool)に合わせて false を返却
+    console.error(`削除処理でエラー:`, error);
     return false;
   }
 }

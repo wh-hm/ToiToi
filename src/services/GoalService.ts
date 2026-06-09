@@ -100,51 +100,30 @@ export async function updateGoal(
   status?: number | null,
   delete_flag?: number | null
 ): Promise<Goal> {
-  try {
-    // 1. 現行レコードの取得
-    const currentGoal = await prisma.goal.findFirst({
-      where: {
-        id: user_id,
-        delete_flag: 0,
-      },
-    });
+  // 1. 現行レコード取得（省略）...
 
-    if (!currentGoal) {
-      throw new Error("更新対象の目標データが見つかりません");
-    }
+  // 2. リセット日時・更新処理の割り振り（ここを修正！）
+  let nextDeletedAt: Date | undefined = undefined;
+  let targetContent: string | null = content;
 
-    // 2. リセット日時・更新処理の割り振り
-    let nextDeletedAt: Date | undefined = undefined;
-    let targetContent: any = content;
-
-    // 設計書「① リセット日時の設定：引数の content が空文字（""）等の場合、deleted_atを次の月曜日の0:00に設定」
-    if (content === "") {
-    targetContent = { set: null }; // 👈 ここ！単なる null ではなく { set: null } を指定
+  // 空文字または null の場合は null に正規化し、リセット日を設定
+  if (content === "" || content === null) {
+    targetContent = null; 
     nextDeletedAt = getNextMondayOf(new Date());
-    } else if (content === null) {
-    targetContent = { set: null }; // 👈 引数が null の場合も同様に指定
-    }
-
-    const updatedGoal = await prisma.goal.update({
-      where: {
-        id: user_id,
-      },
-      data: {
-        content: targetContent,
-        ...(status !== undefined && status !== null ? { status: status } : {}),
-        ...(delete_flag !== undefined && delete_flag !== null ? { delete_flag: delete_flag } : {}),
-        ...(nextDeletedAt ? { deleted_at: nextDeletedAt } : {}),
-      },
-    });
-
-    // 3. 戻り値の返却：更新完了後、最新のレコードデータを呼び出し元へ返却する。
-    return updatedGoal as Goal;
-  } catch (error) {
-    // 例外処理：同一の user_id で既にレコードが存在している（一意性制約エラー）場合や、DBエラーが発生した場合は、呼び出し元にエラーをそのまま返す。
-    throw error;
   }
-}
 
+  const updatedGoal = await prisma.goal.update({
+    where: { id: user_id },
+    data: {
+      content: targetContent, // ★直接値を渡す
+      status: status ?? undefined, // nullなら無視、値があれば代入
+      delete_flag: delete_flag ?? undefined,
+      ...(nextDeletedAt ? { deleted_at: nextDeletedAt } : {}),
+    },
+  });
+
+  return updatedGoal;
+}
 /**
  * 💡 補助関数：指定された日時の「次の月曜日の0:00」を計算して返す
  */

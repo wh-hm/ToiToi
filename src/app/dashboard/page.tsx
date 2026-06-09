@@ -26,8 +26,8 @@ export default function Dashboard() {
 
   //おきに利
   const handleToggleFavorite = async (id: number) => {
-    await fetch(`/api/dashboard/spaces/${id}/favorite`, { method: "PATCH" });
-    fetchSpaces(); // 一覧再取得
+    // await fetch(`/api/dashboard/spaces/${id}/favorite`, { method: "PATCH" });
+    // fetchSpaces(); // 一覧再取得
   };
 
   // モーダルを開く関数
@@ -48,7 +48,7 @@ export default function Dashboard() {
     try {
       const res = await fetch(`/api/dashboard/spaces/${id}`, { method: "DELETE" });
       if (res.ok) {
-        fetchSpaces(); // 再取得して画面を更新
+        // fetchSpaces(); // 再取得して画面を更新
       }
     } catch (error) {
       console.error("削除失敗:", error);
@@ -61,37 +61,38 @@ export default function Dashboard() {
     }
   }, [status, router]);
 
-  const fetchSpaces = async () => {
-    if (!session?.user?.id) return;
-    setIsLoading(true); // ロード中表示
-    try {
-      const res = await fetch(`/api/dashboard/?userId=${session.user.id}`);
-      const data = await res.json();
-      setSpaces(data);
-    } catch (error) {
-      console.error("データの取得に失敗しました", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // const fetchSpaces = async () => {
+  //   if (!session?.user?.id) return;
+  //   setIsLoading(true); // ロード中表示
+  //   try {
+  //     const res = await fetch(`/api/dashboard/`);
+  //     const data = await res.json();
+  //     setSpaces(data);
+  //   } catch (error) {
+  //     console.error("データの取得に失敗しました", error);
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
   // ① 関数を先に定義する
-  const fetchGoal = async () => {
-    try {
-      const res = await fetch(`/api/dashboard/goal?userId=${session?.user?.id}`);
-      if (!res.ok) throw new Error("目標取得失敗");
-      const data = await res.json();
-      setGoal(data);
-    } catch (error) {
-      alert("目標の取得に失敗しました");
-    }
-  };
+  // const fetchGoal = async () => {
+  //   try {
+  //     const res = await fetch(`/api/dashboard/goal?userId=${session?.user?.id}`);
+  //     if (!res.ok) throw new Error("目標取得失敗");
+  //     const data = await res.json();
+  //     setGoal(data);
+  //   } catch (error) {
+  //     alert("目標の取得に失敗しました");
+  //   }
+  // };
 
   const fetchLoginProfile = async () => {
     try {
-      const res = await fetch(`/api/dashboard/login-profile?userId=${session?.user?.id}`);
+      const res = await fetch(`/api/dashboard/`);
       if (!res.ok) throw new Error("ログイン情報取得失敗");
-
       const data = await res.json();
+      console.log(data);
+
       setLoginInfo(data);
 
       const hour = new Date().getHours();
@@ -111,8 +112,8 @@ export default function Dashboard() {
 
   // ② その後で useEffect で呼び出す
   useEffect(() => {
-    fetchSpaces();
-    fetchGoal();
+    // fetchSpaces();
+    // fetchGoal();
     fetchLoginProfile();
   }, [session]);
 
@@ -199,7 +200,7 @@ export default function Dashboard() {
         spaceType={selectedType ?? 1}
         onSuccess={() => {
           setIsModalOpen(false);
-          fetchSpaces();
+          // fetchSpaces();
           window.dispatchEvent(new Event('refresh-header'));
         }}
         editingSpace={editingSpace}
