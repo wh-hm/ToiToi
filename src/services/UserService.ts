@@ -11,6 +11,30 @@ import { deleteSpaces } from './SpaceService';
  * メソッド名称：getUser
  * 概要：ユーザー情報を取得
  */
+
+export async function getUser(id: string): Promise<User> {
+  try {
+    // 引数の id をキーとして、ユーザーテーブル（users）から該当するレコード1件を一件検索（findUnique）する。
+    const user = await prisma.user.findUnique({
+      where: {
+        id: id,
+        // ※ Prismaの findUnique で複合ユニーク（id と delete_flag の組み合わせ等）がない場合は、
+        // findFirst を使用して delete_flag: 0 を担保するのが確実です。
+      },
+    });
+
+    // 検索条件：delete_flag = 0 
+    if (!user || user.delete_flag !== 0) {
+    }
+
+    // 検索完了後、特定されたユーザーの登録情報のデータを丸ごと返却する。
+    return user as User;
+  } catch (error) {
+    // 例外処理：データベース接続エラー等の例外発生時は、呼び出し元にエラーをそのまま返す
+    throw error;
+  }
+}
+
 export async function registerUser(google_id: string, email: string): Promise<User> {
   try {
     const existingUser = await prisma.user.findFirst({
