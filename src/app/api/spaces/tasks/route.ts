@@ -1,0 +1,32 @@
+import { NextResponse } from "next/server";
+import { deleteSpaces } from "@/services/SpaceService";
+import { getAuthContext } from "@/lib/auth-guard";
+import { MESSAGES } from "@/constants/messages";
+
+export async function DELETE() {
+    // 1. 認証チェック
+    const auth = await getAuthContext();
+    if ('error' in auth) {
+        return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
+    try {
+        // 2. サービス層でタスク(TASK)の全削除を実行
+        const success = await deleteSpaces(auth.user_id, "TASK"); 
+        
+        if (!success) {
+            return NextResponse.json(
+                { error: MESSAGES.E2004("タスクスペース全削除") }, 
+                { status: 500 }
+            );
+        }
+        
+        return NextResponse.json({ message: MESSAGES.S1003("タスクスペース全削除") });
+    } catch (error) {
+        console.error("【タスクスペース全削除エラー】", error);
+        return NextResponse.json(
+            { error: MESSAGES.E2004("タスクスペース全削除") }, 
+            { status: 500 }
+        );
+    }
+}

@@ -63,7 +63,7 @@ model Chat {
   favorite_flag Int?      @default(0)
   stamp         String?   @db.VarChar(255)
   background    Int?      @default(0)
-   updated_at  DateTime?  @default(now()) @updatedAt @db.Timestamp
+   updated_at  DateTime?  
 
   // 外部キーとの紐付け
   space         Space    @relation(fields: [space_id], references: [id])
@@ -114,17 +114,17 @@ model Question {
   @@map("questions")
 }
 
-// 6. 質問メッセージマスタ (question_chats)
+// 6. 質問チャットマスタ (question_chats)
 model QuestionChats {
   id          Int      @id @default(autoincrement()) // SERIAL
   question_id Int      
   user_id     String   @db.VarChar(255)
-  content     String?   @db.VarChar(255)
+  message     String?   @db.VarChar(255)
   created_at  DateTime @default(now()) @db.Timestamp
   delete_flag Int      @default(0)
   image_url   String?  @db.VarChar(255)
   stamp       String?  @db.VarChar(255)
-  updated_at  DateTime?  @default(now()) @updatedAt @db.Timestamp
+  updated_at  DateTime?  
   nice_flag   Int?      @default(0)
 
   // 外部キーとの紐付け

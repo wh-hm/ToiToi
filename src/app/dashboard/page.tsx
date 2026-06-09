@@ -21,6 +21,8 @@ export default function Dashboard() {
   const [loginInfo, setLoginInfo] = useState(null);
   const [loginMessage, setLoginMessage] = useState("");
 
+  
+
 
   //おきに利
   const handleToggleFavorite = async (id: number) => {
@@ -198,6 +200,7 @@ export default function Dashboard() {
         onSuccess={() => {
           setIsModalOpen(false);
           fetchSpaces();
+          window.dispatchEvent(new Event('refresh-header'));
         }}
         editingSpace={editingSpace}
       />

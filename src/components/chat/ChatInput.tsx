@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { Input, Button, Popover, PopoverTrigger, PopoverContent } from "@nextui-org/react";
 import { Paperclip, SendHorizontal, Smile } from "lucide-react";
+import { CHARACTER_STAMPS } from "@/constants/stamp";
 
 interface ChatInputProps {
   value: string;
@@ -10,11 +11,11 @@ interface ChatInputProps {
   onSend: () => void;
   onSendStamp: (stampId: string) => void;
   onUploadImage: (file: File) => void;
+  disabled?: boolean;
 }
 
 export default function ChatInput({ value, onChange, onSend, onSendStamp, onUploadImage }: ChatInputProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const stamps = ["😊", "👍", "🎉", "🔥", "✨", "🤔", "👋", "✅", "💡", "💖"];
 
   return (
     // 【重要】fixed bottom-0 left-0 right-0 で画面の一番下に固定する
@@ -48,12 +49,22 @@ export default function ChatInput({ value, onChange, onSend, onSendStamp, onUplo
                     <Smile size={20} />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="grid grid-cols-5 gap-2 p-3">
-                  {stamps.map((s) => (
-                    <button key={s} onClick={() => onSendStamp(s)} className="text-2xl hover:bg-gray-100 p-2 rounded-full transition-transform active:scale-90">
-                      {s}
-                    </button>
-                  ))}
+                <PopoverContent className="p-4 w-[280px]">
+                  <div className="grid grid-cols-4 gap-2">
+                    {Object.values(CHARACTER_STAMPS).flat().map((stamp) => (
+                      <button 
+                        key={stamp.id} 
+                        onClick={() => onSendStamp(stamp.id)} 
+                        className="hover:bg-gray-100 p-1 rounded-xl transition-transform active:scale-90 flex flex-col items-center"
+                      >
+                        <img 
+                          src={`/stamps/${stamp.id}.png`} 
+                          alt={stamp.name} 
+                          className="w-10 h-10 object-contain" 
+                        />
+                      </button>
+                    ))}
+                  </div>
                 </PopoverContent>
               </Popover>
 

@@ -162,7 +162,7 @@ export async function deleteSpaces(
     }
 
     // スペーステーブルから、条件に一致する有効なスペースを検索
-    const spaces = await db.spaces.findMany({
+    const spaces = await db.space.findMany({
       where: whereClause,
       select: {
         id: true,
@@ -203,7 +203,7 @@ export async function deleteSpaceChat(
 
     // 1. 全IDの抽出（メソッド内で完結）：
     // チャットサービス（またはchatsテーブル）から、対象 space_id に紐づく有効な（delete_flag=0）レコードをすべて検索する。
-    const chats = await db.chats.findMany({
+    const chats = await db.chat.findMany({
       where: {
         space_id: space_id,
         user_id: user_id, // セキュリティ担保のため、user_id も条件に含める

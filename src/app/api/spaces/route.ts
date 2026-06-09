@@ -1,7 +1,36 @@
 import { NextResponse } from "next/server";
-import { registerSpace, deleteSpace } from "@/services/SpaceService";
+import { registerSpace, deleteSpace, getSpaces } from "@/services/SpaceService";
 import { getAuthContext } from "@/lib/auth-guard";
 import { MESSAGES } from "@/constants/messages";
+
+
+// 1. GET: スペース一覧取得
+export async function GET(request: Request) {
+    const auth = await getAuthContext();
+    if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+    try {
+        // あなたのサービスの取得関数を呼び出す（例: getSpacesByUserId など）
+        // getSpaces などの関数は SpaceService に定義されている前提です
+        const spaces = await getSpaces(auth.user_id); 
+
+        // 2. 認証済みID (auth.user_id) を使ってスペースを取得
+
+        // 3. 型ごとのフィルタリング
+        const result = {
+        type1: spaces.filter(s => s.space_type === 1),
+        type2: spaces.filter(s => s.space_type === 2),
+        type3: spaces.filter(s => s.space_type === 3),
+        };
+        
+        // データが空でも [] を返すことで、JSONパースエラーを防げます
+        return NextResponse.json(result);
+    } catch (error) {
+        console.error("GET spaces error:", error);
+        return NextResponse.json({ error: MESSAGES.E2001("スペース一覧") }, { status: 500 });
+    }
+}
+
 
 // 2. POST: スペース登録（単体チェックを追加）
 export async function POST(request: Request) {
