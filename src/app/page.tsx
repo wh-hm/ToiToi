@@ -12,7 +12,7 @@ function TopPageContent() {
         if (status === "authenticated" && session?.user) {
             const checkUser = async () => {
                 try {
-                    const res = await fetch("/api/login/create", {
+                    const res = await fetch("/api/auth/login/", {
                         method: "POST",
                         body: JSON.stringify({ 
                             google_id: session.user.id, 
@@ -22,7 +22,20 @@ function TopPageContent() {
 
                     if (res.ok) {
                         // 成功したら遷移
-                        router.push("/username");
+                        try {
+                            const res = await fetch(`/api/user/username/check`);
+                            if (!res.ok) {
+                            }
+                            
+                            const data = await res.json();
+                            if (data.hasUsername) {
+                                router.push("/dashboard");
+                            }else{
+                                router.push("/username");
+                            }
+                        } catch (error) {
+                            console.log(error);
+                        }
                     } else {
                         // 失敗したらアラートやコンソールで通知
                         console.log("Status Code:", res.status);

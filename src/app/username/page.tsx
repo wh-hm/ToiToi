@@ -53,7 +53,7 @@ export default function Username() {
       if (!session?.user?.id) return;
 
       try {
-        const res = await fetch(`/api/users/username/check?googleId=${session.user.id}`);
+        const res = await fetch(`/api/user/username/check`);
         if (!res.ok) throw new Error();
         
         const data = await res.json();
