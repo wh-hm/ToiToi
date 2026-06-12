@@ -65,14 +65,27 @@ function TopPageContent() {
 
     return (
         <section id="Login" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh" }}>
-        <h1 style={{ fontSize: "3rem", marginBottom: "20px" }}>ToiToi</h1>
-        <div>
-            <button
-            onClick={() => signIn("google")}
-            >
-            Googleアカウントでログイン
-            </button>
-        </div>
+            <h1 style={{ fontSize: "3rem", marginBottom: "20px" }}>ToiToi</h1>
+            
+            {/* ログイン状態に応じてボタンを切り替える */}
+            {status === "authenticated" ? (
+                <div style={{ textAlign: "center" }}>
+                    <p>ログイン済みです。あまりにもセッションが削除できなかったため臨時ではいってます</p>
+                    <button onClick={() => {
+                        // 強制ログアウト処理
+                        // signOutをインポートして使ってください
+                        import("next-auth/react").then(({ signOut }) => signOut());
+                    }}>
+                        強制ログアウトしてリセット
+                    </button>
+                </div>
+            ) : (
+                <div>
+                    <button onClick={() => signIn("google")}>
+                        Googleアカウントでログイン
+                    </button>
+                </div>
+            )}
         </section>
     );
 }
