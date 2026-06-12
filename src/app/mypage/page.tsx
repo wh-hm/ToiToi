@@ -41,28 +41,34 @@ export default function MyPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
+  
   const handleAction = async (action: string, label: string) => {
     if (!confirm(`${label}を実行しますか？`)) return;
 
     try {
-      const res = await fetch(`/api/spaces/${action}`, { method: "DELETE" });
+      const res = await fetch(`/api/${action}`, { method: "DELETE" });
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error);
+      
+      // 削除失敗時はエラーを投げて catch に飛ばす
+      if (!res.ok) throw new Error(result.error || "操作に失敗しました");
       
       toast.success(result.message);
-      
-      if (action === "user/delete") {
+
+      // ユーザー削除の場合の特別処理
+      if (action === "user/account") {
+        // データを再取得せず、即座にログアウト処理へ
         await signOut({ callbackUrl: "/" });
-      } else {
-        // 削除成功後にデータを再取得してUIを更新（ボタンが自動的に非活性になる）
-        await fetchData();
+        return; // ここで処理を終了し、下の fetchData() を呼ばない
       }
+
+      // それ以外の削除処理（タスク削除など）
+      await fetchData();
+      
     } catch (e: any) {
+      console.error(e);
       toast.error(e.message);
     }
   };
-
   const handleUpdateUsername = async () => {
     if (!newName.trim()) return toast.error("ユーザー名を入力してください");
     
@@ -159,7 +165,7 @@ export default function MyPage() {
       {/* 3. アカウント操作 */}
       <div className="pt-8 border-t border-gray-100 space-y-4">
         <button onClick={() => signOut({ callbackUrl: "/" })} className="w-full bg-gray-100 hover:bg-gray-200 py-3 rounded-xl font-bold transition-all">ログアウト</button>
-        <button onClick={() => handleAction("user/delete", "アカウント削除")} className="w-full text-red-500 hover:bg-red-50 font-medium py-3 rounded-xl transition-all">アカウントを削除</button>
+        <button onClick={() => handleAction("user/account", "アカウント削除")} className="w-full text-red-500 hover:bg-red-50 font-medium py-3 rounded-xl transition-all">アカウントを削除</button>
       </div>
     </section>
   );

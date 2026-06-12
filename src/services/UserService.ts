@@ -72,7 +72,7 @@ export async function registerUser(google_id: string, email: string): Promise<Us
         await registerLoginManagement(user.id); // ログイン管理の登録
       } else {
         // ★【復活時】更新（リセット）処理を呼ぶ
-        await updateGoal(user.id, "", 0);
+        await updateGoal(user.id, "", 0, 0);
         await updateLoginManagement(user.id, 1, 0, tx);
       }
 
