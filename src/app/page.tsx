@@ -1,19 +1,27 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn, signOut, useSession, SessionProvider } from "next-auth/react";
 
 function TopPageContent() {
     const router = useRouter();
     const { data: session, status } = useSession();
+    const [isAppBrowser, setIsAppBrowser] = useState(false);
 
-    // ログイン後の処理
+    // 1. アプリ内ブラウザの判定
+    useEffect(() => {
+        const ua = window.navigator.userAgent.toLowerCase();
+        const patterns = ["line", "fbav", "fb_iab", "instagram", "twitter", "tiktok", "wv", "messenger", "snapchat"];
+        const isEmbedded = patterns.some((pattern) => ua.includes(pattern));
+        setIsAppBrowser(isEmbedded);
+    }, []);
+
+    // 2. ログイン後の処理
     useEffect(() => {
         if (status === "authenticated" && session?.user) {
             const checkUser = async () => {
                 try {
-                    // ユーザー登録・ログイン判定API
                     const res = await fetch("/api/auth/login/", {
                         method: "POST",
                         body: JSON.stringify({ 
@@ -23,65 +31,68 @@ function TopPageContent() {
                     });
 
                     if (res.ok) {
-                        // ユーザーネーム登録状況の確認
-                        try {
-                            const res = await fetch(`/api/user/username/check`);
-                            const data = await res.json();
-                            
-                            if (data.hasUsername) {
-                                router.push("/dashboard");
-                            } else {
-                                router.push("/username");
-                            }
-                        } catch (error) {
-                            console.error("Username check error:", error);
+                        const resCheck = await fetch(`/api/user/username/check`);
+                        const data = await resCheck.json();
+                        if (data.hasUsername) {
+                            router.push("/dashboard");
+                        } else {
+                            router.push("/username");
                         }
                     } else {
-                        console.error("Login API Error:", res.status);
                         alert("登録処理に失敗しました。");
                     }
                 } catch (error) {
                     console.error("API Error:", error);
-                    alert("サーバーとの通信に失敗しました。");
                 }
             };
-
             checkUser();
         }
     }, [status, session, router]);
 
-    // 読み込み中の表示
+    // 読み込み中
     if (status === "loading") {
-        return (
-            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
-                <p>読み込み中...</p>
-            </div>
-        );
+        return <div style={{ textAlign: "center", marginTop: "50px" }}>読み込み中...</div>;
     }
 
     return (
-        <section id="Login" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh" }}>
+        <section style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh" }}>
             <h1 style={{ fontSize: "3rem", marginBottom: "20px" }}>ToiToi</h1>
-            
-            {/* ログイン状態に応じてUIを切り替える */}
-            {status === "authenticated" ? (
-                <div style={{ textAlign: "center", border: "1px solid #ccc", padding: "20px", borderRadius: "8px" }}>
-                    <p style={{ marginBottom: "10px" }}>ログイン済みです。セッションが錯書できなかったので、臨時ではいってます</p>
-                    <button 
-                        onClick={() => signOut()}
-                        style={{ padding: "10px 20px", cursor: "pointer", backgroundColor: "#ff4444", color: "white", border: "none", borderRadius: "5px" }}
+
+            {/* アプリ内ブラウザなら「ブラウザで開くボタン」を表示 */}
+            {isAppBrowser ? (
+                <div style={{ textAlign: "center", padding: "20px" }}>
+                    <p>このアプリ内ではログインできません。</p>
+                    <a 
+                        href={window.location.href} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{
+                            display: "inline-block",
+                            padding: "15px 30px",
+                            backgroundColor: "#0070f3",
+                            color: "white",
+                            borderRadius: "8px",
+                            textDecoration: "none",
+                            fontSize: "1.2rem",
+                            marginTop: "10px"
+                        }}
                     >
-                        強制ログアウトしてリセット
-                    </button>
+                        ブラウザで開く
+                    </a>
                 </div>
             ) : (
-                <div>
-                    <button 
-                        onClick={() => signIn("google")}
-                        style={{ padding: "10px 20px", cursor: "pointer" }}
-                    >
-                        Googleアカウントでログイン
-                    </button>
+                /* 通常のログインUI */
+                <div style={{ textAlign: "center" }}>
+                    {status === "authenticated" ? (
+                        <div>
+                            <p>ログイン済みです</p>
+                            <button onClick={() => signOut()}>強制ログアウトしてリセット</button>
+                        </div>
+                    ) : (
+                        <button onClick={() => signIn("google")} style={{ padding: "10px 20px" }}>
+                            Googleアカウントでログイン
+                        </button>
+                    )}
                 </div>
             )}
         </section>
