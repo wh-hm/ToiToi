@@ -62,37 +62,21 @@ function TopPageContent() {
             {isAppBrowser ? (
                 <div style={{ textAlign: "center", padding: "20px" }}>
                     <p>このアプリ内ではログインできません。</p>
-                    <a 
-                        href={window.location.href} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        style={{
-                            display: "inline-block",
-                            padding: "15px 30px",
-                            backgroundColor: "#0070f3",
-                            color: "white",
-                            borderRadius: "8px",
-                            textDecoration: "none",
-                            fontSize: "1.2rem",
-                            marginTop: "10px"
-                        }}
-                    >
-                        ブラウザで開く
-                    </a>
+                    <button onClick={() => {
+                        navigator.clipboard.writeText(window.location.href);
+                        alert("URLをコピーしました！ブラウザ（Safari/Chrome）を開いて貼り付けてください。");
+                    }}>
+                        URLをコピーしてブラウザで開く
+                    </button>
                 </div>
             ) : (
                 /* 通常のログインUI */
                 <div style={{ textAlign: "center" }}>
-                    {status === "authenticated" ? (
-                        <div>
-                            <p>ログイン済みです</p>
-                            <button onClick={() => signOut()}>強制ログアウトしてリセット</button>
-                        </div>
-                    ) : (
-                        <button onClick={() => signIn("google")} style={{ padding: "10px 20px" }}>
-                            Googleアカウントでログイン
-                        </button>
-                    )}
+                    
+                    <button onClick={() => signIn("google")} style={{ padding: "10px 20px" }}>
+                        Googleアカウントでログイン
+                    </button>
+                    
                 </div>
             )}
         </section>
