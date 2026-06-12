@@ -1,7 +1,7 @@
 // app/api/images/route.ts
 import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth-guard";
-import { deleteImages } from "@/services/StorageService"; // ストレージサービスと仮定
+import { deleteImage } from "@/services/StorageService"; // ストレージサービスと仮定
 import { MESSAGES } from "@/constants/messages";
 
 export async function DELETE(request: Request) {
