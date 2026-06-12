@@ -4,6 +4,7 @@ import { getChatsWithImages, registerChat } from "@/services/ChatService";
 import { uploadImage, deleteImage } from "@/services/StorageService";
 import { MESSAGES } from "@/constants/messages";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 // 1. GET: チャット一覧取得
 export async function GET(request: NextRequest) {
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. DB登録 (トランザクション内)
-    const newChat = await prisma.$transaction(async (tx) => {
+    const newChat = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       return await registerChat({
         user_id: auth.user_id,
         space_id: space_id,

@@ -7,6 +7,7 @@ import { MESSAGES } from "@/constants/messages";
 import { getQuestion } from "@/services/QuestionService";
 import Question from "@/app/question/[spaceId]/page";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 // 1. メッセージ一覧取得 (GET)
 export async function GET(
@@ -85,7 +86,7 @@ export async function POST(
       imageUrl = await uploadImage(file, auth.user_id, space_id);
     }
     // 簡易バリデーション
-    const newMessage = await prisma.$transaction(async (tx) => {
+    const newMessage = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       return await registerQuestionChat(
         parseInt(id),
         auth.user_id,
