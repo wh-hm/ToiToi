@@ -1,17 +1,19 @@
-"use client"
+"use client";
+
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { signIn, useSession, SessionProvider } from "next-auth/react";
+import { signIn, signOut, useSession, SessionProvider } from "next-auth/react";
 
 function TopPageContent() {
     const router = useRouter();
     const { data: session, status } = useSession();
 
-    //ログインの処理
+    // ログイン後の処理
     useEffect(() => {
         if (status === "authenticated" && session?.user) {
             const checkUser = async () => {
                 try {
+                    // ユーザー登録・ログイン判定API
                     const res = await fetch("/api/auth/login/", {
                         method: "POST",
                         body: JSON.stringify({ 
@@ -21,29 +23,21 @@ function TopPageContent() {
                     });
 
                     if (res.ok) {
-                        // 成功したら遷移
+                        // ユーザーネーム登録状況の確認
                         try {
                             const res = await fetch(`/api/user/username/check`);
-                            if (!res.ok) {
-                            }
-                            
                             const data = await res.json();
+                            
                             if (data.hasUsername) {
                                 router.push("/dashboard");
-                            }else{
+                            } else {
                                 router.push("/username");
                             }
                         } catch (error) {
-                            console.log(error);
+                            console.error("Username check error:", error);
                         }
                     } else {
-                        // 失敗したらアラートやコンソールで通知
-                        console.log("Status Code:", res.status);
-  
-                        // レスポンスの本文をテキストとして取得して表示
-                        const errorText = await res.text();
-                        console.error("API Error Response Body:", errorText);
-                        console.error("API Error Detail:", res);
+                        console.error("Login API Error:", res.status);
                         alert("登録処理に失敗しました。");
                     }
                 } catch (error) {
@@ -54,34 +48,38 @@ function TopPageContent() {
 
             checkUser();
         }
-    }, [status, session, router]); // statusなどが変わった時だけ実行される
+    }, [status, session, router]);
 
-    // 読み込み中（一瞬ボタンが見えちゃうのを防ぐ）
+    // 読み込み中の表示
     if (status === "loading") {
-        return <p style={{ textAlign: "center", marginTop: "50px" }}>読み込み中...</p>;
+        return (
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
+                <p>読み込み中...</p>
+            </div>
+        );
     }
-
-    
 
     return (
         <section id="Login" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh" }}>
             <h1 style={{ fontSize: "3rem", marginBottom: "20px" }}>ToiToi</h1>
             
-            {/* ログイン状態に応じてボタンを切り替える */}
+            {/* ログイン状態に応じてUIを切り替える */}
             {status === "authenticated" ? (
-                <div style={{ textAlign: "center" }}>
-                    <p>ログイン済みです。あまりにもセッションが削除できなかったため臨時ではいってます</p>
-                    <button onClick={() => {
-                        // 強制ログアウト処理
-                        // signOutをインポートして使ってください
-                        import("next-auth/react").then(({ signOut }) => signOut());
-                    }}>
+                <div style={{ textAlign: "center", border: "1px solid #ccc", padding: "20px", borderRadius: "8px" }}>
+                    <p style={{ marginBottom: "10px" }}>ログイン済みです。セッションが錯書できなかったので、臨時ではいってます</p>
+                    <button 
+                        onClick={() => signOut()}
+                        style={{ padding: "10px 20px", cursor: "pointer", backgroundColor: "#ff4444", color: "white", border: "none", borderRadius: "5px" }}
+                    >
                         強制ログアウトしてリセット
                     </button>
                 </div>
             ) : (
                 <div>
-                    <button onClick={() => signIn("google")}>
+                    <button 
+                        onClick={() => signIn("google")}
+                        style={{ padding: "10px 20px", cursor: "pointer" }}
+                    >
                         Googleアカウントでログイン
                     </button>
                 </div>
@@ -91,9 +89,9 @@ function TopPageContent() {
 }
 
 export default function TopPage() {
-return (
-    <SessionProvider>
-    <TopPageContent />
-    </SessionProvider>
-);
+    return (
+        <SessionProvider>
+            <TopPageContent />
+        </SessionProvider>
+    );
 }
