@@ -11,7 +11,7 @@ export default function TaskPage() {
   const router = useRouter();
   const params = useParams(); 
   // URLが /task/[id] なら、params.id が spaceId に該当するはず
-  const spaceId = params.id;
+  const spaceId = params!.id;
   const [tasks, setTasks] = useState({ incomplete: [], complete: [] });
   const [isLoading, setIsLoading] = useState(true);
 // 修正ポイント：state の初期値を false にする
