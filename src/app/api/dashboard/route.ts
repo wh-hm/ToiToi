@@ -6,29 +6,46 @@ import { MESSAGES } from "@/constants/messages";
 import { getGoal } from "@/services/GoalService";
 import { getLoginManagement } from "@/services/LoginManagementService";
 export async function GET() {
-  // 1. 認証ガード
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   try {
-    // 2. 必要なデータをまとめて取得（Promise.all で並列実行して高速化）
-    const [spaces, tasksCount, goal, login_management] = await Promise.all([
+    // 1. スペース一覧 と スペースごとのタスク数配列 を取得
+    const [allSpaces, tasksWithCounts, goal, login_management] = await Promise.all([
       getSpaces(auth.user_id),
-      getTasksCount(auth.user_id),
+      getTasksCount(auth.user_id), // これが { space_id, space_name, task_count } の配列
       getGoal(auth.user_id),
       getLoginManagement(auth.user_id)
     ]);
 
+    // 2. スペースにタスク数を結合する（マージ処理）
+    const spacesWithTaskCount = allSpaces.map(space => {
+      const taskInfo = tasksWithCounts.find(t => t.space_id === space.id);
+      return {
+        ...space,
+        task_count: taskInfo ? taskInfo.task_count : 0 // 見つからなければ0
+      };
+    });
+
     // 3. データの整形と統合
+    // データの整形と統合
     const result = {
       spaces: {
-        type1: spaces.filter(s => s.space_type === 1),
-        type2: spaces.filter(s => s.space_type === 2),
-        type3: spaces.filter(s => s.space_type === 3),
+        // type1 はそのまま（spacesWithTaskCount を使っているので全データ＋タスク数がある）
+        type1: spacesWithTaskCount.filter(s => s.space_type === 1),
+        
+        // type2 も同様に「全データ」を返すようにする
+        type2: spacesWithTaskCount
+          .filter(s => s.space_type === 2)
+          .map(s => ({
+            ...s, // ★ここが重要：s の中身（全プロパティ）を全て展開する
+            task_count: s.task_count // 既に付与済みの task_count を上書き、またはそのまま保持
+          })),
+          
+        type3: spacesWithTaskCount.filter(s => s.space_type === 3),
       },
-      tasksCount, // 未完了タスクの合計件数など
-      goal,       // 目標データ
-      login_management, // ログイン管理情報
+      goal,
+      login_management,
     };
 
     return NextResponse.json(result);

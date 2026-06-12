@@ -92,7 +92,7 @@ export default function Dashboard() {
       if (!res.ok) throw new Error("ログイン情報取得失敗");
       const data = await res.json();
       console.log(data);
-
+      setSpaces(data.spaces);
       setLoginInfo(data);
 
       const hour = new Date().getHours();

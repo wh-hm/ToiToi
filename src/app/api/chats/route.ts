@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth-guard";
-import { getChats, registerChat } from "@/services/ChatService";
-import { uploadImage } from "@/services/StorageService";
+import { getChatsWithImages, registerChat } from "@/services/ChatService";
+import { uploadImage, deleteImage } from "@/services/StorageService";
 import { MESSAGES } from "@/constants/messages";
+import { prisma } from "@/lib/prisma";
 
 // 1. GET: チャット一覧取得
 export async function GET(request: NextRequest) {
@@ -17,65 +18,63 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-        const questions = await getChats(auth.user_id, spaceId);
+        const questions = await getChatsWithImages(auth.user_id, spaceId);
         return NextResponse.json(questions);
     } catch (error) {
         return NextResponse.json({ error: MESSAGES.E2003("チャット") }, { status: 500 });
     }
 }
 
-
 export async function POST(request: NextRequest) {
-  // ... 認証処理などはそのまま
   const auth = await getAuthContext();
-    if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+  // 1. まず変数を用意（スコープを広げるため）
+  let imageUrl: string | undefined;
+
   try {
     const formData = await request.formData();
     const message = formData.get("message") as string;
     const file = formData.get("image") as File | null;
     const space_id = Number(formData.get("space_id"));
     const stamp = formData.get("stamp") as string | null;
-    let imageUrl: string | undefined;
-    
-    console.log("変換後のspace_id:", space_id);
-    // 1. 必須チェック (E1001)
+
+    // 2. バリデーションチェック
     if (!message && !file && !stamp) {
       return NextResponse.json({ error: MESSAGES.E1001("チャット内容") }, { status: 400 });
     }
-
-    // 2. 桁数チェック (E1002)
     if (message && message.length > 100) {
       return NextResponse.json({ error: MESSAGES.E1002("チャット内容", 100) }, { status: 400 });
     }
 
-    
-
-
-    // 3. 画像バリデーション (E1005)
+    // 3. 画像アップロード
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
+      if (file.size > 2 * 1024 * 1024 || !["image/png", "image/jpeg", "image/jpg"].includes(file.type)) {
         return NextResponse.json({ error: MESSAGES.E1005 }, { status: 400 });
       }
-      const validTypes = ["image/png", "image/jpeg", "image/jpg"];
-      if (!validTypes.includes(file.type)) {
-        return NextResponse.json({ error: MESSAGES.E1005}, { status: 400 });
-      }
-
       imageUrl = await uploadImage(file, auth.user_id, space_id);
     }
-    // 4. 登録（サニタイズはサービス層で行われるため、ここでは何もせず渡す）
-    const newChat = await registerChat({
+
+    // 4. DB登録 (トランザクション内)
+    const newChat = await prisma.$transaction(async (tx) => {
+      return await registerChat({
         user_id: auth.user_id,
-        space_id,
-        message,
-        image_url: imageUrl || undefined,
-        stamp: stamp || undefined
+        space_id: space_id,
+        message: message || undefined,
+        image_url: imageUrl,
+        stamp: stamp || undefined,
+      }, tx);
     });
 
-    
+    return NextResponse.json({ newChat }, { status: 201 });
 
-    return NextResponse.json({newChat}, { status: 201 });
   } catch (error) {
+    // 5. エラー処理（ここで全ての予期せぬエラーをキャッチ）
+    if (imageUrl) {
+      console.error("エラー発生。アップロード済みの画像を削除します:", imageUrl);
+      await deleteImage(imageUrl).catch(e => console.error("削除失敗:", e));
+    }
+    console.error("API処理エラー:", error);
     return NextResponse.json({ error: MESSAGES.E2001("チャット") }, { status: 500 });
   }
 }

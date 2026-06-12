@@ -10,6 +10,7 @@ export interface ChatMessage {
   updated_at: string;
   question_id?: number;
   nice_flag?: number;
+  signedImageUrl?: string | null;
 }
 
 export interface ChatInputProps {

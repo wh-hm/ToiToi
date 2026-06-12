@@ -89,11 +89,11 @@ export const deleteLoginManagement = async (
 // 4. 設定済みの目標内容、または目標達成状況（ステータス）を更新する (ログイン管理日付判定)
 // ==========================================
 export const updateLoginManagement = async (
-  user_id: string,           // 引数: string user_id
-  total_login_days?: number | null, // 引数: int? total_login_days (設計書指示のため定義)
-  delete_flag?: number | null,      // 引数: int? delete_flag (設計書指示のため定義)
+  user_id: string,
+  total_login_days?: number | null,
+  delete_flag?: number | null, // これを確実に処理する
   tx?: any
-): Promise<any> => {         // 戻り値: LoginManagement
+): Promise<any> => {
   try {
     const db = tx || prisma;
 
@@ -101,54 +101,42 @@ export const updateLoginManagement = async (
       where: { user_id: user_id } 
     });
     
-    // 既存レコードがない場合は、安全のため初期登録へ流す
     if (!currentData) {
       return await registerLoginManagement(user_id, db);
     }
     
-    // ・取得した最終ログイン日時（last_login_at）を比較し、更新処理を分岐する。
+    // 現在の streak / total を取得
+    let newStreak = currentData.current_streak;
+    let newTotalDays = currentData.total_login_days;
+
+    // 日付判定ロジック
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
     const lastLogin = new Date(currentData.last_login_at);
     lastLogin.setHours(0, 0, 0, 0);
-
     const diffDays = (today.getTime() - lastLogin.getTime()) / (1000 * 60 * 60 * 24);
 
-    // 3. すでに「本日」ログイン済みのログインの場合：
-    if (diffDays === 0) {
-      // - 更新処理を行わず、現在のデータをそのまま返却する。
-      return currentData; 
+    if (diffDays !== 0) {
+      newTotalDays += 1;
+      if (diffDays === 1) {
+        newStreak += 1;
+      } else {
+        newStreak = 1;
+      }
     }
 
-    let newStreak = currentData.current_streak;
-    let newTotalDays = currentData.total_login_days + 1;
-
-    // 1. 前回のログインが「昨日」の場合：
-    if (diffDays === 1) {
-      // - 連続ログイン日数（current_streak）を +1 する。
-      // - 累計ログイン日数（total_login_days）を +1 する。
-      newStreak += 1;
-    } 
-    // 2. 前回のログインが「昨日より前」の場合：
-    else if (diffDays > 1) {
-      // - 連続ログイン日数（current_streak）を 1 にリセットする。
-      // - 累計ログイン日数（total_login_days）を +1 する。
-      newStreak = 1;
-    }
-
-    // ・上記いずれの場合も最終ログイン日時（last_login_at）を現在時刻に更新する。
+    // ★ここで delete_flag を確実に 0 に戻す処理を追加
     return await db.loginManagement.update({
       where: { user_id: user_id },
       data: {
-        last_login_at: new Date(), // 現在時刻に更新
+        last_login_at: new Date(),
         total_login_days: newTotalDays,
-        current_streak: newStreak
+        current_streak: newStreak,
+        delete_flag: delete_flag !== undefined && delete_flag !== null ? delete_flag : currentData.delete_flag
       }
     });
   } catch (error) {
-    // 例外処理: エラーログを記録し、呼び出し元へ false を返却して「削除不可」状態を維持する。
-    console.error(`user_id: ${user_id} のログイン時刻更新中にエラーが発生しました:`, error);
-    return false;
+    console.error(`user_id: ${user_id} のログイン更新エラー:`, error);
+    throw error; // false を返すよりエラーを投げる方が安全
   }
 };

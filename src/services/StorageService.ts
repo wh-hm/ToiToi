@@ -1,5 +1,49 @@
 import { prisma } from "@/lib/prisma";
+import { S3Client, PutObjectCommand, GetObjectCommand} from "@aws-sdk/client-s3"; // 追加
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
+// S3クライアントの初期化（lib/s3.tsなどに切り出すとより綺麗です）
+const s3Client = new S3Client({
+  region: "auto",
+  endpoint: process.env.R2_ENDPOINT,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+  },
+});
+
+/**
+ * 設計書の getImages メソッドの実装
+ * @param image_urls R2のファイル名（Key）の配列
+ */
+export async function getImages(image_urls: string[]): Promise<string[]> {
+  // 1. 入力検証
+  if (!image_urls || image_urls.length === 0) {
+    return [];
+  }
+
+  try {
+    // 2. ストレージアクセス（並列処理）
+    const urlPromises = image_urls.map(async (key) => {
+      const command = new GetObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME,
+        Key: key,
+      });
+      // 一時的な公開URL（署名付きURL）を発行（有効期限は60分など）
+      return await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+    });
+
+    // Promise.all で並列にURLを取得
+    const imageUrls = await Promise.all(urlPromises);
+
+    // 3. データ返却
+    return imageUrls;
+  } catch (error) {
+    console.error("画像取得エラー:", error);
+    // 設計書の通り、エラー時は null または空配列などを返す処理
+    return []; 
+  }
+}
 
 /**
  * メソッド名称：getImageCount
@@ -53,20 +97,33 @@ export async function getImageCountAlternative(user_id: string): Promise<number>
 }
 */
 // 既存のメソッドを引数に合わせて書き換え
+/**
+ * 画像をR2にアップロードして、ファイル名を返す関数
+ */
 export async function uploadImage(image: File, user_id: string, space_id: string | number) {
-  // 1. ファイル名生成（ルール：ユーザーID_スペースID_投稿日時）
-  const timestamp = Date.now();
-  const fileName = `${user_id}_${space_id}_${timestamp}.png`;
+  // 1. ファイル名の生成 (ユニークにするためにUUIDも活用するとより安全です)
+  const currentCount = await getImageCount(user_id);
+  //  常に「現在の数 + 1」を使うことで、自動的に連番になる
+  const nextSequence = currentCount + 1;
+  const fileName = `${user_id}_${space_id}_${nextSequence.toString().padStart(3, '0')}.png`;
+  // 2. ファイルをArrayBufferに変換
+  const arrayBuffer = await image.arrayBuffer();
 
-  // 2. ここに実際のストレージアップロード処理を記述
-  // (例: S3へのアップロード処理など)
-  // const uploadedPath = await s3Client.send(...);
-  
-  // 3. アップロード成功後のURLを返す
-  return `https://your-storage-url/${fileName}`;
-}
+  // 3. R2へアップロード実行
+  try {
+    await s3Client.send(
+      new PutObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME,
+        Key: fileName,
+        Body: Buffer.from(arrayBuffer),
+        ContentType: image.type,
+      })
+    );
+  } catch (error) {
+    console.error("R2 Upload Error:", error);
+    throw new Error("画像のアップロードに失敗しました");
+  }
 
-
-export async function deleteImages(image_url: string[]){
-
+  // 4. アップロードされたファイル名を返す
+  return fileName;
 }
