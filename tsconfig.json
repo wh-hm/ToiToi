@@ -36,7 +36,7 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts",
     "generated/**/*"
-  ],
-  "exclude": ["node_modules"],
+, "tailwind.config.cjs"  ],
+  "exclude": ["node_modules", ".next"]
   
 }
