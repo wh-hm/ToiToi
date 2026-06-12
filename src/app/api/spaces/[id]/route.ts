@@ -10,7 +10,7 @@ const safeRegex = /[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uFF01-\uFF
 // 1. PATCH: スペースの更新
 export async function PATCH(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     const auth = await getAuthContext();
     if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
@@ -39,7 +39,7 @@ export async function PATCH(
 // 2. DELETE: スペース削除
 export async function DELETE(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     const auth = await getAuthContext();
     if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
