@@ -4,6 +4,7 @@ import { deleteChat } from "./ChatService";
 import { deleteTask } from "./TaskService";
 import { deleteQuestion } from "./QuestionService";
 // import { deleteImages } from "@/services/StorageService";
+import { ChatMessage } from "@/types/chat";
 
 // 概要：ユーザーに紐づく有効なスペース一覧を取得する
 export async function getSpaces(
@@ -222,7 +223,7 @@ export async function deleteSpaceChat(
         .filter((url): url is string => typeof url === 'string' && url.length > 0);
     };
 
-    const chatIdList = chats.map(c => c.id);
+    const chatIdList = chats.map((c:ChatMessage) => c.id);
     const imageUrlList = getValidImageUrls(chats);
 
 
@@ -333,7 +334,7 @@ export async function deleteSpaceQuestion(
     });
 
     if (questions.length === 0) return true;
-    const questionIds = questions.map(q => q.id);
+    const questionIds = questions.map((q:ChatMessage) => q.id);
 
     // 2. 質問自体を一括論理削除
     await db.question.updateMany({
