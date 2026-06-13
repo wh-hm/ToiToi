@@ -35,7 +35,8 @@ export async function getSpaces(
 export async function registerSpace(
   user_id: string,
   name: string,
-  space_type: number
+  space_type: number,
+  favorite_flag: number
 ): Promise<Space> {
   try {
     // 処理概要：引数の情報をもとに、スペーステーブル（spaces）に新規レコードを登録（create）
@@ -45,6 +46,7 @@ export async function registerSpace(
         name: name,             // 引数のnameを設定する
         space_type: space_type, // 引数のspace_typeを設定する
         delete_flag: 0,         // 初期値として有効状態を設定
+        favorite_flag: favorite_flag,
       },
     });
 

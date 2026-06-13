@@ -1,216 +1,200 @@
 "use client";
-import { useRouter } from "next/navigation"
-import Header from "@/components/Header"
-import Footer from "@/components/Footer"
-import SpaceModal from "@/components/SpaceModal"
+import { useRouter } from "next/navigation";
+import SpaceModal from "@/components/SpaceModal";
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import SpaceList from "@/components/SpaceList"
+import SpaceList from "@/components/SpaceList";
+
+type Space = {
+  id: string;
+  name: string;
+  space_type: number;
+  favorite: number;
+  is_archived: number;
+};
+
+type SpacesState = {
+  type1: Space[];
+  type2: Space[];
+  type3: Space[];
+  type1Empty: boolean;
+  type2Empty: boolean;
+  type3Empty: boolean;
+  allEmpty: boolean;
+};
 
 export default function Dashboard() {
-  const { data: session, status } = useSession(); // セッションの現在の状態を取得
+  const { data: session, status } = useSession();
   const router = useRouter();
-  const [spaces, setSpaces] = useState({ type1: [], type2: [], type3: [] });
+
+  const [spaces, setSpaces] = useState<SpacesState>({
+    type1: [], type2: [], type3: [],
+    type1Empty: false, type2Empty: false, type3Empty: false, allEmpty: false,
+  });
+
   const [isLoading, setIsLoading] = useState(true);
-  // 既存の const の下に追加
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedType, setSelectedType] = useState<number | null>(null);
-  const [editingSpace, setEditingSpace] = useState<{ id: string; name: string } | null>(null);
+  const [editingSpace, setEditingSpace] = useState<Space | null>(null);
+  const [modalFavorite, setModalFavorite] = useState<number>(0);
 
-  const [goal, setGoal] = useState(null);
-  const [loginInfo, setLoginInfo] = useState(null);
+  const [goal, setGoal] = useState<any>(null);
+  const [loginInfo, setLoginInfo] = useState<any>(null);
   const [loginMessage, setLoginMessage] = useState("");
 
-  
-
-
-  //おきに利
-  const handleToggleFavorite = async (id: number) => {
-    // await fetch(`/api/dashboard/spaces/${id}/favorite`, { method: "PATCH" });
-    // fetchSpaces(); // 一覧再取得
+  const handleModalFavoriteToggle = () => {
+    setModalFavorite(prev => (prev === 1 ? 0 : 1));
   };
 
-  // モーダルを開く関数
+  useEffect(() => {
+    window.addEventListener("toggle-modal-favorite", handleModalFavoriteToggle);
+    return () => window.removeEventListener("toggle-modal-favorite", handleModalFavoriteToggle);
+  }, []);
+
   const openModal = (type: number) => {
+    setModalFavorite(0);
     setSelectedType(type);
     setIsModalOpen(true);
   };
-  const handleEdit = (space: any) => {
-    setEditingSpace(space); // 編集対象のデータをセット
+
+  const handleEdit = (space: Space) => {
+    setModalFavorite(space.favorite);
+    setEditingSpace(space);
     setSelectedType(space.space_type);
-    setIsModalOpen(true); // モーダルを開く
+    setIsModalOpen(true);
   };
 
-
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, spaceType: number) => {
     if (!confirm("本当に削除しますか？")) return;
-
     try {
-      const res = await fetch(`/api/dashboard/spaces/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/spaces/${id}?space_type=${spaceType}`, {
+        method: "DELETE",
+      })
       if (res.ok) {
-        // fetchSpaces(); // 再取得して画面を更新
+        await fetchSpaces();
+        window.dispatchEvent(new Event("refresh-header"));
       }
     } catch (error) {
       console.error("削除失敗:", error);
     }
   };
+
   useEffect(() => {
-    // ステータスが "unauthenticated"（未ログイン）なら強制的にトップへ飛ばす
-    if (status === "unauthenticated") {
-      router.push("/");
-    }
+    if (status === "unauthenticated") router.push("/");
   }, [status, router]);
 
-  // const fetchSpaces = async () => {
-  //   if (!session?.user?.id) return;
-  //   setIsLoading(true); // ロード中表示
-  //   try {
-  //     const res = await fetch(`/api/dashboard/`);
-  //     const data = await res.json();
-  //     setSpaces(data);
-  //   } catch (error) {
-  //     console.error("データの取得に失敗しました", error);
-  //   } finally {
-  //     setIsLoading(false);
-  //   }
-  // };
-  // ① 関数を先に定義する
-  // const fetchGoal = async () => {
-  //   try {
-  //     const res = await fetch(`/api/dashboard/goal?userId=${session?.user?.id}`);
-  //     if (!res.ok) throw new Error("目標取得失敗");
-  //     const data = await res.json();
-  //     setGoal(data);
-  //   } catch (error) {
-  //     alert("目標の取得に失敗しました");
-  //   }
-  // };
+  // ------------------------------
+  // 🌟 完璧な同期制御を持つ一覧更新処理
+  // ------------------------------
+  const fetchSpaces = async () => {
+    if (!session?.user?.id) return null;
+    setIsLoading(true);
 
-  const fetchLoginProfile = async () => {
     try {
-      const res = await fetch(`/api/dashboard/`);
-      if (!res.ok) throw new Error("ログイン情報取得失敗");
+      const res = await fetch("/api/dashboard/");
+      if (!res.ok) return null;
+
       const data = await res.json();
-      console.log(data);
+      if (data.goal) setGoal(data.goal);
+      if (data.loginInfo) setLoginInfo(data.loginInfo);
+      if (data.loginMessage) setLoginMessage(data.loginMessage);
 
-      setLoginInfo(data);
+      const targetData = data.spaces || data;
 
-      const hour = new Date().getHours();
-      let msg =
-        hour < 12 ? "おはようございます！" :
-          hour < 18 ? "こんにちは！" :
-            "こんばんは！";
+      const convertAndFilter = (list: any[]): Space[] => {
+        if (!Array.isArray(list)) return [];
+        return list
+          .filter((s) => !s.is_archived)
+          .map((s) => ({
+            id: String(s.id),
+            name: String(s.name),
+            space_type: Number(s.space_type),
+            favorite: Number(s.favorite_flag),
+            is_archived: Number(s.is_archived),
+          }));
+      };
 
-      msg += ` ${data.continuousDays}日連続ログイン中！`;
+      const sortFavorite = (list: Space[]): Space[] =>
+        [...list].sort((a, b) => (a.favorite === b.favorite ? 0 : a.favorite ? -1 : 1));
 
-      setLoginMessage(msg);
+      const type1 = sortFavorite(convertAndFilter(targetData.type1));
+      const type2 = sortFavorite(convertAndFilter(targetData.type2));
+      const type3 = sortFavorite(convertAndFilter(targetData.type3));
 
+      const newState = {
+        type1, type2, type3,
+        type1Empty: type1.length === 0,
+        type2Empty: type2.length === 0,
+        type3Empty: type3.length === 0,
+        allEmpty: type1.length + type2.length + type3.length === 0,
+      };
+
+      setSpaces(newState);
+      return targetData;
     } catch (error) {
-      alert("ログイン情報の取得に失敗しました");
+      console.error("取得失敗:", error);
+      return null;
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // ② その後で useEffect で呼び出す
   useEffect(() => {
-    // fetchSpaces();
-    // fetchGoal();
-    fetchLoginProfile();
-  }, [session]);
+    if (status === "authenticated") fetchSpaces();
+  }, [status]);
 
+  if (status === "loading") return <div>読み込み中...</div>;
 
-  // 読み込み中は何も表示しない、またはローディング画面を出す
-  if (status === "loading") {
-    return <div>読み込み中...</div>;
-  }
   return (
     <>
-      <section
-        style={{
-          maxWidth: "900px",
-          margin: "40px auto",
-          padding: "30px",
-          background: "white",
-          borderRadius: "8px",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
-        }}
-      >
-        <h1 style={{ fontSize: "28px", fontWeight: "bold", marginBottom: "20px" }}>
-          ダッシュボード
-        </h1>
+      <section style={{ maxWidth: "900px", margin: "40px auto", padding: "30px", background: "white", borderRadius: "8px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
+        <h1 style={{ fontSize: "28px", fontWeight: "bold", marginBottom: "20px" }}>ダッシュボード</h1>
 
-        <SpaceList title="チャット" items={spaces.type1} onEdit={handleEdit} onDelete={handleDelete} toggleFavorite={handleToggleFavorite} />
-        <SpaceList title="ToDoリスト" items={spaces.type2} onEdit={handleEdit} onDelete={handleDelete} toggleFavorite={handleToggleFavorite} />
-        <SpaceList title="質問" items={spaces.type3} onEdit={handleEdit} onDelete={handleDelete} toggleFavorite={handleToggleFavorite} />
+        {loginMessage && <div style={{ padding: "15px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: "6px", marginBottom: "20px" }}>{loginMessage}</div>}
+        {goal && <div style={{ padding: "15px", background: "#fef9c3", border: "1px solid #fde047", borderRadius: "6px", marginBottom: "20px" }}><strong>今日の目標：</strong> {goal.goal_text}</div>}
+
+        <SpaceList
+          key={`type1_${spaces.type1.map(s => `${s.id}-${s.favorite}`).join(',')}`}
+          title="チャット"
+          items={spaces.type1}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
+        <SpaceList
+          key={`type2_${spaces.type2.map(s => `${s.id}-${s.favorite}`).join(',')}`}
+          title="ToDoリスト"
+          items={spaces.type2}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
+        <SpaceList
+          key={`type3_${spaces.type3.map(s => `${s.id}-${s.favorite}`).join(',')}`}
+          title="質問"
+          items={spaces.type3}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
 
         <div style={{ marginTop: "30px", display: "flex", gap: "12px" }}>
-          <button
-            style={{
-              padding: "10px 20px",
-              fontSize: "16px",
-              background: "#2563eb",
-              color: "white",
-              border: "none",
-              borderRadius: "6px",
-              cursor: "pointer"
-            }}
-            onClick={() => { setEditingSpace(null); openModal(1); }}
-          >
-            チャット作成
-          </button>
-
-          <button
-            style={{
-              padding: "10px 20px",
-              fontSize: "16px",
-              background: "#16a34a",
-              color: "white",
-              border: "none",
-              borderRadius: "6px",
-              cursor: "pointer"
-            }}
-            onClick={() => { setEditingSpace(null); openModal(2); }}
-          >
-            Todo作成
-          </button>
-
-          <button
-            style={{
-              padding: "10px 20px",
-              fontSize: "16px",
-              background: "#7c3aed",
-              color: "white",
-              border: "none",
-              borderRadius: "6px",
-              cursor: "pointer"
-            }}
-            onClick={() => { setEditingSpace(null); openModal(3); }}
-          >
-            質問作成
-          </button>
+          <button style={{ padding: "10px 20px", background: "#2563eb", color: "white", border: "none", borderRadius: "6px", cursor: "pointer" }} onClick={() => { setEditingSpace(null); openModal(1); }}>チャット作成</button>
+          <button style={{ padding: "10px 20px", background: "#16a34a", color: "white", border: "none", borderRadius: "6px", cursor: "pointer" }} onClick={() => { setEditingSpace(null); openModal(2); }}>Todo作成</button>
+          <button style={{ padding: "10px 20px", background: "#7c3aed", color: "white", border: "none", borderRadius: "6px", cursor: "pointer" }} onClick={() => { setEditingSpace(null); openModal(3); }}>質問作成</button>
         </div>
-
       </section>
 
       <SpaceModal
         isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false)
-          setEditingSpace(null);
-        }}
+        onClose={() => { setIsModalOpen(false); setEditingSpace(null); }}
         spaceType={selectedType ?? 1}
-        onSuccess={() => {
+        onSuccess={async () => {
+          // 🌟 モーダル側から保存完了のシグナルが来たら、安全にステートを閉じ、最新データを取得してuseStateを即時更新
           setIsModalOpen(false);
-          // fetchSpaces();
-          window.dispatchEvent(new Event('refresh-header'));
+          setEditingSpace(null);
+          await fetchSpaces();
+          window.dispatchEvent(new Event("refresh-header"));
         }}
         editingSpace={editingSpace}
       />
-
-      <Footer />
     </>
-
-
   );
-
-
 }

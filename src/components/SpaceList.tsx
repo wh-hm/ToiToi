@@ -1,12 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+type Space = {
+  id: string;
+  name: string;
+  space_type: number;
+  favorite: number;
+};
 
 export default function SpaceList(props: any) {
-  const { items, title, onEdit, onDelete, toggleFavorite } = props;
-  const [open, setOpen] = useState(true); // ← 最初は開いた状態にする
+  const { items, title, onEdit, onDelete } = props; // 🌟 toggleFavorite は使わないので削除
+  const [open, setOpen] = useState(true);
+  const [localItems, setLocalItems] = useState<Space[]>(items);
 
-  const getLinkPath = (type: number, id: string | number) => {
+  useEffect(() => {
+    setLocalItems(items);
+  }, [items]);
+
+  const getLinkPath = (type: number, id: string) => {
     switch (type) {
       case 1: return `/chat/${id}`;
       case 2: return `/task/${id}`;
@@ -17,8 +29,6 @@ export default function SpaceList(props: any) {
 
   return (
     <div style={{ marginBottom: "20px" }}>
-      
-      {/* ▼ タイトル行（UIはシンプルなまま） */}
       <h2
         onClick={() => setOpen(!open)}
         style={{
@@ -36,11 +46,10 @@ export default function SpaceList(props: any) {
         <span>{open ? "▲" : "▼"}</span>
       </h2>
 
-      {/* ▼ 開閉部分（元のUIそのまま） */}
       {open && (
         <ul style={{ marginTop: "10px" }}>
-          {items && items.length > 0 ? (
-            items.map((s: any) => (
+          {localItems && localItems.length > 0 ? (
+            localItems.map((s: Space) => (
               <li
                 key={s.id}
                 style={{
@@ -51,17 +60,28 @@ export default function SpaceList(props: any) {
                   alignItems: "center",
                 }}
               >
-                {/* お気に入り */}
-                <button onClick={() => toggleFavorite(s.id)}>
-                  {s.favorite_flag === 1 ? "★" : "☆"}
-                </button>
+                <div style={{ width: "36px", display: "flex", justifyContent: "center", flexShrink: 0 }}>
+                  {s.favorite === 1 ? (
+                    <span
+                      style={{
+                        fontSize: "18px",
+                        color: "#eab308", // 綺麗な黄色
+                        userSelect: "none",
+                      }}
+                    >
+                      ★
+                    </span>
+                  ) : (
+                    "" // 0（お気に入りでない）時は何も表示しないが、親のdivが幅をキープするのでズレない
+                  )}
+                </div>
 
-                {/* 名前リンク */}
-                <a href={getLinkPath(s.space_type, s.id)}>{s.name}</a>
+                <a href={getLinkPath(s.space_type, s.id)} style={{ flexGrow: 1, textDecoration: "none", color: "#333" }}>
+                  {s.name}
+                </a>
 
-                {/* 編集・削除 */}
-                <button onClick={() => onEdit(s)}>編集</button>
-                <button onClick={() => onDelete(s.id)}>削除</button>
+                <button onClick={() => onEdit(s)} style={{ padding: "4px 8px", cursor: "pointer" }}>編集</button>
+                <button onClick={() => onDelete(s.id)} style={{ padding: "4px 8px", cursor: "pointer" }}>削除</button>
               </li>
             ))
           ) : (
