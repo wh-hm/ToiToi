@@ -21,12 +21,12 @@ export async function getGoal(user_id: string): Promise<Goal | null> {
       return null;
     }
 
-    // 3. .deleted_at が現在の日時よりも過去の場合、updateGoalを実行し、contentをnullにする（自動リセット）
+    /* 3. .deleted_at が現在の日時よりも過去の場合、updateGoalを実行し、contentをnullにする（自動リセット）
     if (goal.deleted_at && goal.deleted_at < new Date()) {
       // 期限切れのため自動リセット処理を呼び出す（ステータスは既存維持、または仕様に合わせて調整）
       const resetGoal = await updateGoal(user_id, "", goal.status);
       return resetGoal;
-    }
+    }*/
 
     // レコードが存在する場合はそのオブジェクトを返し、存在しない場合はnullを返す（上記でチェック済）
     return goal as Goal;

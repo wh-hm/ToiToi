@@ -13,6 +13,12 @@ type Space = {
   is_archived: number;
 };
 
+type Goal = {
+  id: string;
+  content: string | null;
+  status: number;
+};
+
 type SpacesState = {
   type1: Space[];
   type2: Space[];
@@ -38,7 +44,7 @@ export default function Dashboard() {
   const [editingSpace, setEditingSpace] = useState<Space | null>(null);
   const [modalFavorite, setModalFavorite] = useState<number>(0);
 
-  const [goal, setGoal] = useState<any>(null);
+  const [goal, setGoal] = useState<Goal | null>(null);
   const [loginInfo, setLoginInfo] = useState<any>(null);
   const [loginMessage, setLoginMessage] = useState("");
 
@@ -64,6 +70,23 @@ export default function Dashboard() {
     setIsModalOpen(true);
   };
 
+  // 🌟 ステータスをワンタップで反転（0 ⇄ 1）させて更新する関数
+  const handleToggleGoalStatus = async () => {
+    try {
+      const res = await fetch("/api/dashboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ toggleStatus: true })
+      });
+
+      if (res.ok) {
+        await fetchSpaces();
+      }
+    } catch (error) {
+      console.error("ステータス更新失敗:", error);
+    }
+  };
+
   const handleDelete = async (id: string, spaceType: number) => {
     if (!confirm("本当に削除しますか？")) return;
     try {
@@ -83,9 +106,6 @@ export default function Dashboard() {
     if (status === "unauthenticated") router.push("/");
   }, [status, router]);
 
-  // ------------------------------
-  // 🌟 完璧な同期制御を持つ一覧更新処理
-  // ------------------------------
   const fetchSpaces = async () => {
     if (!session?.user?.id) return null;
     setIsLoading(true);
@@ -95,10 +115,19 @@ export default function Dashboard() {
       if (!res.ok) return null;
 
       const data = await res.json();
-      if (data.goal) setGoal(data.goal);
+
+      if (data.goal) {
+        if (Array.isArray(data.goal)) {
+          setGoal(data.goal[0] || null);
+        } else {
+          setGoal(data.goal);
+        }
+      } else {
+        setGoal(null);
+      }
+
       if (data.loginInfo) setLoginInfo(data.loginInfo);
       if (data.loginMessage) setLoginMessage(data.loginMessage);
-
       const targetData = data.spaces || data;
 
       const convertAndFilter = (list: any[]): Space[] => {
@@ -145,14 +174,149 @@ export default function Dashboard() {
 
   if (status === "loading") return <div>読み込み中...</div>;
 
+  const showActiveGoal = !!(goal && goal.content && goal.content.trim() !== "");
+
   return (
     <>
       <section style={{ maxWidth: "900px", margin: "40px auto", padding: "30px", background: "white", borderRadius: "8px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
         <h1 style={{ fontSize: "28px", fontWeight: "bold", marginBottom: "20px" }}>ダッシュボード</h1>
 
         {loginMessage && <div style={{ padding: "15px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: "6px", marginBottom: "20px" }}>{loginMessage}</div>}
-        {goal && <div style={{ padding: "15px", background: "#fef9c3", border: "1px solid #fde047", borderRadius: "6px", marginBottom: "20px" }}><strong>今日の目標：</strong> {goal.goal_text}</div>}
 
+        {/* 🎯 目報管理エリア */}
+        <div style={{ marginBottom: "25px" }}>
+          {showActiveGoal ? (
+            /* ⭕ 目標が登録されている場合の表示（黄色枠） */
+            <div
+              style={{
+                padding: "20px",
+                background: "#fef9c3",
+                border: "1px solid #fef08a",
+                borderRadius: "8px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center"
+              }}
+            >
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <div style={{ fontSize: "14px", color: "#854d0e" }}><strong>今週の目標：</strong></div>
+                <div style={{ fontSize: "18px", fontWeight: "bold", color: "#1e293b" }}>
+                  {goal?.content}
+                </div>
+                <div style={{ marginTop: "4px" }}>
+                  <span
+                    style={{
+                      padding: "4px 8px",
+                      background: goal?.status === 1 ? "#16a34a" : "#dc2626",
+                      color: "white",
+                      borderRadius: "4px",
+                      fontSize: "12px",
+                      fontWeight: "bold"
+                    }}
+                  >
+                    {goal?.status === 1 ? "達成" : "未達成"}
+                  </span>
+                </div>
+              </div>
+
+              {/* 🌟 ボタンエリア */}
+              <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
+                <button
+                  type="button"
+                  onClick={handleToggleGoalStatus}
+                  style={{
+                    padding: "8px 16px",
+                    background: goal?.status === 1 ? "#64748b" : "#16a34a",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                    fontSize: "14px",
+                    transition: "all 0.2s ease"
+                  }}
+                >
+                  {goal?.status === 1 ? "未達成に戻す" : "達成にする！"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedType(99);
+                    setEditingSpace({
+                      id: goal?.id || "edit_goal",
+                      name: goal?.content || "",
+                      space_type: 99,
+                      favorite: 0,
+                      is_archived: 0
+                    });
+                    setIsModalOpen(true);
+                  }}
+                  style={{
+                    padding: "8px 16px",
+                    background: "#ca8a04",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                    fontSize: "14px"
+                  }}
+                >
+                  編集
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* ❌ 目標が登録されていない場合の表示（緑色枠） */
+            <div
+              style={{
+                padding: "20px",
+                background: "#f0fdf4",
+                border: "1px solid #bbf7d0",
+                borderRadius: "8px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center"
+              }}
+            >
+              <div>
+                <span style={{ fontSize: "16px", color: "#166534", fontWeight: "bold" }}>
+                  🌱 今週の目標を登録しよう！
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedType(99);
+                  setEditingSpace({
+                    id: "new_goal",
+                    name: "",
+                    space_type: 99,
+                    favorite: 0,
+                    is_archived: 0
+                  });
+                  setIsModalOpen(true);
+                }}
+                style={{
+                  padding: "8px 16px",
+                  background: "#16a34a",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontWeight: "bold",
+                  fontSize: "14px",
+                  flexShrink: 0
+                }}
+              >
+                登録
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* 各スペース一覧 */}
         <SpaceList
           key={`type1_${spaces.type1.map(s => `${s.id}-${s.favorite}`).join(',')}`}
           title="チャット"
@@ -182,12 +346,12 @@ export default function Dashboard() {
         </div>
       </section>
 
+      {/* 🌟 型エラーの元になっていた modalFavorite を綺麗に削除 */}
       <SpaceModal
         isOpen={isModalOpen}
         onClose={() => { setIsModalOpen(false); setEditingSpace(null); }}
         spaceType={selectedType ?? 1}
         onSuccess={async () => {
-          // 🌟 モーダル側から保存完了のシグナルが来たら、安全にステートを閉じ、最新データを取得してuseStateを即時更新
           setIsModalOpen(false);
           setEditingSpace(null);
           await fetchSpaces();

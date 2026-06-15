@@ -10,7 +10,7 @@ type Space = {
 };
 
 export default function SpaceList(props: any) {
-  const { items, title, onEdit, onDelete } = props; // 🌟 toggleFavorite は使わないので削除
+  const { items, title, onEdit, onDelete } = props; // toggleFavorite は使わないので削除
   const [open, setOpen] = useState(true);
   const [localItems, setLocalItems] = useState<Space[]>(items);
 
