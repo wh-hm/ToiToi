@@ -47,6 +47,76 @@ export default function Dashboard() {
   const [goal, setGoal] = useState<Goal | null>(null);
   const [loginInfo, setLoginInfo] = useState<any>(null);
   const [loginMessage, setLoginMessage] = useState("");
+  const [showArchived, setShowArchived] = useState<number>(0);
+  const [currentLoginMessage, setCurrentLoginMessage] = useState<{ name: string; text: string }>({ name: "", text: "" });
+
+  const updateLoginMessage = (streakDays: number, isStreakAchieved: boolean) => {
+    // 1. 全イベント発生時の現在時刻をリアルタイムに取得
+    const now = new Date();
+    const hour = now.getHours();
+
+    let timeZone: "朝" | "昼" | "夜" = "昼";
+    let charName = "といまる";
+
+    // 2. 時間帯判定 (朝: 3:00〜10:59 / 昼: 11:00〜18:59 / 夜: 19:00〜2:59)
+    if (hour >= 3 && hour < 11) {
+      timeZone = "朝";
+      charName = "しきじー";
+    } else if (hour >= 11 && hour < 19) {
+      timeZone = "昼";
+      charName = "といまる";
+    } else {
+      timeZone = "夜";
+      charName = "フクロウ";
+    }
+
+    // 3. メッセージ一覧マスターデータの定義（仕様書を完全再現）
+    const messageMaster = {
+      "朝": {
+        normal: [
+          "おはよう よく来たな 共に頑張ろう",
+          "Good Morning ん？ わしは英語も話せるじいじだぞ？",
+          "勉強しに来るとは偉いぞ！ どれじいじがお菓子をあげよう"
+        ],
+        success: `おお！ 連続ログイン日数${streakDays}日が達成したぞ！ おめでとう！`
+      },
+      "昼": {
+        normal: [
+          "こんにちは〜 今日も一緒に頑張ろうね〜",
+          "ハロ〜 眠くなったらこまめに休憩してね〜",
+          "お昼ご飯は食べた〜？ きっと今日はいいことがあるね〜"
+        ],
+        success: `わ〜 連続で${streakDays}日も来れて偉いね〜 達成したよ！`
+      },
+      "夜": {
+        normal: [
+          "ホー(こんばんは あなたに会えたことを嬉しく思います。)",
+          "ホーホー(Good evening 夕飯はきちんと食べましたか？)",
+          "ホーホーホー(こんな遅い時間まで作業するあなたはとても偉いです。 私はあなたをとても尊敬しています。)"
+        ],
+        success: `ホー！（おめでとうございます。 無事連続ログイン日数${streakDays}日が達成されました。 今日は自身を労ってくださいね。）`
+      }
+    };
+
+    const selectedZone = messageMaster[timeZone];
+    let finalMessageText = "";
+
+    // 4. 分岐条件の判定
+    if (isStreakAchieved) {
+      // 連続ログイン達成時：おめでとうメッセージ固定
+      finalMessageText = selectedZone.success;
+    } else {
+      // 通常時：通常メッセージ3種からランダムで1つ選択
+      const randomIndex = Math.floor(Math.random() * 3);
+      finalMessageText = selectedZone.normal[randomIndex];
+    }
+
+    // Stateを更新して画面に反映
+    setCurrentLoginMessage({
+      name: charName,
+      text: finalMessageText
+    });
+  };
 
   const handleModalFavoriteToggle = () => {
     setModalFavorite(prev => (prev === 1 ? 0 : 1));
@@ -70,7 +140,7 @@ export default function Dashboard() {
     setIsModalOpen(true);
   };
 
-  // 🌟 ステータスをワンタップで反転（0 ⇄ 1）させて更新する関数
+  // ステータスをワンタップで反転（0 ⇄ 1）させて更新する関数
   const handleToggleGoalStatus = async () => {
     try {
       const res = await fetch("/api/dashboard", {
@@ -126,29 +196,55 @@ export default function Dashboard() {
         setGoal(null);
       }
 
-      if (data.loginInfo) setLoginInfo(data.loginInfo);
+      if (data.loginInfo) {
+        setLoginInfo(data.loginInfo);
+
+        const streakDays = data.loginInfo.streak_days ?? 0;
+        const isStreakAchieved = data.loginInfo.is_streak_achieved ?? false;
+
+        updateLoginMessage(streakDays, isStreakAchieved);
+      }
+
       if (data.loginMessage) setLoginMessage(data.loginMessage);
       const targetData = data.spaces || data;
 
       const convertAndFilter = (list: any[]): Space[] => {
         if (!Array.isArray(list)) return [];
-        return list
-          .filter((s) => !s.is_archived)
-          .map((s) => ({
-            id: String(s.id),
-            name: String(s.name),
-            space_type: Number(s.space_type),
-            favorite: Number(s.favorite_flag),
-            is_archived: Number(s.is_archived),
-          }));
+        return list.map((s) => ({
+          id: String(s.id),
+          name: String(s.name),
+          space_type: Number(s.space_type),
+          favorite: Number(s.favorite_flag),
+          is_archived: Number(s.is_archived),
+        }));
       };
 
-      const sortFavorite = (list: Space[]): Space[] =>
-        [...list].sort((a, b) => (a.favorite === b.favorite ? 0 : a.favorite ? -1 : 1));
+      //指定された優先順位でソートするロジック
+      const sortSpaces = (list: Space[]): Space[] => {
+        return [...list].sort((a, b) => {
+          // 優先度1: アーカイブされていない(0)が上、アーカイブされている(1)が下
+          if (a.is_archived !== b.is_archived) {
+            return a.is_archived - b.is_archived;
+          }
+          // 優先度2: 同じアーカイブ状態同士なら、お気に入り(1)が上、星なし(0)が下
+          if (a.favorite !== b.favorite) {
+            return b.favorite - a.favorite;
+          }
+          return 0;
+        });
+      };
 
-      const type1 = sortFavorite(convertAndFilter(targetData.type1));
-      const type2 = sortFavorite(convertAndFilter(targetData.type2));
-      const type3 = sortFavorite(convertAndFilter(targetData.type3));
+      // showArchived の 0 / 1 に応じてデータを絞り込む
+      const filterByArchiveSetting = (list: Space[]): Space[] => {
+        if (showArchived === 1) {
+          return sortSpaces(list); // 表示(1)：アーカイブも含めて全部ソートして出す
+        }
+        return sortSpaces(list.filter(s => s.is_archived === 0)); // 非表示(0)：アーカイブ(1)を完全除外
+      };
+
+      const type1 = filterByArchiveSetting(convertAndFilter(targetData.type1));
+      const type2 = filterByArchiveSetting(convertAndFilter(targetData.type2));
+      const type3 = filterByArchiveSetting(convertAndFilter(targetData.type3));
 
       const newState = {
         type1, type2, type3,
@@ -170,7 +266,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (status === "authenticated") fetchSpaces();
-  }, [status]);
+  }, [status, showArchived]);
 
   if (status === "loading") return <div>読み込み中...</div>;
 
@@ -181,12 +277,56 @@ export default function Dashboard() {
       <section style={{ maxWidth: "900px", margin: "40px auto", padding: "30px", background: "white", borderRadius: "8px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
         <h1 style={{ fontSize: "28px", fontWeight: "bold", marginBottom: "20px" }}>ダッシュボード</h1>
 
+        {currentLoginMessage.name && (
+          <div style={{
+            marginBottom: "25px",
+            padding: "16px",
+            background: "#f8fafc", // シンプルな薄いグレー
+            border: "1px solid #e2e8f0",
+            borderRadius: "8px",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px"
+          }}>
+            <div style={{
+              padding: "4px 12px",
+              background: "#475569", // 落ち着いたダークグレー 
+              color: "white",
+              borderRadius: "4px",
+              fontSize: "12px",
+              fontWeight: "bold",
+              flexShrink: 0
+            }}>
+              {currentLoginMessage.name}
+            </div>
+            <div style={{ fontSize: "14px", color: "#1e293b", fontWeight: "500", lineHeight: "1.5" }}>
+              {currentLoginMessage.text}
+            </div>
+          </div>
+        )}
+
+        {/* アーカイブ切り替えエリア */}
+        <div style={{ marginBottom: "20px", display: "flex", alignItems: "center", gap: "8px", background: "#f8fafc", padding: "12px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
+          <input
+            type="checkbox"
+            id="archiveToggle"
+            checked={showArchived === 1}
+            onChange={(e) => {
+              const nextValue = e.target.checked ? 1 : 0;
+              setShowArchived(nextValue);
+            }}
+            style={{ width: "16px", height: "16px", cursor: "pointer" }}
+          />
+          <label htmlFor="archiveToggle" style={{ fontSize: "14px", fontWeight: "bold", color: "#334155", cursor: "pointer" }}>
+            アーカイブされたスペースを表示する
+          </label>
+        </div>
+
         {loginMessage && <div style={{ padding: "15px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: "6px", marginBottom: "20px" }}>{loginMessage}</div>}
 
-        {/* 🎯 目報管理エリア */}
+        {/* 目標管理エリア */}
         <div style={{ marginBottom: "25px" }}>
           {showActiveGoal ? (
-            /* ⭕ 目標が登録されている場合の表示（黄色枠） */
             <div
               style={{
                 padding: "20px",
@@ -219,7 +359,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* 🌟 ボタンエリア */}
+              {/* ボタンエリア */}
               <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
                 <button
                   type="button"
@@ -268,7 +408,6 @@ export default function Dashboard() {
               </div>
             </div>
           ) : (
-            /* ❌ 目標が登録されていない場合の表示（緑色枠） */
             <div
               style={{
                 padding: "20px",
@@ -282,7 +421,7 @@ export default function Dashboard() {
             >
               <div>
                 <span style={{ fontSize: "16px", color: "#166534", fontWeight: "bold" }}>
-                  🌱 今週の目標を登録しよう！
+                  今週の目標を登録しよう！
                 </span>
               </div>
               <button
@@ -318,21 +457,21 @@ export default function Dashboard() {
 
         {/* 各スペース一覧 */}
         <SpaceList
-          key={`type1_${spaces.type1.map(s => `${s.id}-${s.favorite}`).join(',')}`}
+          key={`type1_${spaces.type1.map(s => `${s.id}-${s.favorite}-${s.is_archived}`).join(',')}`}
           title="チャット"
           items={spaces.type1}
           onEdit={handleEdit}
           onDelete={handleDelete}
         />
         <SpaceList
-          key={`type2_${spaces.type2.map(s => `${s.id}-${s.favorite}`).join(',')}`}
+          key={`type2_${spaces.type2.map(s => `${s.id}-${s.favorite}-${s.is_archived}`).join(',')}`}
           title="ToDoリスト"
           items={spaces.type2}
           onEdit={handleEdit}
           onDelete={handleDelete}
         />
         <SpaceList
-          key={`type3_${spaces.type3.map(s => `${s.id}-${s.favorite}`).join(',')}`}
+          key={`type3_${spaces.type3.map(s => `${s.id}-${s.favorite}-${s.is_archived}`).join(',')}`}
           title="質問"
           items={spaces.type3}
           onEdit={handleEdit}
@@ -346,7 +485,6 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {/* 🌟 型エラーの元になっていた modalFavorite を綺麗に削除 */}
       <SpaceModal
         isOpen={isModalOpen}
         onClose={() => { setIsModalOpen(false); setEditingSpace(null); }}

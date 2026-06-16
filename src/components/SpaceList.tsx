@@ -7,16 +7,17 @@ type Space = {
   name: string;
   space_type: number;
   favorite: number;
+  is_archived?: number; 
 };
 
 export default function SpaceList(props: any) {
-  const { items, title, onEdit, onDelete } = props; // toggleFavorite は使わないので削除
+  const { items, title, onEdit, onDelete } = props;
   const [open, setOpen] = useState(true);
   const [localItems, setLocalItems] = useState<Space[]>(items);
 
   useEffect(() => {
     setLocalItems(items);
-  }, [items]);
+  }, [items, items.map(i => `${i.id}-${i.is_archived}`).join(',')]);
 
   const getLinkPath = (type: number, id: string) => {
     switch (type) {
@@ -40,6 +41,7 @@ export default function SpaceList(props: any) {
           padding: "10px",
           borderRadius: "4px",
           border: "1px solid #ddd",
+          userSelect: "none",
         }}
       >
         {title}
@@ -47,7 +49,7 @@ export default function SpaceList(props: any) {
       </h2>
 
       {open && (
-        <ul style={{ marginTop: "10px" }}>
+        <ul style={{ marginTop: "10px", paddingLeft: "0", listStyle: "none" }}>
           {localItems && localItems.length > 0 ? (
             localItems.map((s: Space) => (
               <li
@@ -58,34 +60,65 @@ export default function SpaceList(props: any) {
                   padding: "8px",
                   borderBottom: "1px solid #eee",
                   alignItems: "center",
+                  opacity: s.is_archived === 1 ? 0.5 : 1,
+                  background: s.is_archived === 1 ? "#fafafa" : "transparent",
+                  transition: "all 0.2s ease"
                 }}
               >
+                {/* ★マークエリア */}
                 <div style={{ width: "36px", display: "flex", justifyContent: "center", flexShrink: 0 }}>
                   {s.favorite === 1 ? (
                     <span
                       style={{
                         fontSize: "18px",
-                        color: "#eab308", // 綺麗な黄色
+                        color: "#eab308",
                         userSelect: "none",
                       }}
                     >
                       ★
                     </span>
                   ) : (
-                    "" // 0（お気に入りでない）時は何も表示しないが、親のdivが幅をキープするのでズレない
+                    ""
                   )}
                 </div>
 
-                <a href={getLinkPath(s.space_type, s.id)} style={{ flexGrow: 1, textDecoration: "none", color: "#333" }}>
-                  {s.name}
-                </a>
+                {/* リンクとテキストエリア */}
+                <div style={{ flexGrow: 1, display: "flex", alignItems: "center", gap: "8px" }}>
+                  <a 
+                    href={getLinkPath(s.space_type, s.id)} 
+                    style={{ 
+                      textDecoration: "none", 
+                      color: "#333",
+                      fontWeight: "500"
+                    }}
+                  >
+                    {s.name}
+                  </a>
 
+                  {s.is_archived === 1 && (
+                    <span 
+                      style={{ 
+                        padding: "2px 6px", 
+                        background: "#cbd5e1", // 薄いグレー
+                        color: "#475569",     // 濃いグレーの文字
+                        borderRadius: "4px", 
+                        fontSize: "11px",
+                        fontWeight: "bold",
+                        userSelect: "none"
+                      }}
+                    >
+                      アーカイブ済
+                    </span>
+                  )}
+                </div>
+
+                {/* 操作ボタン */}
                 <button onClick={() => onEdit(s)} style={{ padding: "4px 8px", cursor: "pointer" }}>編集</button>
-                <button onClick={() => onDelete(s.id)} style={{ padding: "4px 8px", cursor: "pointer" }}>削除</button>
+                <button onClick={() => onDelete(s.id, s.space_type)} style={{ padding: "4px 8px", cursor: "pointer" }}>削除</button>
               </li>
             ))
           ) : (
-            <p>データなし</p>
+            <p style={{ padding: "10px", color: "#666" }}>データなし</p>
           )}
         </ul>
       )}
