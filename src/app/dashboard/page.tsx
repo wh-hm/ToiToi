@@ -48,7 +48,13 @@ export default function Dashboard() {
   const [loginInfo, setLoginInfo] = useState<any>(null);
   const [loginMessage, setLoginMessage] = useState("");
   const [showArchived, setShowArchived] = useState<number>(0);
-  const [currentLoginMessage, setCurrentLoginMessage] = useState<{ name: string; text: string }>({ name: "", text: "" });
+  
+  // 🌟 修正：キャラクター名、メッセージテキストに加え「画像パス」も管理できるように拡張
+  const [currentLoginMessage, setCurrentLoginMessage] = useState<{ name: string; text: string; image: string }>({ 
+    name: "", 
+    text: "",
+    image: ""
+  });
 
   const updateLoginMessage = (streakDays: number, isStreakAchieved: boolean) => {
     // 1. 全イベント発生時の現在時刻をリアルタイムに取得
@@ -56,23 +62,21 @@ export default function Dashboard() {
     const hour = now.getHours();
 
     let timeZone: "朝" | "昼" | "夜" = "昼";
-    let charName = "といまる";
 
     // 2. 時間帯判定 (朝: 3:00〜10:59 / 昼: 11:00〜18:59 / 夜: 19:00〜2:59)
     if (hour >= 3 && hour < 11) {
       timeZone = "朝";
-      charName = "しきじー";
     } else if (hour >= 11 && hour < 19) {
       timeZone = "昼";
-      charName = "といまる";
     } else {
       timeZone = "夜";
-      charName = "フクロウ";
     }
 
     // 3. メッセージ一覧マスターデータの定義（仕様書を完全再現）
     const messageMaster = {
       "朝": {
+        charName: "しきじー",
+        image: "/stamps/shikiji_defualt.png", 
         normal: [
           "おはよう よく来たな 共に頑張ろう",
           "Good Morning ん？ わしは英語も話せるじいじだぞ？",
@@ -81,6 +85,8 @@ export default function Dashboard() {
         success: `おお！ 連続ログイン日数${streakDays}日が達成したぞ！ おめでとう！`
       },
       "昼": {
+        charName: "といまる",
+        image: "/stamps/toimaru_default.png", 
         normal: [
           "こんにちは〜 今日も一緒に頑張ろうね〜",
           "ハロ〜 眠くなったらこまめに休憩してね〜",
@@ -89,6 +95,8 @@ export default function Dashboard() {
         success: `わ〜 連続で${streakDays}日も来れて偉いね〜 達成したよ！`
       },
       "夜": {
+        charName: "フクロウ",
+        image: "/stamps/fukurou_default.png", 
         normal: [
           "ホー(こんばんは あなたに会えたことを嬉しく思います。)",
           "ホーホー(Good evening 夕飯はきちんと食べましたか？)",
@@ -103,18 +111,17 @@ export default function Dashboard() {
 
     // 4. 分岐条件の判定
     if (isStreakAchieved) {
-      // 連続ログイン達成時：おめでとうメッセージ固定
       finalMessageText = selectedZone.success;
     } else {
-      // 通常時：通常メッセージ3種からランダムで1つ選択
       const randomIndex = Math.floor(Math.random() * 3);
       finalMessageText = selectedZone.normal[randomIndex];
     }
 
-    // Stateを更新して画面に反映
+    // 🌟 修正：判定されたキャラクター画像パスも一緒に反映
     setCurrentLoginMessage({
-      name: charName,
-      text: finalMessageText
+      name: selectedZone.charName,
+      text: finalMessageText,
+      image: selectedZone.image
     });
   };
 
@@ -140,7 +147,6 @@ export default function Dashboard() {
     setIsModalOpen(true);
   };
 
-  // ステータスをワンタップで反転（0 ⇄ 1）させて更新する関数
   const handleToggleGoalStatus = async () => {
     try {
       const res = await fetch("/api/dashboard", {
@@ -198,11 +204,13 @@ export default function Dashboard() {
 
       if (data.loginInfo) {
         setLoginInfo(data.loginInfo);
-
         const streakDays = data.loginInfo.streak_days ?? 0;
         const isStreakAchieved = data.loginInfo.is_streak_achieved ?? false;
-
         updateLoginMessage(streakDays, isStreakAchieved);
+      } else {
+        // APIからログイン情報が届いていない場合のフォールバック（安全装置）
+        console.warn("APIからloginInfoが取得できませんでした。デフォルト値でメッセージを表示します。");
+        updateLoginMessage(0, false); 
       }
 
       if (data.loginMessage) setLoginMessage(data.loginMessage);
@@ -219,14 +227,11 @@ export default function Dashboard() {
         }));
       };
 
-      //指定された優先順位でソートするロジック
       const sortSpaces = (list: Space[]): Space[] => {
         return [...list].sort((a, b) => {
-          // 優先度1: アーカイブされていない(0)が上、アーカイブされている(1)が下
           if (a.is_archived !== b.is_archived) {
             return a.is_archived - b.is_archived;
           }
-          // 優先度2: 同じアーカイブ状態同士なら、お気に入り(1)が上、星なし(0)が下
           if (a.favorite !== b.favorite) {
             return b.favorite - a.favorite;
           }
@@ -234,12 +239,11 @@ export default function Dashboard() {
         });
       };
 
-      // showArchived の 0 / 1 に応じてデータを絞り込む
       const filterByArchiveSetting = (list: Space[]): Space[] => {
         if (showArchived === 1) {
-          return sortSpaces(list); // 表示(1)：アーカイブも含めて全部ソートして出す
+          return sortSpaces(list);
         }
-        return sortSpaces(list.filter(s => s.is_archived === 0)); // 非表示(0)：アーカイブ(1)を完全除外
+        return sortSpaces(list.filter(s => s.is_archived === 0));
       };
 
       const type1 = filterByArchiveSetting(convertAndFilter(targetData.type1));
@@ -265,6 +269,7 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
+    updateLoginMessage(0, false);
     if (status === "authenticated") fetchSpaces();
   }, [status, showArchived]);
 
@@ -277,29 +282,57 @@ export default function Dashboard() {
       <section style={{ maxWidth: "900px", margin: "40px auto", padding: "30px", background: "white", borderRadius: "8px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
         <h1 style={{ fontSize: "28px", fontWeight: "bold", marginBottom: "20px" }}>ダッシュボード</h1>
 
+        {/* 🌟 修正：フキダシ構造の中にキャラクター画像を美しく配置 */}
         {currentLoginMessage.name && (
           <div style={{
             marginBottom: "25px",
-            padding: "16px",
-            background: "#f8fafc", // シンプルな薄いグレー
-            border: "1px solid #e2e8f0",
-            borderRadius: "8px",
             display: "flex",
             alignItems: "center",
-            gap: "12px"
+            gap: "16px"
           }}>
-            <div style={{
-              padding: "4px 12px",
-              background: "#475569", // 落ち着いたダークグレー 
-              color: "white",
-              borderRadius: "4px",
-              fontSize: "12px",
-              fontWeight: "bold",
-              flexShrink: 0
-            }}>
-              {currentLoginMessage.name}
+            {/* 左側：キャラクター画像と名前 */}
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", flexShrink: 0, width: "70px" }}>
+              <img 
+                src={currentLoginMessage.image} 
+                alt={currentLoginMessage.name}
+                style={{ 
+                  width: "55px", 
+                  height: "55px", 
+                  borderRadius: "50%", 
+                  objectFit: "cover",
+                  border: "2px solid #cbd5e1"
+                }} 
+              />
+              <span style={{ fontSize: "12px", fontWeight: "bold", color: "#475569", textAlign: "center" }}>
+                {currentLoginMessage.name}
+              </span>
             </div>
-            <div style={{ fontSize: "14px", color: "#1e293b", fontWeight: "500", lineHeight: "1.5" }}>
+
+            {/* 右側：フキダシ風メッセージコンテナ */}
+            <div style={{
+              position: "relative",
+              flexGrow: 1,
+              padding: "16px",
+              background: "#f8fafc", 
+              border: "1px solid #e2e8f0",
+              borderRadius: "8px",
+              fontSize: "14px",
+              color: "#1e293b",
+              fontWeight: "500",
+              lineHeight: "1.5"
+            }}>
+              {/* フキダシの左側の三角形の角 */}
+              <div style={{
+                position: "absolute",
+                left: "-6px",
+                top: "50%",
+                transform: "translateY(-50%) rotate(45deg)",
+                width: "10px",
+                height: "10px",
+                background: "#f8fafc",
+                borderLeft: "1px solid #e2e8f0",
+                borderBottom: "1px solid #e2e8f0"
+              }}></div>
               {currentLoginMessage.text}
             </div>
           </div>

@@ -11,7 +11,7 @@ export default function Question() {
   const router = useRouter();
   const params = useParams(); 
   // URLが /task/[id] なら、params.id が spaceId に該当するはず
-  const spaceId = params.id;
+  const spaceId = params?.id;
 
   // ★統合した useEffect
   useEffect(() => {
