@@ -80,7 +80,7 @@ export default function Header() {
             <div key={cat.key} className="relative" onMouseEnter={() => setOpenStates(p => ({...p, [cat.key]: true}))} onMouseLeave={() => setOpenStates(p => ({...p, [cat.key]: false}))}>
               <Dropdown isOpen={openStates[cat.key]}>
                 <DropdownTrigger>
-                  <button className="font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-full capitalize flex items-center gap-1">
+                  <button className="font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 px-2 py-2 rounded-full capitalize flex items-center gap-1">
                     {cat.title} 
                     <ChevronDownIcon 
                       className={`w-4 h-4 transition-transform duration-300 ${

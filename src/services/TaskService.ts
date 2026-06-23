@@ -189,39 +189,42 @@ export async function updateStatusTask(
   }
 }
 
-// 概要：未完了のタスクの個数を取得
-export async function getTasksCount(
-  user_id: string,
-  space_id?: number
-): Promise<number> {
-  try {
-    // 1. 所有者・権限チェック：
-    // スペーステーブル（spaces）を検索し、引数の space_id に紐づくレコードの所有者（user_id）が、引数の user_id と一致するか確認する。
-    const space = await prisma.task.findFirst({
-      where: {
-        id: space_id,
-      },
-    });
 
-    // 一致しない場合、または該当スペースが存在しない・削除済みの場合は、アクセス権限がないため処理を中断し、件数 0 を返す。
-    if (!space || space.user_id !== user_id || space.delete_flag !== 0) {
-      return 0;
-    }
+/**
+ * 各スペースごとの未完了タスク件数を配列で取得する
+ */
+export async function getTasksCount(user_id: string) {
+  // 1. まずユーザーの全スペースを取得
+  const spaces = await prisma.space.findMany({
+    where: {
+      user_id: user_id,
+      delete_flag: 0,
+    },
+    select: {
+      id: true,
+      name: true, // スペース名も取れるようにしておくのがおすすめ
+    },
+  });
 
-    // 2. 未完了タスクの件数カウント（count）：
-    // チェックをクリアした場合、タスクマスタ（tasks）から以下の条件に一致するレコードの総数をカウントする。
-    const count = await prisma.task.count({
-      where: {
-        user_id: user_id,
-        ...(space_id ? { space_id: space_id } : {}),
-        status: 0,      // status = 0（未完了状態のタスクのみを対象とする）
-        delete_flag: 0, // delete_flag = 0（削除されていない有効なタスクのみを対象とする）
-      },
-    });
+  // 2. 各スペースについてタスクをカウント（並列処理で高速化）
+  const result = await Promise.all(
+    spaces.map(async (space) => {
+      const count = await prisma.task.count({
+        where: {
+          user_id: user_id,
+          space_id: space.id,
+          status: 0,
+          delete_flag: 0,
+        },
+      });
+      
+      return {
+        space_id: space.id,
+        space_name: space.name,
+        task_count: count,
+      };
+    })
+  );
 
-    // 3. 戻り値の返却：カウントした結果（0以上の整数）を呼び出し元へ返却する。
-    return count;
-  } catch (error) {
-    throw error;
-  }
+  return result; // これが「配列」になります
 }

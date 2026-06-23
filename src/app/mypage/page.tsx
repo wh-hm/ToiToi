@@ -16,16 +16,39 @@ export default function MyPage() {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [newName, setNewName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [archiveCount, setArchiveCount] = useState(0);
 
   // データ再取得用の関数を useCallback で定義
   const fetchData = useCallback(async () => {
-    try {
-      const res = await fetch("/api/user/account");
-      if (!res.ok) throw new Error("取得失敗");
-      const json = await res.json();
-      setUsername(json.user?.username || "ユーザー");
-      setSpaces(json.spaces || { type1: [], type2: [], type3: [] });
-      setImageCount(json.imageCount || 0);
+  try {
+    const res = await fetch("/api/user/account");
+    if (!res.ok) throw new Error("取得失敗");
+    const json = await res.json();
+    
+    // 1. 元のデータを取得
+    const rawSpaces = json.spaces || { type1: [], type2: [], type3: [] };
+    
+    // 2. 全データを統合して、is_archived を判定する
+    const allItems = [
+      ...(rawSpaces.type1 || []),
+      ...(rawSpaces.type2 || []),
+      ...(rawSpaces.type3 || [])
+    ];
+    
+    // 3. アーカイブされているものだけを抽出してカウント
+    const archivedItems = allItems.filter(item => item.is_archived === 1);
+    // setArchiveCount は別途ステートを用意してください
+    setArchiveCount(archivedItems.length);
+    
+    // 4. 表示用の spaces には is_archived が 0 のものだけをセットする
+    setSpaces({
+      type1: rawSpaces.type1 || [],
+      type2: rawSpaces.type2 || [],
+      type3: rawSpaces.type3 || [],
+    });
+
+    setUsername(json.user?.username || "ユーザー");
+    setImageCount(json.imageCount || 0);
     } catch (e) {
       toast.error("データ取得に失敗しました");
     } finally {
@@ -41,27 +64,39 @@ export default function MyPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
+  
   const handleAction = async (action: string, label: string) => {
     if (!confirm(`${label}を実行しますか？`)) return;
 
     try {
-      const res = await fetch(`/api/spaces/${action}`, { method: "DELETE" });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error);
+      // 修正: 画像削除の場合はボディを含める必要がある
+      const options: RequestInit = {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+      };
+
+      const res = await fetch(`/api/${action}`, options);
       
+      // ボディが空の可能性がある場合のエラーハンドリングを強化
+      const text = await res.text();
+      const result = text ? JSON.parse(text) : {};
+
+      if (!res.ok) throw new Error(result.error || "操作に失敗しました");
+
       toast.success(result.message);
-      
-      if (action === "user/delete") {
+
+      if (action === "user/account") {
         await signOut({ callbackUrl: "/" });
-      } else {
-        // 削除成功後にデータを再取得してUIを更新（ボタンが自動的に非活性になる）
-        await fetchData();
+        return;
       }
+
+      await fetchData();
     } catch (e: any) {
-      toast.error(e.message);
+      console.error(e);
+      toast.error(e.message || "処理に失敗しました");
     }
   };
+
 
   const handleUpdateUsername = async () => {
     if (!newName.trim()) return toast.error("ユーザー名を入力してください");
@@ -134,10 +169,11 @@ export default function MyPage() {
         </h2>
         <div className="grid gap-3">
           {[
-            { label: "チャット全削除", action: "chats", count: spaces?.type1?.length ?? 0 },
-            { label: "タスク全削除", action: "tasks", count: spaces?.type2?.length ?? 0 },
-            { label: "質問全削除", action: "questions", count: spaces?.type3?.length ?? 0 },
-            { label: "画像全削除", action: "delete/images", count: imageCount },
+            { label: "チャット全削除", action: "spaces/chats", count: spaces?.type1?.length ?? 0 },
+            { label: "タスク全削除", action: "spaces/tasks", count: spaces?.type2?.length ?? 0 },
+            { label: "質問全削除", action: "spaces/questions", count: spaces?.type3?.length ?? 0 },
+            { label: "アーカイブ全削除", action: "spaces/archive", count: archiveCount ?? 0 },
+            { label: "画像全削除", action: "images", count: imageCount },
           ].map((item) => (
             <button 
               key={item.action}
@@ -159,7 +195,7 @@ export default function MyPage() {
       {/* 3. アカウント操作 */}
       <div className="pt-8 border-t border-gray-100 space-y-4">
         <button onClick={() => signOut({ callbackUrl: "/" })} className="w-full bg-gray-100 hover:bg-gray-200 py-3 rounded-xl font-bold transition-all">ログアウト</button>
-        <button onClick={() => handleAction("user/delete", "アカウント削除")} className="w-full text-red-500 hover:bg-red-50 font-medium py-3 rounded-xl transition-all">アカウントを削除</button>
+        <button onClick={() => handleAction("user/account", "アカウント削除")} className="w-full text-red-500 hover:bg-red-50 font-medium py-3 rounded-xl transition-all">アカウントを削除</button>
       </div>
     </section>
   );

@@ -1,13 +1,23 @@
-"use client"
-import { useEffect } from "react";
+"use client";
+
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { signIn, useSession, SessionProvider } from "next-auth/react";
+import { signIn, signOut, useSession, SessionProvider } from "next-auth/react";
 
 function TopPageContent() {
     const router = useRouter();
     const { data: session, status } = useSession();
+    const [isAppBrowser, setIsAppBrowser] = useState(false);
 
-    //ログインの処理
+    // 1. アプリ内ブラウザの判定
+    useEffect(() => {
+        const ua = window.navigator.userAgent.toLowerCase();
+        const patterns = ["line", "fbav", "fb_iab", "instagram", "twitter", "tiktok", "wv", "messenger", "snapchat"];
+        const isEmbedded = patterns.some((pattern) => ua.includes(pattern));
+        setIsAppBrowser(isEmbedded);
+    }, []);
+
+    // 2. ログイン後の処理
     useEffect(() => {
         if (status === "authenticated" && session?.user) {
             const checkUser = async () => {
@@ -21,66 +31,62 @@ function TopPageContent() {
                     });
 
                     if (res.ok) {
-                        // 成功したら遷移
-                        try {
-                            const res = await fetch(`/api/user/username/check`);
-                            if (!res.ok) {
-                            }
-                            
-                            const data = await res.json();
-                            if (data.hasUsername) {
-                                router.push("/dashboard");
-                            }else{
-                                router.push("/username");
-                            }
-                        } catch (error) {
-                            console.log(error);
+                        const resCheck = await fetch(`/api/user/username/check`);
+                        const data = await resCheck.json();
+                        if (data.hasUsername) {
+                            router.push("/dashboard");
+                        } else {
+                            router.push("/username");
                         }
                     } else {
-                        // 失敗したらアラートやコンソールで通知
-                        console.log("Status Code:", res.status);
-  
-                        // レスポンスの本文をテキストとして取得して表示
-                        const errorText = await res.text();
-                        console.error("API Error Response Body:", errorText);
-                        console.error("API Error Detail:", res);
                         alert("登録処理に失敗しました。");
                     }
                 } catch (error) {
                     console.error("API Error:", error);
-                    alert("サーバーとの通信に失敗しました。");
                 }
             };
-
             checkUser();
         }
-    }, [status, session, router]); // statusなどが変わった時だけ実行される
+    }, [status, session, router]);
 
-    // 読み込み中（一瞬ボタンが見えちゃうのを防ぐ）
+    // 読み込み中
     if (status === "loading") {
-        return <p style={{ textAlign: "center", marginTop: "50px" }}>読み込み中...</p>;
+        return <div style={{ textAlign: "center", marginTop: "50px" }}>読み込み中...</div>;
     }
 
-    
-
     return (
-        <section id="Login" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh" }}>
-        <h1 style={{ fontSize: "3rem", marginBottom: "20px" }}>ToiToi</h1>
-        <div>
-            <button
-            onClick={() => signIn("google")}
-            >
-            Googleアカウントでログイン
-            </button>
-        </div>
+        <section style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh" }}>
+            <h1 style={{ fontSize: "3rem", marginBottom: "20px" }}>ToiToi</h1>
+
+            {/* アプリ内ブラウザなら「ブラウザで開くボタン」を表示 */}
+            {isAppBrowser ? (
+                <div style={{ textAlign: "center", padding: "20px" }}>
+                    <p>このアプリ内ではログインできません。</p>
+                    <button onClick={() => {
+                        navigator.clipboard.writeText(window.location.href);
+                        alert("URLをコピーしました！ブラウザ（Safari/Chrome）を開いて貼り付けてください。");
+                    }}>
+                        URLをコピーしてブラウザで開く
+                    </button>
+                </div>
+            ) : (
+                /* 通常のログインUI */
+                <div style={{ textAlign: "center" }}>
+                    
+                    <button onClick={() => signIn("google")} style={{ padding: "10px 20px" }}>
+                        Googleアカウントでログイン
+                    </button>
+                    
+                </div>
+            )}
         </section>
     );
 }
 
 export default function TopPage() {
-return (
-    <SessionProvider>
-    <TopPageContent />
-    </SessionProvider>
-);
+    return (
+        <SessionProvider>
+            <TopPageContent />
+        </SessionProvider>
+    );
 }
