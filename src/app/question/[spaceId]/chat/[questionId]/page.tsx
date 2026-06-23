@@ -132,6 +132,36 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
     fetchMessages();
   };
 
+  const handleDownload = async (imageUrl: string) => {
+    // ダウンロード処理を開始
+    const response = await fetch("/api/images", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targetUrl: imageUrl })
+    });
+
+    if (!response.ok) {
+      console.error("APIエラー");
+      return;
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    
+    // <a>タグをプログラム的に作成
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "download.png"; // ファイル名
+    
+    // bodyに追加してクリック
+    document.body.appendChild(a);
+    a.click();
+    
+    // 後片付け
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
   return (
     <div ref={containerRef} className="flex flex-col h-[calc(100vh-64px)] w-full overflow-hidden bg-gray-50">
       {/* 1. 質問エリア */}
@@ -163,6 +193,7 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
           onDelete={handleDeleteClick}
           setEditValue={setEditValue}
           onNiceFlag={handleNiceFlag}
+          onDownload={handleDownload}
           type="question"
         />
       </div>
