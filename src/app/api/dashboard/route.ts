@@ -31,6 +31,8 @@ export async function GET() {
       };
     });
 
+    const tasksCount = tasksWithCounts.reduce((sum, t) => sum + (t.task_count || 0), 0);
+
     // 3. データの整形と統合
     // データの整形と統合
     const result = {
