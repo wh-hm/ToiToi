@@ -44,6 +44,8 @@ export default function Dashboard() {
   const [editingSpace, setEditingSpace] = useState<Space | null>(null);
   const [modalFavorite, setModalFavorite] = useState<number>(0);
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
+  const [consecutiveLoginDays, setConsecutiveLoginDays] = useState<number>(0);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   const [goal, setGoal] = useState<Goal | null>(null);
   const [loginInfo, setLoginInfo] = useState<any>(null);
@@ -204,15 +206,17 @@ export default function Dashboard() {
         setGoal(null);
       }
 
-      if (data.loginInfo) {
-        setLoginInfo(data.loginInfo);
-        const streakDays = data.loginInfo.streak_days ?? 0;
-        const isStreakAchieved = data.loginInfo.is_streak_achieved ?? false;
+      if (data.login_management) {
+        setLoginInfo(data.login_management);
+        const streakDays = data.login_management.streak_days ?? 0;
+        setConsecutiveLoginDays(streakDays);
+        setLoginError(null); 
+        const isStreakAchieved = data.login_management.is_streak_achieved ?? false;
         updateLoginMessage(streakDays, isStreakAchieved);
       } else {
-        // APIからログイン情報が届いていない場合のフォールバック（安全装置）
-        console.warn("APIからloginInfoが取得できませんでした。デフォルト値でメッセージを表示します。");
-        updateLoginMessage(0, false);
+        setLoginError("ログイン情報の取得に失敗しました。");
+        setIsLoading(false);
+        return null; 
       }
 
       if (data.loginMessage) setLoginMessage(data.loginMessage);
@@ -283,12 +287,22 @@ export default function Dashboard() {
       <section style={{ maxWidth: "900px", margin: "40px auto", padding: "30px", background: "white", borderRadius: "8px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
         <h1 style={{ fontSize: "28px", fontWeight: "bold", marginBottom: "20px" }}>ダッシュボード</h1>
 
+        {loginError && (
+          <div style={{ padding: "12px 16px", background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: "6px", color: "#b91c1c", fontWeight: "bold", marginBottom: "20px" }}>
+            ⚠️ {loginError}
+          </div>
+        )}
+
         {currentLoginMessage.name && (
           <div style={{
             marginBottom: "25px",
             display: "flex",
             alignItems: "center",
-            gap: "16px"
+            gap: "16px",
+            background: "#f8fafc",    
+            border: "1px solid #e2e8f0",
+            borderRadius: "12px",
+            padding: "16px 20px",
           }}>
             {/* 左側：キャラクター画像と名前 */}
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", flexShrink: 0, width: "70px" }}>
@@ -308,32 +322,29 @@ export default function Dashboard() {
               </span>
             </div>
 
-            {/* 右側：フキダシ風メッセージコンテナ */}
-            <div style={{
-              position: "relative",
-              flexGrow: 1,
-              padding: "16px",
-              background: "#f8fafc",
-              border: "1px solid #e2e8f0",
-              borderRadius: "8px",
-              fontSize: "14px",
-              color: "#1e293b",
-              fontWeight: "500",
-              lineHeight: "1.5"
-            }}>
-              {/* フキダシの左側の三角形の角 */}
+            {/* 右側：コンテンツエリア（ログイン日数 ＋ セリフ） */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", flexGrow: 1 }}>
+              
+              {/* 連続ログイン日数をフキダシ内の最上部にスマートに配置 */}
+              {!loginError && (
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", color: "#64748b" }}>
+                  <span>連続ログイン:</span>
+                  <span style={{ fontSize: "16px", fontWeight: "800", color: "#b45309" }}>
+                    {consecutiveLoginDays}
+                  </span>
+                  <span>日目</span>
+                </div>
+              )}
+
+              {/* キャラクターのセリフ */}
               <div style={{
-                position: "absolute",
-                left: "-6px",
-                top: "50%",
-                transform: "translateY(-50%) rotate(45deg)",
-                width: "10px",
-                height: "10px",
-                background: "#f8fafc",
-                borderLeft: "1px solid #e2e8f0",
-                borderBottom: "1px solid #e2e8f0"
-              }}></div>
-              {currentLoginMessage.text}
+                fontSize: "14px",
+                color: "#1e293b",
+                fontWeight: "500",
+                lineHeight: "1.5"
+              }}>
+                {currentLoginMessage.text}
+              </div>
             </div>
           </div>
         )}

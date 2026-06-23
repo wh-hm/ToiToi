@@ -34,25 +34,21 @@ export async function GET() {
     const tasksCount = tasksWithCounts.reduce((sum, t) => sum + (t.task_count || 0), 0);
 
     // 3. データの整形と統合
-    // データの整形と統合
     const result = {
       spaces: {
-        // type1 はそのまま（spacesWithTaskCount を使っているので全データ＋タスク数がある）
         type1: spacesWithTaskCount.filter(s => s.space_type === 1),
-        
-        // type2 も同様に「全データ」を返すようにする
         type2: spacesWithTaskCount
           .filter(s => s.space_type === 2)
           .map(s => ({
-            ...s, // ★ここが重要：s の中身（全プロパティ）を全て展開する
-            task_count: s.task_count // 既に付与済みの task_count を上書き、またはそのまま保持
+            ...s, 
+            task_count: s.task_count 
           })),
           
         type3: spacesWithTaskCount.filter(s => s.space_type === 3),
       },
-      tasksCount,       // 未完了タスクの合計件数など
-      goal,             // 目標データ
-      login_management, // ログイン管理情報
+      tasksCount,       
+      goal,           
+      login_management, 
     };
 
     return NextResponse.json(result);
