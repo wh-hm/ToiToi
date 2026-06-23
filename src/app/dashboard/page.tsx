@@ -76,7 +76,7 @@ export default function Dashboard() {
     const messageMaster = {
       "朝": {
         charName: "しきじー",
-        image: "/stamps/shikiji_defualt.png", 
+        image: "/stamps/shikiji_default.png", 
         normal: [
           "おはよう よく来たな 共に頑張ろう",
           "Good Morning ん？ わしは英語も話せるじいじだぞ？",
@@ -96,7 +96,7 @@ export default function Dashboard() {
       },
       "夜": {
         charName: "フクロウ",
-        image: "/stamps/fukurou_default.png", 
+        image: "/stamps/hukurou_default.png", 
         normal: [
           "ホー(こんばんは あなたに会えたことを嬉しく思います。)",
           "ホーホー(Good evening 夕飯はきちんと食べましたか？)",

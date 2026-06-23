@@ -98,18 +98,16 @@ export async function deleteTask(
   try {
     const result = await prisma.task.updateMany({
       where: {
-        id: id,            // 引数の id （数値型）
-        user_id: user_id,  // 引数の user_id
-        space_id: space_id, // 引数の space_id
-        delete_flag: 0,    // 未削除の有効なタスクのみ
+        id: id,          
+        user_id: user_id, 
+        space_id: space_id, 
+        delete_flag: 0,   
       },
       data: {
-        delete_flag: 1, // 削除済み状態に変更
+        delete_flag: 1,
       },
     });
 
-    // レコードの更新が正常に完了した場合は、成功の証として true を呼び出し元に返却する。
-    // 対象レコードが存在しない（他人のタスク、または既に削除されている）場合は、更新が行われないため false を返却する。
     if (result.count > 0) {
       return true;
     } else {

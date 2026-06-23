@@ -12,7 +12,6 @@ export default function TaskPage() {
   const spaceId = params?.id;
 
   // 1. 状態管理（State）の設計
-  // 💡 解決の鍵：初期状態をAPIの戻り値と同じ `{ incomplete: [], complete: [] }` の形にしておく！
   const [taskData, setTaskData] = useState<{ incomplete: any[]; complete: any[] }>({
     incomplete: [],
     complete: [],
@@ -24,23 +23,24 @@ export default function TaskPage() {
   const [editingTask, setEditingTask] = useState<any>(null);
   const [modalMode, setModalMode] = useState<"create" | "edit" | "detail">("create");
 
-  // タグ検索とソートの状態
-  const [searchTag, setSearchTag] = useState<string>("");
   const [sortType, setSortType] = useState<"date" | "priority">("date");
+
+  // タグ検索とナレッジ検索の状態
+  const [searchTag, setSearchTag] = useState<string>("");
+  const [searchKnowledge, setSearchKnowledge] = useState<string>("");
 
   // 2. タスクデータの取得
   const fetchTasks = useCallback(async () => {
     if (!spaceId) return;
 
     try {
-      // 💡 解決の秘密兵器：API側が文字列・数値のどちらで受け取っても引っかかるように両方のキーで送りつける！
       const res = await fetch(`/api/task?spaceId=${spaceId}&space_id=${spaceId}`, {
         cache: "no-store",
       });
       if (!res.ok) throw new Error("API error");
-      
+
       const data = await res.json();
-      console.log("🔥 認証情報を含めた最新データ:", data);
+      console.log("認証情報を含めた最新データ:", data);
 
       setTaskData({
         incomplete: Array.isArray(data.incomplete) ? data.incomplete : [],
@@ -49,7 +49,7 @@ export default function TaskPage() {
     } catch (error) {
       console.error("タスク取得失敗", error);
     } finally {
-      setIsLoading(false); 
+      setIsLoading(false);
     }
   }, [spaceId]);
 
@@ -66,26 +66,27 @@ export default function TaskPage() {
     }
   }, [spaceId, status, router, fetchTasks]);
 
-  // ✨ 3. 検索・ソート・完了未完了の分配ロジック（迷いのない超シンプル版）
+  // 3. 検索・ソート・完了未完了の分配ロジック（質問画面ベースの安全版）
   const processedTasks = useMemo(() => {
-    // 状態（taskData）から2つの部屋のタスクを1つの配列に安全にマージする
+    // 状態（taskData）からタスクをマージ
     const allTasks = [...taskData.incomplete, ...taskData.complete];
 
-    // 💡 1. 検索（フィルタリング）
+    // 1. 検索（フィルタリング：タグ ＆ ナレッジ）
     let filtered = allTasks.filter((task) => {
-      if (!searchTag.trim()) return true;
+      const matchTag = searchTag ? String(task.tag) === searchTag : true;
 
-      const searchWord = searchTag.trim().toLowerCase();
-      const taskTitle = (task.title || "").toLowerCase();
-      const taskTag = String(task.tag || "");
+      const matchKnowledge = searchKnowledge
+        ? (task.title || "").toLowerCase().includes(searchKnowledge.toLowerCase()) ||
+        (task.description || "").toLowerCase().includes(searchKnowledge.toLowerCase())
+        : true;
 
-      return taskTitle.includes(searchWord) || taskTag.includes(searchWord);
+      return matchTag && matchKnowledge;
     });
 
-    // 💡 2. ソート
+    // 2. ソート（安全な日付パース付き）
     filtered.sort((a, b) => {
-      const dateA = new Date(a.due_date).getTime();
-      const dateB = new Date(b.due_date).getTime();
+      const dateA = a.due_date ? new Date(a.due_date).getTime() : 0;
+      const dateB = b.due_date ? new Date(b.due_date).getTime() : 0;
       const prioA = Number(a.priority) || 1;
       const prioB = Number(b.priority) || 1;
 
@@ -98,13 +99,12 @@ export default function TaskPage() {
       }
     });
 
-    // 💡 3. 仕分けて引き渡し（型がブレないので100%安全！）
+    // 3. 仕分けて引き渡し
     return {
-      // status が 1（完了）ではないものは、すべて 0（未完了）の部屋に入れて画面に出す！
       incomplete: filtered.filter((task) => Number(task.status) !== 1),
       complete: filtered.filter((task) => Number(task.status) === 1),
     };
-  }, [taskData, searchTag, sortType]);
+  }, [taskData, searchTag, searchKnowledge, sortType]); 
 
   // 4. 各種ボタンのアクションハンドラー
   const handleCreateOpen = () => {
@@ -126,8 +126,9 @@ export default function TaskPage() {
   };
 
   const handleDelete = async (id: number) => {
+    if (!window.confirm("このタスクを削除してもよろしいですか？")) return;
     try {
-      const res = await fetch(`/api/task/${id}?space_id=${spaceId}`,  {
+      const res = await fetch(`/api/task/${id}?space_id=${spaceId}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ space_id: Number(spaceId) }),
@@ -144,33 +145,32 @@ export default function TaskPage() {
   };
 
   const toggleComplete = async (task: any) => {
-  const newStatus = Number(task.status) === 0 ? 1 : 0;
-  try {
-    const res = await fetch(`/api/task/${task.id}/status`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...task,
-        status: newStatus,
-        space_id: Number(spaceId), // ← ★ここを修正
-      }),
-    });
+    const newStatus = Number(task.status) === 0 ? 1 : 0;
+    try {
+      const res = await fetch(`/api/task/${task.id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...task,
+          status: newStatus,
+          space_id: Number(spaceId),
+        }),
+      });
 
-    if (res.ok) {
-      if (newStatus === 1) triggerCelebration();
-      fetchTasks();
-    } else {
-      alert("更新に失敗しました。チェックを元に戻します。");
+      if (res.ok) {
+        if (newStatus === 1) triggerCelebration();
+        fetchTasks();
+      } else {
+        alert("更新に失敗しました。チェックを元に戻します。");
+        fetchTasks();
+      }
+    } catch (error) {
       fetchTasks();
     }
-  } catch (error) {
-    fetchTasks();
-  }
-};
-
+  };
 
   const triggerCelebration = () => {
-    console.log("🎉お祝い演出実行！");
+    console.log("お祝い演出実行！");
   };
 
   if (isLoading) return <div className="p-6 text-slate-500 text-sm">読み込み中...</div>;
@@ -193,24 +193,24 @@ export default function TaskPage() {
           </button>
         </header>
 
-        {/* 検索・ソートコントロールエリア */}
-        <div className="flex flex-col sm:flex-row gap-3 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-          <div className="relative flex-1">
-            <input
-              type="text"
-              placeholder="タグで検索..."
-              value={searchTag}
-              onChange={(e) => setSearchTag(e.target.value)}
-              className="w-full pl-3 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
-            />
-          </div>
+        {/*  検索・絞り込みエリア（質問管理と同じ並び、ソート切り替えも選択可能にすると便利です） */}
+        <div className="flex gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <input
+            type="text"
+            placeholder="ナレッジ検索（タイトルや詳細のキーワード）..."
+            value={searchKnowledge}
+            onChange={(e) => setSearchKnowledge(e.target.value)}
+            className="flex-1 px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
           <select
-            value={sortType}
-            onChange={(e) => setSortType(e.target.value as any)}
-            className="bg-slate-50 border border-slate-200 rounded-lg text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+            value={searchTag}
+            onChange={(e) => setSearchTag(e.target.value)}
+            className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
-            <option value="date">日付順 (優先度順) </option>
-            <option value="priority"> 優先度順 (日付順) </option>
+            <option value="">全てのタグ</option>
+            <option value="1">学習 / カテゴリ1</option>
+            <option value="2">重要 / カテゴリ2</option>
+            <option value="3">プライベート / カテゴリ3</option>
           </select>
         </div>
 
@@ -233,6 +233,7 @@ export default function TaskPage() {
           mode={modalMode}
           task={editingTask}
           spaceId={spaceId}
+          type="task"
           onClose={() => setIsModalOpen(false)}
           onSuccess={() => {
             setIsModalOpen(false);
