@@ -123,7 +123,8 @@ return (
         <div style={{ marginBottom: "24px", position: "relative", display: "flex", alignItems: "center" }}>
           <input
             type="text"
-            value={editingSpace?.name || ""} 
+            value={name} // 🌟 Stateの「name」をバインドする
+            onChange={(e) => setName(e.target.value)} // 🌟 入力時にStateを更新する
             placeholder="名前を入力"
             style={{
               width: "100%",
