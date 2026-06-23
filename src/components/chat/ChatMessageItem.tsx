@@ -17,12 +17,13 @@ interface ChatMessageItemProps {
   setEditValue: (val: string) => void;
   onNiceFlag?: (id: number, flag: number) => void;
   onImageClick?: (url: string) => void;
+  onDownload: (url: string) => void;
   type: string;
 }
 
 export default function ChatMessageItem({ 
   message, spaceId, isOpen, isSubmitting, 
-  onOpenChange, onToggleFavorite, onEdit, onDelete, onBackgroundChange, setEditValue, onNiceFlag, onImageClick, type
+  onOpenChange, onToggleFavorite, onEdit, onDelete, onBackgroundChange, setEditValue, onNiceFlag, onImageClick, onDownload, type
 }: ChatMessageItemProps) {
   
   const [isHovered, setIsHovered] = useState(false);
@@ -152,7 +153,9 @@ export default function ChatMessageItem({
             ${(isHovered || isOpen) && !isSubmitting ? "brightness-90" : "brightness-100"}
           `}
         >
-          {message.message && <p className="text-lg text-gray-800 whitespace-pre-wrap">{message.message}</p>}
+          {(!message.signedImageUrl && message.message) && (
+            <p className="text-lg text-gray-800 whitespace-pre-wrap">{message.message}</p>
+          )}          
           {message.stamp ? (
             <img
               src={`/stamps/${message.stamp}.png`}

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Input, Button } from "@nextui-org/react";
-import { Paperclip, SendHorizontal, X } from "lucide-react";
 import { PreviewModal } from "@/components/chat/PreviewModal";
+import { Input, Button, Popover, PopoverTrigger, PopoverContent } from "@nextui-org/react";
+import { Paperclip, SendHorizontal, Smile, X } from "lucide-react";
+import { CHARACTER_STAMPS } from "@/constants/stamp";
 
 interface ChatInputProps {
   value: string;
@@ -76,6 +77,15 @@ export default function ChatInput({
             size="lg"
             variant="bordered"
             disabled={disabled}
+            onKeyDown={(e) => {
+              // EnterキーかつShiftが押されていない場合のみ送信
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault(); // 改行が入るのを防ぐ
+                if (value.trim() || selectedFiles.length > 0) {
+                  onSend();
+                }
+              }
+            }}
             startContent={
               <Button 
                 isIconOnly 
@@ -89,6 +99,30 @@ export default function ChatInput({
             }
             endContent={
               <div className="flex items-center gap-1">
+                <Popover placement="top-end">
+                  <PopoverTrigger>
+                    <Button isIconOnly variant="light" radius="full" className="text-gray-400 hover:text-blue-600">
+                      <Smile size={20} />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="p-4 w-[280px]">
+                    <div className="grid grid-cols-4 gap-2">
+                      {Object.values(CHARACTER_STAMPS).flat().map((stamp) => (
+                        <button 
+                          key={stamp.id} 
+                          onClick={() => onSendStamp(stamp.id)} 
+                          className="hover:bg-gray-100 p-1 rounded-xl transition-transform active:scale-90 flex flex-col items-center"
+                        >
+                          <img 
+                            src={`/stamps/${stamp.id}.png`} 
+                            alt={stamp.name} 
+                            className="w-10 h-10 object-contain" 
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
                 <Button 
                   isIconOnly 
                   variant="light" 
@@ -125,3 +159,4 @@ export default function ChatInput({
     </>
   );
 }
+
