@@ -179,30 +179,36 @@ export async function getImageCountAlternative(user_id: string): Promise<number>
 /**
  * 画像をR2にアップロードして、ファイル名を返す関数
  */
-export async function uploadImage(image: File, user_id: string, space_id: string | number) {
-  // 1. ファイル名の生成 (ユニークにするためにUUIDも活用するとより安全です)
-  const currentCount = await getImageCount(user_id);
-  //  常に「現在の数 + 1」を使うことで、自動的に連番になる
-  const nextSequence = currentCount + 1;
-  const fileName = `${user_id}_${space_id}_${nextSequence.toString().padStart(3, '0')}.png`;
-  // 2. ファイルをArrayBufferに変換
-  const arrayBuffer = await image.arrayBuffer();
+export async function uploadImages(images: File[], user_id: string, space_id: string | number) {
+  const uploadedFileNames: string[] = [];
 
-  // 3. R2へアップロード実行
-  try {
-    await s3Client.send(
-      new PutObjectCommand({
-        Bucket: process.env.R2_BUCKET_NAME,
-        Key: fileName,
-        Body: Buffer.from(arrayBuffer),
-        ContentType: image.type,
-      })
-    );
-  } catch (error) {
-    console.error("R2 Upload Error:", error);
-    throw new Error("画像のアップロードに失敗しました");
+  // 現在のカウントを取得（ループの外で一度だけ取得し、以降はインクリメント）
+  let currentCount = await getImageCount(user_id);
+
+  for (const image of images) {
+    currentCount += 1;
+    const fileName = `${user_id}_${space_id}_${currentCount.toString().padStart(3, '0')}.png`;
+    
+    // 2. ファイルをArrayBufferに変換
+    const arrayBuffer = await image.arrayBuffer();
+
+    // 3. R2へアップロード実行
+    try {
+      await s3Client.send(
+        new PutObjectCommand({
+          Bucket: process.env.R2_BUCKET_NAME,
+          Key: fileName,
+          Body: Buffer.from(arrayBuffer),
+          ContentType: image.type,
+        })
+      );
+      uploadedFileNames.push(fileName);
+    } catch (error) {
+      console.error("R2 Upload Error:", error);
+      throw new Error("画像のアップロードに失敗しました");
+    }
   }
 
-  // 4. アップロードされたファイル名を返す
-  return fileName;
+  // 4. アップロードされた全ファイル名を返す
+  return uploadedFileNames;
 }
