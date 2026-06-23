@@ -45,66 +45,71 @@ export async function GET(
 }
 
 
-
-// 2. メッセージ送信 (POST)
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  
   const { id } = await params;
-  let imageUrl: string | undefined;
+  const questionId = parseInt(id);
 
   try {
-
     const formData = await request.formData();
     const message = formData.get("message") as string;
-    const file = formData.get("image") as File | null;
-    const image_url = formData.get("image_url") as string;
+    const files = formData.getAll("images") as File[]; // 複数画像取得
     const stamp = formData.get("stamp") as string | null;
     const space_id = Number(formData.get("space_id"));
 
-        if (!message && !file && !stamp) {
+    // 1. バリデーション
+    if (!message && files.length === 0 && !stamp) {
       return NextResponse.json({ error: MESSAGES.E1001("チャット内容") }, { status: 400 });
     }
 
-    // 2. 桁数チェック (E1002)
     if (message && message.length > 100) {
       return NextResponse.json({ error: MESSAGES.E1002("チャット内容", 100) }, { status: 400 });
     }
-    // 3. 画像バリデーション (E1005)
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        return NextResponse.json({ error: MESSAGES.E1005 }, { status: 400 });
+
+    // 画像アップロード処理
+    let imageUrls: string[] = [];
+    if (files.length > 0) {
+      for (const file of files) {
+        if (file.size > 2 * 1024 * 1024 || !["image/png", "image/jpeg", "image/jpg"].includes(file.type)) {
+          return NextResponse.json({ error: MESSAGES.E1005 }, { status: 400 });
+        }
       }
-      const validTypes = ["image/png", "image/jpeg", "image/jpg"];
-      if (!validTypes.includes(file.type)) {
-        return NextResponse.json({ error: MESSAGES.E1005}, { status: 400 });
+      imageUrls = await uploadImages(files, auth.user_id, space_id);
+    }
+
+    // 2. DB登録処理
+    const newChats = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      // 画像がない場合
+      if (imageUrls.length === 0) {
+        return [await registerQuestionChat(questionId, auth.user_id, message || undefined, undefined, stamp || undefined, tx)];
       }
 
-      imageUrl = await uploadImages(file, auth.user_id, space_id);
-    }
-    // 簡易バリデーション
-    const newMessage = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      return await registerQuestionChat(
-        parseInt(id),
-        auth.user_id,
-        message || undefined,
-        imageUrl,
-        stamp || undefined,
-        tx
-      );
+      // 画像がある場合はループして個別に登録
+      const results = [];
+      for (let i = 0; i < imageUrls.length; i++) {
+        const res = await registerQuestionChat(
+          questionId,
+          auth.user_id,
+          i === 0 ? (message || undefined) : undefined, // 1枚目にメッセージ/スタンプ付与
+          imageUrls[i],
+          i === 0 ? (stamp || undefined) : undefined,
+          tx
+        );
+        results.push(res);
+      }
+      return results;
     });
-    return NextResponse.json(newMessage, { status: 201 });
+
+    return NextResponse.json({ messages: newChats }, { status: 201 });
+
   } catch (error) {
-    // 5. エラー処理 (画像だけアップロード成功してDB登録失敗した場合のリカバリー)
-    if (imageUrl) {
-      console.error("エラー発生。アップロード済みの画像を削除します:", imageUrl);
-      // await deleteImages(imageUrl).catch(e => console.error("削除失敗:", e));
-    }
-    console.error("質問作成エラー:", error);
+    // エラー時の画像削除
+    console.error("API処理エラー:", error);
     return NextResponse.json({ error: MESSAGES.E2001("質問") }, { status: 500 });
   }
 }
-
