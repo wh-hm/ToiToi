@@ -9,37 +9,33 @@ export async function getTasks(
   user_id: string
 ): Promise<Task[]> {
   try {
-    // スペーステーブル（spaces）を検索し、引数のspace_idに紐づくレコードの所有者（user_id）が一致するか確認
-    const space = await prisma.task.findFirst({
+    const space = await prisma.space.findFirst({
       where: {
         id: space_id,
+        user_id: user_id,
+        delete_flag: 0,
       },
     });
-
-    // 一致しない場合、または該当スペースが存在しない、あるいは削除済みの場合は空配列「[]」を返す
-    if (!space || space.user_id !== user_id || space.delete_flag !== 0) {
+    if (!space) {
       return [];
     }
-
-    // タスク一覧の検索（findMany）、ソート条件
+    // タスク一覧取得
     const tasks = await prisma.task.findMany({
       where: {
         space_id: space_id,
-        delete_flag: 0, // 削除されていない、有効なタスクのみを対象とする
+        delete_flag: 0,
       },
       orderBy: [
-        { due_date: 'asc' },   // 期日（due_date）の昇順
-        { created_at: 'desc' } // 登録日時（created_at）の降順等で並び替え
+        { due_date: 'asc' },
+        { created_at: 'desc' }
       ],
     });
-
-    // 戻り値の判定：取得したタスクレコードの配列（存在しない場合は空配列「[]」）を返却
-    return tasks as Task[];
+    return tasks;
   } catch (error) {
-    // 例外処理：データベース接続エラー等の例外発生時は、呼び出し元にエラーをそのまま返す
     throw error;
   }
 }
+
 
 
 // 概要：タスクの登録
@@ -66,9 +62,9 @@ export async function registerTask(
       data: {
         user_id: user_id, // 引数の user_id
         title: title,     // 引数の title
-        description: description, 
+        description: description,
         // 引数の due_date を Date型（日付型）に変換して設定
-        due_date: new Date(due_date), 
+        due_date: new Date(due_date),
         status: 0,        // 初期値：未完了状態を固定設定
         tag: tag,         // 引数の tag
         is_allday: is_allday, // 引数の is_allday
@@ -102,18 +98,16 @@ export async function deleteTask(
   try {
     const result = await prisma.task.updateMany({
       where: {
-        id: id,            // 引数の id （数値型）
-        user_id: user_id,  // 引数の user_id
-        space_id: space_id, // 引数の space_id
-        delete_flag: 0,    // 未削除の有効なタスクのみ
+        id: id,          
+        user_id: user_id, 
+        space_id: space_id, 
+        delete_flag: 0,   
       },
       data: {
-        delete_flag: 1, // 削除済み状態に変更
+        delete_flag: 1,
       },
     });
 
-    // レコードの更新が正常に完了した場合は、成功の証として true を呼び出し元に返却する。
-    // 対象レコードが存在しない（他人のタスク、または既に削除されている）場合は、更新が行われないため false を返却する。
     if (result.count > 0) {
       return true;
     } else {

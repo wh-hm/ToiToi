@@ -1,154 +1,279 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
+
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
-import TaskList from "@/components/TaskList";
-import QuestionModal from "@/components/QuestionModal";
+import { useRouter, useParams } from "next/navigation";
+import TaskModal from "@/components/TaskModal"; 
 
-
-export default function Question() {
+export default function QuestionPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const params = useParams(); 
-  // URLが /task/[id] なら、params.id が spaceId に該当するはず
-  const spaceId = params?.spaceid;
+  const params = useParams();
+  
+  const spaceId = params?.spaceId;
 
-  // ★統合した useEffect
+  // 状態管理
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'create' | 'edit' | 'detail'>('create');
+  const [selectedQuestion, setSelectedQuestion] = useState<any>(null);
+  
+  // 検索用ステート（仕様：タグ検索 ＆ ナレッジ検索）
+  const [searchTag, setSearchTag] = useState<string>("");
+  const [searchKnowledge, setSearchKnowledge] = useState<string>("");
+
+  // 1. 初期表示・セッション有効チェック
   useEffect(() => {
-    if (status === "loading") return; // ロード中は待つ
     if (status === "unauthenticated") {
-      router.push("/");
-      return;
+      router.push("/login");
     }
-    
-    // 認証済みならデータを取得
-    if (spaceId) {
-      getQuestions();
-    }
-  }, [spaceId, status, router]); // 必要なものだけ監視
+  }, [status, router]);
 
-  const [questions, setQuestions] = useState([]);
-  // 毎回計算して、TaskListに渡すデータを作る
-  const taskData = {
-    incomplete: questions.filter((q: any) => q.is_resolved === 0),
-    complete: questions.filter((q: any) => q.is_resolved === 1),
-  };
-
-const getQuestions = async () => {
-  try {
-    // APIのGETメソッドを叩く (spaceIdをクエリパラメータで渡す)
-    const res = await fetch(`/api/question?spaceId=${spaceId}`);
-    const data = await res.json();
-    
-    if (res.ok) {
-      setQuestions(data); // 取得したデータをstateへ
-    }
-  } catch (error) {
-    console.error("取得失敗:", error);
-  }
-};
-
-  const handleSaveQuestion = async (title: string, question: string, tag: number) => {
+ // 2. 質問サービス：getQuestions の実行
+  const fetchQuestions = useCallback(async () => {
+    if (!spaceId) return;
     try {
-      const response = await fetch(`/api/question`, {
-        method: "POST",
+      setIsLoading(true);
+      
+      const res = await fetch(`/api/questions?spaceId=${spaceId}&space_id=${spaceId}`, {
+        cache: "no-store",
+      });
+      
+      if (!res.ok) throw new Error("質問データの取得に失敗しました。");
+      
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : (data.questions || []);
+      setQuestions(list);
+    } catch (error: any) {
+      alert(error.message || "通信エラーが発生しました。");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [spaceId]);
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      fetchQuestions();
+    }
+  }, [status, fetchQuestions]);
+
+  // 3. チェックマーク押下・ステータス更新 (updateQuestionStatus)
+  const handleStatusToggle = async (question: any) => {
+    // 0: 未解決 / 1: 解決
+    const newStatus = question.status === 1 ? 0 : 1;
+    
+    try {
+      const res = await fetch(`/api/questions/${question.id}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          title, 
-          question, 
-          tag,
-          space_id: parseInt(spaceId as string) 
+          status: newStatus,
+          spaceId: spaceId
         }),
       });
 
-      if (response.ok) {
-        console.log("作成成功");
-        getQuestions();
-        // 必要に応じて一覧再取得の関数などをここに呼ぶ
+      if (!res.ok) throw new Error("ステータスの更新に失敗しました。");
+
+      if (newStatus === 1) {
+        alert("🎉 質問解決おめでとうございます！お祝い演出 🎉");
+      } else {
+        alert("ステータスを未解決に戻しました。");
       }
-    } catch (error) {
-      console.error("送信エラー:", error);
+      
+      fetchQuestions();
+    } catch (error: any) {
+      alert(error.message);
     }
   };
 
-  // 削除処理の例
-const handleDelete = async (id: number) => {
-  if (!confirm("本当に削除しますか？")) return;
-  
-  // ここでAPIを叩いて削除処理を行う
-  const res = await fetch(`/api/question/${id}`, {
-     method: "DELETE",
-    body: JSON.stringify({ space_id: spaceId })
-   });
-  if (res.ok) {
-    getQuestions(); // 再取得して一覧を更新
-  }
-};
+  // 4. 削除ボタン押下 (deleteQuestion)
+  const handleDelete = async (id: number) => {
+    if (!window.confirm("この質問を削除してもよろしいですか？")) return;
 
-// 完了/未完了の切り替え処理の例
-const handleToggleComplete = async (task: any) => {
-  const newStatus = task.is_resolved === 0 ? 1 : 0;
-  try {
-    const res = await fetch(`/api/question/${task.id}/status`, { // IDをURLに含める形式が安全
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ 
-        is_resolved: newStatus,
-        space_id: spaceId // 権限チェック用に必要
-      }),
-    });
-    
-    if (res.ok) {
-      getQuestions(); // 成功したら一覧を再取得して画面を更新
+    try {
+      const res = await fetch(`/api/questions/${id}?space_id=${spaceId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!res.ok) throw new Error("削除に失敗しました。DBの論理削除は行われませんでした。");
+      
+      // 成功時：メッセージを表示
+      alert("質問を削除しました（論理削除完了）。");
+      fetchQuestions();
+    } catch (error: any) {
+      alert(error.message);
     }
-  } catch (e) {
-    console.error("更新エラー:", e);
-  }
-};
+  };
 
-// 1. 状態管理を追加
-const [editingTask, setEditingTask] = useState<any>(null);
-const [isModalOpen, setIsModalOpen] = useState(false);
-
-// 2. 編集ボタン用関数
-const handleEdit = (task: any) => {
-  setEditingTask(task); // 編集対象をセット
-  setIsModalOpen(true); // モーダルを開く
-};
-// 3. 保存・更新の分岐処理
-const handleSave = async (title: string, question: string, tag: number, id?: number) => {
-  if (id) {
-    // 編集モード：PATCH で更新
-    await fetch(`/api/question/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, question, space_id: spaceId })
+  // 5. 検索機能 ＆ 解決・未解決の仕分けロジック (useMemoでリアルタイム処理)
+  const processedQuestions = useMemo(() => {
+    // 表示されているデータから「タグ」と「ナレッジ」で絞り込み
+    const filtered = questions.filter((q) => {
+      const matchTag = searchTag ? String(q.tag) === searchTag : true;
+      const matchKnowledge = searchKnowledge 
+        ? q.title.includes(searchKnowledge) || q.description.includes(searchKnowledge)
+        : true;
+      return matchTag && matchKnowledge;
     });
-  } else {
-    // 新規作成モード：POST で作成
-    await fetch(`/api/question`, {
-      method: "POST",
-      // ...既存のPOST処理
-    });
+    const incomplete = filtered.filter((q) => Number(q.is_resolved ?? q.status) !== 1);
+    const complete = filtered.filter((q) => Number(q.is_resolved ?? q.status) === 1);
+
+    return { 
+      incomplete, 
+      complete, 
+      totalFiltered: filtered.length,
+      hasOriginalData: questions.length > 0 
+    };
+  }, [questions, searchTag, searchKnowledge]);
+
+  if (status === "loading" || isLoading) {
+    return <div className="p-8 text-center text-slate-500 font-medium">質問スペースを読み込み中...</div>;
   }
-  getQuestions();
-};
 
+  return (
+    <div className="p-6 max-w-5xl mx-auto space-y-6 text-slate-800">
+      {/* ヘッダーエリア */}
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-slate-900">質問スペース</h1>
+        <button
+          onClick={() => { setModalMode('create'); setSelectedQuestion(null); setIsModalOpen(true); }}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 shadow-sm transition-all"
+        >
+          + 新規質問作成
+        </button>
+      </div>
 
-    // 4. Return 内でモーダルを表示
-return (
-  <section>
-    <button onClick={() => { setEditingTask(null); setIsModalOpen(true); }}>新規作成</button>
-    
-    <TaskList tasks={taskData} onDelete={handleDelete} onEdit={handleEdit} />
+      {/* 検索・絞り込みエリア（仕様：タグ検索、ナレッジ検索） */}
+      <div className="flex gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+        <input
+          type="text"
+          placeholder="ナレッジ検索（タイトルや詳細のキーワード）..."
+          value={searchKnowledge}
+          onChange={(e) => setSearchKnowledge(e.target.value)}
+          className="flex-1 px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+        <select
+          value={searchTag}
+          onChange={(e) => setSearchTag(e.target.value)}
+          className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        >
+          <option value="">全てのタグ</option>
+          <option value="1">学習 / カテゴリ1</option>
+          <option value="2">重要 / カテゴリ2</option>
+          <option value="3">プライベート / カテゴリ3</option>
+        </select>
+      </div>
 
-    {isModalOpen && (
-      <QuestionModal 
-        onSave={handleSave} 
-        initialData={editingTask} 
-        onClose={() => setIsModalOpen(false)} 
-      />
-    )}
-  </section>
-);
+      {/* データの表示判定 */}
+      {!processedQuestions.hasOriginalData ? (
+        // 仕様：元々のデータがそもそも空の場合
+        <div className="text-center py-12 text-slate-400 font-medium">データがありません</div>
+      ) : processedQuestions.totalFiltered === 0 ? (
+        // 仕様：検索によって該当データがなくなった場合
+        <div className="text-center py-12 text-slate-400 font-medium">該当のデータはありません</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          {/* 未解決エリア */}
+          <div className="space-y-3">
+            <h2 className="font-bold text-red-500 border-b border-red-100 pb-2 flex justify-between items-center">
+              <span>未解決</span>
+              <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full">{processedQuestions.incomplete.length}件</span>
+            </h2>
+            {processedQuestions.incomplete.map((q) => (
+              <div key={q.id} className="p-4 bg-white border border-slate-200 rounded-xl shadow-sm flex justify-between items-center hover:border-slate-300 transition-all">
+               {/* 仕様：データクリック時・直接質問チャット画面に遷移する */}
+                <div 
+                  className="cursor-pointer flex-1 pr-4" 
+                  onClick={() => {
+                    router.push(`/question/${spaceId}/chat/${q.id}`);
+                  }}
+                >
+                  <p className="font-semibold text-slate-900">{q.title}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {/* 仕様：チェックマーク押下で解決へ移動 */}
+                  <input 
+                    type="checkbox" 
+                    checked={false} 
+                    onChange={() => handleStatusToggle(q)} 
+                    className="w-4 h-4 cursor-pointer rounded text-indigo-600 focus:ring-indigo-500" 
+                  />
+                  {/* 仕様：編集ボタン押下 */}
+                  <button 
+                    onClick={() => { setSelectedQuestion(q); setModalMode('edit'); setIsModalOpen(true); }} 
+                    className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                  >
+                    編集
+                  </button>
+                  {/* 仕様：削除ボタン押下 */}
+                  <button 
+                    onClick={() => handleDelete(q.id)} 
+                    className="text-xs font-medium text-red-500 hover:text-red-700"
+                  >
+                    削除
+                  </button>
+                </div>
+              </div>
+            ))}
+            {processedQuestions.incomplete.length === 0 && (
+              <p className="text-xs text-slate-400 text-center py-4">未解決の質問はありません</p>
+            )}
+          </div>
+
+          {/* 解決済みエリア */}
+          <div className="space-y-3">
+            <h2 className="font-bold text-green-600 border-b border-green-100 pb-2 flex justify-between items-center">
+              <span>解決済み</span>
+              <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full">{processedQuestions.complete.length}件</span>
+            </h2>
+            {processedQuestions.complete.map((q) => (
+              <div key={q.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center opacity-75 hover:opacity-100 transition-all">
+                {/* 詳細表示 */}
+                <div 
+                  className="cursor-pointer flex-1 pr-4" 
+                  onClick={() => { setSelectedQuestion(q); setModalMode('detail'); setIsModalOpen(true); }}
+                >
+                  <p className="font-semibold text-slate-500 line-through">{q.title}</p>
+                  <p className="text-xs text-slate-400 mt-1">解決済み</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {/* チェックを外して未解決に戻す */}
+                  <input 
+                    type="checkbox" 
+                    checked={true} 
+                    onChange={() => handleStatusToggle(q)} 
+                    className="w-4 h-4 cursor-pointer rounded text-indigo-600 focus:ring-indigo-500" 
+                  />
+                  <button 
+                    onClick={() => handleDelete(q.id)} 
+                    className="text-xs font-medium text-red-500 hover:text-red-700"
+                  >
+                    削除
+                  </button>
+                </div>
+              </div>
+            ))}
+            {processedQuestions.complete.length === 0 && (
+              <p className="text-xs text-slate-400 text-center py-4">解決済みの質問はありません</p>
+            )}
+          </div>
+
+        </div>
+      )}
+
+      {/* モーダル表示（拡張したTaskModalを再利用） */}
+      {isModalOpen && (
+        <TaskModal
+          task={selectedQuestion}
+          mode={modalMode}
+          spaceId={spaceId}
+          type="question" // 💡 これを渡すことで質問用の挙動にスイッチ！
+          onClose={() => setIsModalOpen(false)}
+          onSuccess={() => { setIsModalOpen(false); fetchQuestions(); }}
+        />
+      )}
+    </div>
+  );
 }

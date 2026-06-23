@@ -38,12 +38,13 @@ export async function POST(request: Request) {
     if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     try {
-        const { name, space_type } = await request.json();
+        const { name, space_type, favorite_flag } = await request.json();
         
         // --- 単体チェック ---
         // 1. 必須チェック (E1001)
         if (!name) return NextResponse.json({ error: MESSAGES.E1001("スペース名") }, { status: 400 });
-
+        if (!space_type && Number(space_type)) return NextResponse.json({ error: MESSAGES.E1001("スペースタイプ") }, { status: 400 });
+        if (!favorite_flag && Number(favorite_flag)) return NextResponse.json({ error: MESSAGES.E1001("お気に入り") }, { status: 400 });
         // 2. 桁数チェック (E1002: 20文字)
         if (name.length > 20) return NextResponse.json({ error: MESSAGES.E1002("スペース名", 20) }, { status: 400 });
 
@@ -53,7 +54,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: MESSAGES.E1003("スペース名", "記号") }, { status: 400 });
         }
 
-        const success = await registerSpace(auth.user_id, name, space_type);
+        const success = await registerSpace(auth.user_id, name, space_type, favorite_flag);
         if (!success) return NextResponse.json({ error: MESSAGES.E2001("スペース") }, { status: 500 });
 
         return NextResponse.json({ message: MESSAGES.S1001("スペース") });
