@@ -43,18 +43,21 @@ export default function Dashboard() {
   const [selectedType, setSelectedType] = useState<number | null>(null);
   const [editingSpace, setEditingSpace] = useState<Space | null>(null);
   const [modalFavorite, setModalFavorite] = useState<number>(0);
+  const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
 
   const [goal, setGoal] = useState<Goal | null>(null);
   const [loginInfo, setLoginInfo] = useState<any>(null);
   const [loginMessage, setLoginMessage] = useState("");
-  const [showArchived, setShowArchived] = useState<number>(0);
-  
-  // 🌟 修正：キャラクター名、メッセージテキストに加え「画像パス」も管理できるように拡張
-  const [currentLoginMessage, setCurrentLoginMessage] = useState<{ name: string; text: string; image: string }>({ 
-    name: "", 
+  const [showArchivedType1, setShowArchivedType1] = useState<number>(0);
+  const [showArchivedType2, setShowArchivedType2] = useState<number>(0);
+  const [showArchivedType3, setShowArchivedType3] = useState<number>(0);
+
+  const [currentLoginMessage, setCurrentLoginMessage] = useState<{ name: string; text: string; image: string }>({
+    name: "",
     text: "",
     image: ""
   });
+  
 
   const updateLoginMessage = (streakDays: number, isStreakAchieved: boolean) => {
     // 1. 全イベント発生時の現在時刻をリアルタイムに取得
@@ -76,7 +79,7 @@ export default function Dashboard() {
     const messageMaster = {
       "朝": {
         charName: "しきじー",
-        image: "/stamps/shikiji_default.png", 
+        image: "/stamps/shikiji_default.png",
         normal: [
           "おはよう よく来たな 共に頑張ろう",
           "Good Morning ん？ わしは英語も話せるじいじだぞ？",
@@ -86,7 +89,7 @@ export default function Dashboard() {
       },
       "昼": {
         charName: "といまる",
-        image: "/stamps/toimaru_default.png", 
+        image: "/stamps/toimaru_default.png",
         normal: [
           "こんにちは〜 今日も一緒に頑張ろうね〜",
           "ハロ〜 眠くなったらこまめに休憩してね〜",
@@ -96,7 +99,7 @@ export default function Dashboard() {
       },
       "夜": {
         charName: "フクロウ",
-        image: "/stamps/hukurou_default.png", 
+        image: "/stamps/hukurou_default.png",
         normal: [
           "ホー(こんばんは あなたに会えたことを嬉しく思います。)",
           "ホーホー(Good evening 夕飯はきちんと食べましたか？)",
@@ -117,7 +120,6 @@ export default function Dashboard() {
       finalMessageText = selectedZone.normal[randomIndex];
     }
 
-    // 🌟 修正：判定されたキャラクター画像パスも一緒に反映
     setCurrentLoginMessage({
       name: selectedZone.charName,
       text: finalMessageText,
@@ -210,7 +212,7 @@ export default function Dashboard() {
       } else {
         // APIからログイン情報が届いていない場合のフォールバック（安全装置）
         console.warn("APIからloginInfoが取得できませんでした。デフォルト値でメッセージを表示します。");
-        updateLoginMessage(0, false); 
+        updateLoginMessage(0, false);
       }
 
       if (data.loginMessage) setLoginMessage(data.loginMessage);
@@ -239,16 +241,16 @@ export default function Dashboard() {
         });
       };
 
-      const filterByArchiveSetting = (list: Space[]): Space[] => {
-        if (showArchived === 1) {
+      const filterByArchiveSetting = (list: Space[], isShowArchived: number): Space[] => {
+        if (isShowArchived === 1) {
           return sortSpaces(list);
         }
         return sortSpaces(list.filter(s => s.is_archived === 0));
       };
 
-      const type1 = filterByArchiveSetting(convertAndFilter(targetData.type1));
-      const type2 = filterByArchiveSetting(convertAndFilter(targetData.type2));
-      const type3 = filterByArchiveSetting(convertAndFilter(targetData.type3));
+      const type1 = filterByArchiveSetting(convertAndFilter(targetData.type1), showArchivedType1);
+      const type2 = filterByArchiveSetting(convertAndFilter(targetData.type2), showArchivedType2);
+      const type3 = filterByArchiveSetting(convertAndFilter(targetData.type3), showArchivedType3);
 
       const newState = {
         type1, type2, type3,
@@ -269,9 +271,8 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    updateLoginMessage(0, false);
     if (status === "authenticated") fetchSpaces();
-  }, [status, showArchived]);
+  }, [status, showArchivedType1, showArchivedType2, showArchivedType3]);
 
   if (status === "loading") return <div>読み込み中...</div>;
 
@@ -282,7 +283,6 @@ export default function Dashboard() {
       <section style={{ maxWidth: "900px", margin: "40px auto", padding: "30px", background: "white", borderRadius: "8px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
         <h1 style={{ fontSize: "28px", fontWeight: "bold", marginBottom: "20px" }}>ダッシュボード</h1>
 
-        {/* 🌟 修正：フキダシ構造の中にキャラクター画像を美しく配置 */}
         {currentLoginMessage.name && (
           <div style={{
             marginBottom: "25px",
@@ -292,16 +292,16 @@ export default function Dashboard() {
           }}>
             {/* 左側：キャラクター画像と名前 */}
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", flexShrink: 0, width: "70px" }}>
-              <img 
-                src={currentLoginMessage.image} 
+              <img
+                src={currentLoginMessage.image}
                 alt={currentLoginMessage.name}
-                style={{ 
-                  width: "55px", 
-                  height: "55px", 
-                  borderRadius: "50%", 
+                style={{
+                  width: "55px",
+                  height: "55px",
+                  borderRadius: "50%",
                   objectFit: "cover",
                   border: "2px solid #cbd5e1"
-                }} 
+                }}
               />
               <span style={{ fontSize: "12px", fontWeight: "bold", color: "#475569", textAlign: "center" }}>
                 {currentLoginMessage.name}
@@ -313,7 +313,7 @@ export default function Dashboard() {
               position: "relative",
               flexGrow: 1,
               padding: "16px",
-              background: "#f8fafc", 
+              background: "#f8fafc",
               border: "1px solid #e2e8f0",
               borderRadius: "8px",
               fontSize: "14px",
@@ -338,23 +338,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* アーカイブ切り替えエリア */}
-        <div style={{ marginBottom: "20px", display: "flex", alignItems: "center", gap: "8px", background: "#f8fafc", padding: "12px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
-          <input
-            type="checkbox"
-            id="archiveToggle"
-            checked={showArchived === 1}
-            onChange={(e) => {
-              const nextValue = e.target.checked ? 1 : 0;
-              setShowArchived(nextValue);
-            }}
-            style={{ width: "16px", height: "16px", cursor: "pointer" }}
-          />
-          <label htmlFor="archiveToggle" style={{ fontSize: "14px", fontWeight: "bold", color: "#334155", cursor: "pointer" }}>
-            アーカイブされたスペースを表示する
-          </label>
-        </div>
-
         {loginMessage && <div style={{ padding: "15px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: "6px", marginBottom: "20px" }}>{loginMessage}</div>}
 
         {/* 目標管理エリア */}
@@ -368,31 +351,44 @@ export default function Dashboard() {
                 borderRadius: "8px",
                 display: "flex",
                 justifyContent: "space-between",
-                alignItems: "center"
+                alignItems: "center",
+                gap: "16px"
               }}
             >
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                <div style={{ fontSize: "14px", color: "#854d0e" }}><strong>今週の目標：</strong></div>
-                <div style={{ fontSize: "18px", fontWeight: "bold", color: "#1e293b" }}>
-                  {goal?.content}
-                </div>
-                <div style={{ marginTop: "4px" }}>
+              {/* 左側エリア：バッジ ⇄ 目標文 の横並び */}
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "16px",
+                flexGrow: 1
+              }}>
+                {/* 達成/未達成バッジ */}
+                <div style={{ flexShrink: 0 }}>
                   <span
                     style={{
-                      padding: "4px 8px",
+                      padding: "6px 12px",
                       background: goal?.status === 1 ? "#16a34a" : "#dc2626",
                       color: "white",
                       borderRadius: "4px",
-                      fontSize: "12px",
-                      fontWeight: "bold"
+                      fontSize: "13px",
+                      fontWeight: "bold",
+                      display: "inline-block",
+                      userSelect: "none"
                     }}
                   >
                     {goal?.status === 1 ? "達成" : "未達成"}
                   </span>
                 </div>
+                {/* 目標テキスト */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                  <div style={{ fontSize: "12px", color: "#854d0e", fontWeight: "bold" }}>今週の目標</div>
+                  <div style={{ fontSize: "18px", fontWeight: "bold", color: "#1e293b", lineHeight: "1.4" }}>
+                    {goal?.content}
+                  </div>
+                </div>
               </div>
 
-              {/* ボタンエリア */}
+              {/* 右側エリア：ステータス切り替え・編集ボタン */}
               <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
                 <button
                   type="button"
@@ -411,7 +407,6 @@ export default function Dashboard() {
                 >
                   {goal?.status === 1 ? "未達成に戻す" : "達成にする！"}
                 </button>
-
                 <button
                   type="button"
                   onClick={() => {
@@ -441,17 +436,8 @@ export default function Dashboard() {
               </div>
             </div>
           ) : (
-            <div
-              style={{
-                padding: "20px",
-                background: "#f0fdf4",
-                border: "1px solid #bbf7d0",
-                borderRadius: "8px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center"
-              }}
-            >
+            /* 目標が未登録のとき（緑カードと右端の登録ボタン） */
+            <div style={{ padding: "20px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
                 <span style={{ fontSize: "16px", color: "#166534", fontWeight: "bold" }}>
                   今週の目標を登録しよう！
@@ -461,13 +447,7 @@ export default function Dashboard() {
                 type="button"
                 onClick={() => {
                   setSelectedType(99);
-                  setEditingSpace({
-                    id: "new_goal",
-                    name: "",
-                    space_type: 99,
-                    favorite: 0,
-                    is_archived: 0
-                  });
+                  setEditingSpace({ id: "new_goal", name: "", space_type: 99, favorite: 0, is_archived: 0 });
                   setIsModalOpen(true);
                 }}
                 style={{
@@ -493,28 +473,108 @@ export default function Dashboard() {
           key={`type1_${spaces.type1.map(s => `${s.id}-${s.favorite}-${s.is_archived}`).join(',')}`}
           title="チャット"
           items={spaces.type1}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-        />
-        <SpaceList
-          key={`type2_${spaces.type2.map(s => `${s.id}-${s.favorite}-${s.is_archived}`).join(',')}`}
-          title="ToDoリスト"
-          items={spaces.type2}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-        />
-        <SpaceList
-          key={`type3_${spaces.type3.map(s => `${s.id}-${s.favorite}-${s.is_archived}`).join(',')}`}
-          title="質問"
-          items={spaces.type3}
+          showArchived={showArchivedType1}
+          onToggleArchive={(checked) => setShowArchivedType1(checked ? 1 : 0)}
           onEdit={handleEdit}
           onDelete={handleDelete}
         />
 
-        <div style={{ marginTop: "30px", display: "flex", gap: "12px" }}>
-          <button style={{ padding: "10px 20px", background: "#2563eb", color: "white", border: "none", borderRadius: "6px", cursor: "pointer" }} onClick={() => { setEditingSpace(null); openModal(1); }}>チャット作成</button>
-          <button style={{ padding: "10px 20px", background: "#16a34a", color: "white", border: "none", borderRadius: "6px", cursor: "pointer" }} onClick={() => { setEditingSpace(null); openModal(2); }}>Todo作成</button>
-          <button style={{ padding: "10px 20px", background: "#7c3aed", color: "white", border: "none", borderRadius: "6px", cursor: "pointer" }} onClick={() => { setEditingSpace(null); openModal(3); }}>質問作成</button>
+        <SpaceList
+          key={`type2_${spaces.type2.map(s => `${s.id}-${s.favorite}-${s.is_archived}`).join(',')}`}
+          title="ToDoリスト"
+          items={spaces.type2}
+          showArchived={showArchivedType2}
+          onToggleArchive={(checked) => setShowArchivedType2(checked ? 1 : 0)}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
+
+        <SpaceList
+          key={`type3_${spaces.type3.map(s => `${s.id}-${s.favorite}-${s.is_archived}`).join(',')}`}
+          title="質問"
+          items={spaces.type3}
+          showArchived={showArchivedType3}
+          onToggleArchive={(checked) => setShowArchivedType3(checked ? 1 : 0)}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
+
+        <div style={{ marginTop: "30px", position: "relative", display: "inline-block" }}>
+          <button 
+            type="button"
+            onClick={() => setIsCreateMenuOpen(!isCreateMenuOpen)}
+            style={{ 
+              padding: "12px 24px", 
+              margin:"0",
+              background: "#2563eb", 
+              color: "white", 
+              border: "none", 
+              borderRadius: "8px", 
+              cursor: "pointer",
+              fontWeight: "bold",
+              fontSize: "14px",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              boxShadow: "0 4px 6px -1px rgba(37, 99, 235, 0.2)",
+              transition: "background 0.2s"
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#1d4ed8"}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "#2563eb"}
+          >
+            <span>＋</span> 新規作成
+          </button>
+
+          {isCreateMenuOpen && (
+            <>
+              {/* メニューの外をクリックしたときに閉じる透明な背面幕 */}
+              <div 
+                onClick={() => setIsCreateMenuOpen(false)} 
+                style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}
+              />
+
+              <div style={{
+                position: "absolute",
+                top: "calc(100% + 6px)",
+                left: 0,
+                backgroundColor: "#ffffff",
+                border: "1px solid #e2e8f0",
+                borderRadius: "8px",
+                padding: "6px",
+                width: "180px",
+                boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.05)",
+                zIndex: 1000,
+                display: "flex",
+                flexDirection: "column",
+                gap: "2px"
+              }}>
+                <button
+                  onClick={() => { setIsCreateMenuOpen(false); setEditingSpace(null); openModal(1); }}
+                  style={{ width: "100%", background: "none", border: "none", padding: "10px 12px", textAlign: "left", cursor: "pointer", fontSize: "13px", fontWeight: "600", color: "#334155", borderRadius: "6px" }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f1f5f9"}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                >
+                  チャットを作成
+                </button>
+                <button
+                  onClick={() => { setIsCreateMenuOpen(false); setEditingSpace(null); openModal(2); }}
+                  style={{ width: "100%", background: "none", border: "none", padding: "10px 12px", textAlign: "left", cursor: "pointer", fontSize: "13px", fontWeight: "600", color: "#334155", borderRadius: "6px" }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f1f5f9"}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                >
+                  ToDoリストを作成
+                </button>
+                <button
+                  onClick={() => { setIsCreateMenuOpen(false); setEditingSpace(null); openModal(3); }}
+                  style={{ width: "100%", background: "none", border: "none", padding: "10px 12px", textAlign: "left", cursor: "pointer", fontSize: "13px", fontWeight: "600", color: "#334155", borderRadius: "6px" }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f1f5f9"}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                >
+                  質問を作成
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </section>
 

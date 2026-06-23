@@ -2,6 +2,8 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
+import toast from "react-hot-toast";
+import { MESSAGES } from "@/constants/messages";
 import TaskList from "@/components/TaskList";
 import TaskModal from "@/components/TaskModal";
 
@@ -104,7 +106,7 @@ export default function TaskPage() {
       incomplete: filtered.filter((task) => Number(task.status) !== 1),
       complete: filtered.filter((task) => Number(task.status) === 1),
     };
-  }, [taskData, searchTag, searchKnowledge, sortType]); 
+  }, [taskData, searchTag, searchKnowledge, sortType]);
 
   // 4. 各種ボタンのアクションハンドラー
   const handleCreateOpen = () => {
@@ -126,7 +128,6 @@ export default function TaskPage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!window.confirm("このタスクを削除してもよろしいですか？")) return;
     try {
       const res = await fetch(`/api/task/${id}?space_id=${spaceId}`, {
         method: "DELETE",
@@ -134,13 +135,14 @@ export default function TaskPage() {
         body: JSON.stringify({ space_id: Number(spaceId) }),
       });
       if (res.ok) {
-        alert("タスクを削除しました");
+        toast.success(MESSAGES.S1003("タスク"));
         fetchTasks();
       } else {
-        alert("削除に失敗しました。");
+        toast.error(MESSAGES.E2004("タスク"));
       }
     } catch (error) {
       console.error(error);
+      toast.error(MESSAGES.E2004("タスク"));
     }
   };
 
@@ -236,6 +238,11 @@ export default function TaskPage() {
           type="task"
           onClose={() => setIsModalOpen(false)}
           onSuccess={() => {
+            if (modalMode === "edit") {
+              toast.success(MESSAGES.S1002("タスク")); 
+            } else {
+              toast.success(MESSAGES.S1001("タスク")); 
+            }
             setIsModalOpen(false);
             fetchTasks();
           }}

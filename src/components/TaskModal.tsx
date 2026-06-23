@@ -98,11 +98,7 @@ export default function TaskModal({ task, onClose, onSuccess, spaceId, mode = 'c
       const resData = await response.json();
 
       if (response.ok) {
-        alert(isEditMode 
-          ? (type === "question" ? "質問を更新しました" : "タスクを更新しました") 
-          : (type === "question" ? "質問を登録しました" : "タスクを登録しました")
-        );
-        onSuccess();
+        onSuccess(); 
       } else {
         alert(`保存失敗: ${resData.error || "リクエストが不正です"}`);
         console.log("POST結果:", resData);
@@ -216,10 +212,10 @@ export default function TaskModal({ task, onClose, onSuccess, spaceId, mode = 'c
               </div>
             </div>
           ) : (
-            // 💡 2. 質問（question）画面のとき
+            // 2. 質問（question）画面のとき
             <div>
               {(!isCreateMode) ? (
-                // 🔄 質問の【編集モード】および【詳細モード】なら、タグとステータスをきれいな2列にする
+                // 質問の【編集モード】および【詳細モード】なら、タグとステータスをきれいな2列にする
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-semibold text-slate-500">タグ</label>
@@ -249,7 +245,6 @@ export default function TaskModal({ task, onClose, onSuccess, spaceId, mode = 'c
                   </div>
                 </div>
               ) : (
-                // ✨ 質問の【新規作成モード】の時。2列グリッドの左側だけにタグをはめ込み、サイズを完全同期！
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-semibold text-slate-500">タグ</label>
@@ -264,13 +259,12 @@ export default function TaskModal({ task, onClose, onSuccess, spaceId, mode = 'c
                       <option value={3}>プライベート</option>
                     </select>
                   </div>
-                  <div></div> {/* 💡 右側を綺麗に空白にしてサイズを保つ */}
+                  <div></div> 
                 </div>
               )}
             </div>
           )}
 
-          {/* 💡 【タスク専用ステータス】質問(question)の時は、上に統合したためタスク専用として外出し配置 */}
           {type !== "question" && (isEditMode || isDetailMode) && (
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-semibold text-slate-500">ステータス</label>
