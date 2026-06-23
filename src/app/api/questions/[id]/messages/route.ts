@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth-guard";
 import { getQuestionChats, registerQuestionChat } from "@/services/QuestionChatService";
-import { uploadImage, deleteImage } from "@/services/StorageService";
+import { uploadImages, deleteImage } from "@/services/StorageService";
 import { MESSAGES } from "@/constants/messages";
 import { getQuestion } from "@/services/QuestionService";
 import Question from "@/app/question/[spaceId]/page";
@@ -12,7 +12,7 @@ import { Prisma } from "@prisma/client";
 // 1. メッセージ一覧取得 (GET)
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id : string }> } // パラメータ名は "id" だけでOK
+  { params }: { params: Promise<{ id: string }> } // パラメータ名は "id" だけでOK
 ) {
   const resolvedParams = await params;
   const { id } = resolvedParams;
@@ -25,13 +25,13 @@ export async function GET(
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
   // const { id } = await params; // ここで id (spaceIdのこと) を取得
   try {
-    
+
     // ★ 並列処理に修正：Promise.all で同時に取得する
     const [messages, question] = await Promise.all([
       getQuestionChats(questionId, auth.user_id),
       getQuestion(questionId, auth.user_id)
     ]);
-    
+
     // データが null なら空配列 [] を返すようにする
     // オブジェクトとしてまとめて返す
     return NextResponse.json({
@@ -65,7 +65,7 @@ export async function POST(
     const stamp = formData.get("stamp") as string | null;
     const space_id = Number(formData.get("space_id"));
 
-        if (!message && !file && !stamp) {
+    if (!message && !file && !stamp) {
       return NextResponse.json({ error: MESSAGES.E1001("チャット内容") }, { status: 400 });
     }
 
@@ -80,10 +80,11 @@ export async function POST(
       }
       const validTypes = ["image/png", "image/jpeg", "image/jpg"];
       if (!validTypes.includes(file.type)) {
-        return NextResponse.json({ error: MESSAGES.E1005}, { status: 400 });
+        return NextResponse.json({ error: MESSAGES.E1005 }, { status: 400 });
       }
 
-      imageUrl = await uploadImage(file, auth.user_id, space_id);
+      const uploadedUrls = await uploadImages([file], auth.user_id, space_id);
+      const image_url = uploadedUrls[0];
     }
     // 簡易バリデーション
     const newMessage = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
