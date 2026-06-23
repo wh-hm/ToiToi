@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth-guard";
 import { getQuestionChats, registerQuestionChat } from "@/services/QuestionChatService";
-import { uploadImage, deleteImage } from "@/services/StorageService";
+import { uploadImages, deleteImages } from "@/services/StorageService";
 import { MESSAGES } from "@/constants/messages";
 import { getQuestion } from "@/services/QuestionService";
 import Question from "@/app/question/[spaceId]/page";
@@ -83,7 +83,7 @@ export async function POST(
         return NextResponse.json({ error: MESSAGES.E1005}, { status: 400 });
       }
 
-      imageUrl = await uploadImage(file, auth.user_id, space_id);
+      imageUrl = await uploadImages(file, auth.user_id, space_id);
     }
     // 簡易バリデーション
     const newMessage = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -101,7 +101,7 @@ export async function POST(
     // 5. エラー処理 (画像だけアップロード成功してDB登録失敗した場合のリカバリー)
     if (imageUrl) {
       console.error("エラー発生。アップロード済みの画像を削除します:", imageUrl);
-      await deleteImage(imageUrl).catch(e => console.error("削除失敗:", e));
+      // await deleteImages(imageUrl).catch(e => console.error("削除失敗:", e));
     }
     console.error("質問作成エラー:", error);
     return NextResponse.json({ error: MESSAGES.E2001("質問") }, { status: 500 });
