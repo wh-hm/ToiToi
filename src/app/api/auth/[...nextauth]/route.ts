@@ -18,6 +18,19 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   secret: process.env.NEXTAUTH_SECRET,
+  cookies: {
+    sessionToken: {
+      name: `__Secure-next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: true, // これをtrueにすることで、スマホブラウザがHTTPS環境でCookieを許可しやすくなります
+      },
+    },
+  },
+
+  
 
   // ★★★ これが無いとセッションが作られない ★★★
   session: {

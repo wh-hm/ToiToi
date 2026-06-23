@@ -16,12 +16,14 @@ interface ChatMessageItemProps {
   onBackgroundChange?: (id: number, color: number) => void;
   setEditValue: (val: string) => void;
   onNiceFlag?: (id: number, flag: number) => void;
+  onImageClick?: (url: string) => void;
+  onDownload: (url: string) => void;
   type: string;
 }
 
 export default function ChatMessageItem({ 
   message, spaceId, isOpen, isSubmitting, 
-  onOpenChange, onToggleFavorite, onEdit, onDelete, onBackgroundChange, setEditValue, onNiceFlag, type
+  onOpenChange, onToggleFavorite, onEdit, onDelete, onBackgroundChange, setEditValue, onNiceFlag, onImageClick, onDownload, type
 }: ChatMessageItemProps) {
   
   const [isHovered, setIsHovered] = useState(false);
@@ -151,17 +153,29 @@ export default function ChatMessageItem({
             ${(isHovered || isOpen) && !isSubmitting ? "brightness-90" : "brightness-100"}
           `}
         >
-          {message.message && <p className="text-lg text-gray-800 whitespace-pre-wrap">{message.message}</p>}
+          {(!message.signedImageUrl && message.message) && (
+            <p className="text-lg text-gray-800 whitespace-pre-wrap">{message.message}</p>
+          )}          
           {message.stamp ? (
             <img
               src={`/stamps/${message.stamp}.png`}
               className="w-32 h-32 object-contain aspect-square"
               onError={(e) => {
                 e.currentTarget.style.display = 'none';
-                e.currentTarget.nextSibling!.textContent = "画像が読み込めません";
+                e.currentTarget.nextSibling!.textContent = "スタンプが読み込めません";
               }}
             />
           ) : null}
+          {message.signedImageUrl && (
+            <div className="mt-2">
+              <img
+                src={message.signedImageUrl}
+                alt="chat image"
+                className="max-w-[200px] h-auto rounded-lg border border-gray-200 cursor-pointer hover:opacity-80" // cursor-pointerを追加
+                onClick={() => onImageClick?.(message.signedImageUrl!)}
+              />
+            </div>
+          )}
         </div>
       </div>
       <span className="text-[10px] text-gray-400 mt-1">{formatDateTime(message.created_at, message.updated_at)}</span>

@@ -3,7 +3,8 @@ import { Space } from "@prisma/client";
 import { deleteChat } from "./ChatService";
 import { deleteTask } from "./TaskService";
 import { deleteQuestion } from "./QuestionService";
-import { deleteImages } from "@/services/StorageService";
+// import { deleteImages } from "@/services/StorageService";
+import { ChatMessage } from "@/types/chat";
 
 // 概要：ユーザーに紐づく有効なスペース一覧を取得する
 export async function getSpaces(
@@ -22,7 +23,6 @@ export async function getSpaces(
         ...(space_type !== undefined && space_type !== null && { space_type }),
       },
     });
-
     // 取得結果として、条件に一致したスペースレコードの配列を返却する
     return spaces as Space[];
   } catch (error) {
@@ -132,6 +132,7 @@ export async function deleteSpace(
   }
 }
 
+
 // 概要：スペース一括削除、質問一括削除、チャット一括削除、タスク一括削除
 export async function deleteSpaces(
   user_id: string,
@@ -224,7 +225,7 @@ export async function deleteSpaceChat(
         .filter((url): url is string => typeof url === 'string' && url.length > 0);
     };
 
-    const chatIdList = chats.map(c => c.id);
+    const chatIdList = chats.map((c:ChatMessage) => c.id);
     const imageUrlList = getValidImageUrls(chats);
 
 
@@ -236,7 +237,7 @@ export async function deleteSpaceChat(
 
     // 3. ストレージから画像を一括削除
     if (imageUrlList.length > 0) {
-      const imagesDeleted = await deleteImages(imageUrlList);
+      // const imagesDeleted = await deleteImages(imageUrlList);
       
     }
     return true;
@@ -246,90 +247,156 @@ export async function deleteSpaceChat(
   }
 }
 
-// 概要：タスクスペース削除（スペース内タスク一括削除）
 export async function deleteSpaceTask(
   space_id: number, 
   user_id: string,
-  tx?: any          // 上位のトランザクション（$transaction）を引き継げる設計
+  tx?: any
 ): Promise<boolean> {
   try {
     const db = tx || prisma;
 
-    // 1. 全IDの抽出（メソッド内で完結）：
-    // タスクテーブル（tasks）から、対象 space_id に紐づく有効な（delete_flag=0）レコードをすべて検索する。
-    const tasks = await db.tasks.findMany({
-      where: {
-        space_id: space_id, 
-        user_id: user_id,   
-        delete_flag: 0,
-      },
-      // 取得した全レコードから「タスクIDのリスト」を抽出するため、idのみを選択
-      select: {
-        id: true,
-      },
-    });
-
-    // 「タスクIDのリスト」を抽出する
-    const taskIdList = tasks.map((task: { id: number }) => task.id);
-
-    // 2. ループ処理開始 ＆ 3. 個別の削除実行：
-    // 抽出した タスクIDリスト 配列の各要素（taskId）に対して、処理を繰り返す。
-    for (const taskId of taskIdList) {
-      // deleteTask(taskId, user_id, space_id) を呼び出す。
-      // ※ 引数が最初から int型 なので、そのままストレートに渡せます。
-      await deleteTask(taskId, user_id, space_id);
-    }
-
-    // 4. 戻り値の返却：
-    // すべての処理が正常に完了した場合は「true」を返す。
-    return true;
-  } catch (error) {
-    // 例外処理：
-    // データベース操作でエラーが発生した場合は try-catch で捕捉し、ログ出力後に呼び出し元へ false を返却して異常を伝える。
-    console.error(`space_id: ${space_id} のタスク一括削除中にエラーが発生しました:`, error);
-    return false;
-  }
-}
-// 概要：質問スペース削除
-export async function deleteSpaceQuestion(
-  space_id: number, // 引数: int
-  user_id: string,  // 引数: string
-  tx?: any          // トランザクションオブジェクト引き継ぎ用
-): Promise<boolean> { // 戻り値: bool
-  try {
-    const db = tx || prisma;
-
-    // 1. 全質問IDの抽出（メソッド内で完結）：
-    // 質問テーブルから、対象 space_id に紐づく有効な（delete_flag=0）レコードをすべて検索する。
-    const questions = await db.questions.findMany({
+    // 1. 該当するタスクを一括論理削除（delete_flag = 1）
+    // ループ処理は不要です。updateMany で条件に合うものを一発で更新します。
+    const result = await db.task.updateMany({
       where: {
         space_id: space_id,
         user_id: user_id,
-        delete_flag: 0
+        delete_flag: 0,
       },
-      select: {
-        id: true // IDのリストを抽出
-      }
+      data: {
+        delete_flag: 1,
+      },
     });
 
-    // 2. 質問の連動削除（二重のバケツリレー）：
-    // 各質問IDに対して、上で作成した「deleteQuestion」のロジックを再利用して、個別に論理削除する。
-    for (const q of questions) {
-      // 修正ポイント：チャットの直ループではなく、設計書通り単体削除メソッドへ完全に委譲する
-      await deleteQuestion(q.id, space_id, user_id, db);
-    }
-
-    // 3. 戻り値の返却：
-    // すべての処理が正常に完了した場合は「true」を返す。
+    // 2. 結果を返却
+    // result.count で何件削除されたかがわかります
     return true;
-
   } catch (error) {
-    // 例外処理：
-    // データベース操作でエラーが発生した場合は try-catch で捕捉し、ログ出力後に呼び出し元へ false を返却して異常を伝える。
-    console.error(`space_id: ${space_id} の質問スペース一括削除中にエラーが発生しました:`, error);
-    return false;
+    console.error(`space_id: ${space_id} のタスク一括削除中にエラーが発生しました:`, error);
+    throw error; // false を返すより、エラーを投げてトランザクションを確実にロールバックさせるべきです
   }
 }
+
+// // 概要：タスクスペース削除（スペース内タスク一括削除）
+// export async function deleteSpaceTask(
+//   space_id: number, 
+//   user_id: string,
+//   tx?: any          // 上位のトランザクション（$transaction）を引き継げる設計
+// ): Promise<boolean> {
+//   try {
+//     const db = tx || prisma;
+
+//     // 1. 全IDの抽出（メソッド内で完結）：
+//     // タスクテーブル（tasks）から、対象 space_id に紐づく有効な（delete_flag=0）レコードをすべて検索する。
+//     const tasks = await db.tasks.findMany({
+//       where: {
+//         space_id: space_id, 
+//         user_id: user_id,   
+//         delete_flag: 0,
+//       },
+//       // 取得した全レコードから「タスクIDのリスト」を抽出するため、idのみを選択
+//       select: {
+//         id: true,
+//       },
+//     });
+
+//     // 「タスクIDのリスト」を抽出する
+//     const taskIdList = tasks.map((task: { id: number }) => task.id);
+
+//     // 2. ループ処理開始 ＆ 3. 個別の削除実行：
+//     // 抽出した タスクIDリスト 配列の各要素（taskId）に対して、処理を繰り返す。
+//     for (const taskId of taskIdList) {
+//       // deleteTask(taskId, user_id, space_id) を呼び出す。
+//       // ※ 引数が最初から int型 なので、そのままストレートに渡せます。
+//       await deleteTask(taskId, user_id, space_id);
+//     }
+
+//     // 4. 戻り値の返却：
+//     // すべての処理が正常に完了した場合は「true」を返す。
+//     return true;
+//   } catch (error) {
+//     // 例外処理：
+//     // データベース操作でエラーが発生した場合は try-catch で捕捉し、ログ出力後に呼び出し元へ false を返却して異常を伝える。
+//     console.error(`space_id: ${space_id} のタスク一括削除中にエラーが発生しました:`, error);
+//     return false;
+//   }
+// }
+
+export async function deleteSpaceQuestion(
+  space_id: number,
+  user_id: string,
+  tx?: any
+): Promise<boolean> {
+  const db = tx || prisma;
+  try {
+    // 1. 削除対象の質問IDを一括取得
+    const questions = await db.question.findMany({
+      where: { space_id, user_id, delete_flag: 0 },
+      select: { id: true }
+    });
+
+    if (questions.length === 0) return true;
+    const questionIds = questions.map((q:ChatMessage) => q.id);
+
+    // 2. 質問自体を一括論理削除
+    await db.question.updateMany({
+      where: { id: { in: questionIds } },
+      data: { delete_flag: 1 }
+    });
+
+    // 3. 紐づくチャットも一括論理削除（deleteQuestionをループするのではなく）
+    await db.questionChats.updateMany({
+      where: { question_id: { in: questionIds } },
+      data: { delete_flag: 1 }
+    });
+
+    return true;
+  } catch (error) {
+    console.error("一括削除失敗:", error);
+    throw error; // エラーを投げて上位のトランザクションでロールバックさせる
+  }
+}
+
+// // 概要：質問スペース削除
+// export async function deleteSpaceQuestion(
+//   space_id: number, // 引数: int
+//   user_id: string,  // 引数: string
+//   tx?: any          // トランザクションオブジェクト引き継ぎ用
+// ): Promise<boolean> { // 戻り値: bool
+//   try {
+//     const db = tx || prisma;
+
+//     // 1. 全質問IDの抽出（メソッド内で完結）：
+//     // 質問テーブルから、対象 space_id に紐づく有効な（delete_flag=0）レコードをすべて検索する。
+//     const questions = await db.questions.findMany({
+//       where: {
+//         space_id: space_id,
+//         user_id: user_id,
+//         delete_flag: 0
+//       },
+//       select: {
+//         id: true // IDのリストを抽出
+//       }
+//     });
+
+//     // 2. 質問の連動削除（二重のバケツリレー）：
+//     // 各質問IDに対して、上で作成した「deleteQuestion」のロジックを再利用して、個別に論理削除する。
+//     for (const q of questions) {
+//       // 修正ポイント：チャットの直ループではなく、設計書通り単体削除メソッドへ完全に委譲する
+//       await deleteQuestion(q.id, space_id, user_id, db);
+//     }
+
+//     // 3. 戻り値の返却：
+//     // すべての処理が正常に完了した場合は「true」を返す。
+//     return true;
+
+//   } catch (error) {
+//     // 例外処理：
+//     // データベース操作でエラーが発生した場合は try-catch で捕捉し、ログ出力後に呼び出し元へ false を返却して異常を伝える。
+//     console.error(`space_id: ${space_id} の質問スペース一括削除中にエラーが発生しました:`, error);
+//     return false;
+//   }
+// }
 
 
 /**

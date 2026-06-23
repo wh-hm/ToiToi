@@ -2,9 +2,12 @@
 import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth-guard";
 import { getQuestionChats, registerQuestionChat } from "@/services/QuestionChatService";
-import { uploadImage } from "@/services/StorageService";
+import { uploadImage, deleteImage } from "@/services/StorageService";
 import { MESSAGES } from "@/constants/messages";
 import { getQuestion } from "@/services/QuestionService";
+import Question from "@/app/question/[spaceId]/page";
+import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 // 1. メッセージ一覧取得 (GET)
 export async function GET(
@@ -18,19 +21,16 @@ export async function GET(
   }
 
   const auth = await getAuthContext();
+  const questionId = parseInt(id);
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
   // const { id } = await params; // ここで id (spaceIdのこと) を取得
   try {
-    // 取得した値を parseInt してサービスに渡す
-    const messages = await getQuestionChats(
-      parseInt(id), 
-      auth.user_id, 
-    );
-
-    const question = await getQuestion(
-      parseInt(id),
-      auth.user_id
-    )
+    
+    // ★ 並列処理に修正：Promise.all で同時に取得する
+    const [messages, question] = await Promise.all([
+      getQuestionChats(questionId, auth.user_id),
+      getQuestion(questionId, auth.user_id)
+    ]);
     
     // データが null なら空配列 [] を返すようにする
     // オブジェクトとしてまとめて返す
@@ -43,6 +43,9 @@ export async function GET(
     return NextResponse.json({ error: "取得失敗" }, { status: 500 });
   }
 }
+
+
+
 // 2. メッセージ送信 (POST)
 export async function POST(
   request: Request,
@@ -51,6 +54,7 @@ export async function POST(
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
   const { id } = await params;
+  let imageUrl: string | undefined;
 
   try {
 
@@ -60,7 +64,6 @@ export async function POST(
     const image_url = formData.get("image_url") as string;
     const stamp = formData.get("stamp") as string | null;
     const space_id = Number(formData.get("space_id"));
-    let imageUrl: string | undefined;
 
         if (!message && !file && !stamp) {
       return NextResponse.json({ error: MESSAGES.E1001("チャット内容") }, { status: 400 });
@@ -83,11 +86,25 @@ export async function POST(
       imageUrl = await uploadImage(file, auth.user_id, space_id);
     }
     // 簡易バリデーション
-    const newMessage = await registerQuestionChat(parseInt(id), auth.user_id, message, imageUrl, stamp);
+    const newMessage = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      return await registerQuestionChat(
+        parseInt(id),
+        auth.user_id,
+        message || undefined,
+        imageUrl,
+        stamp || undefined,
+        tx
+      );
+    });
     return NextResponse.json(newMessage, { status: 201 });
   } catch (error) {
-    console.error("送信エラー:", error);
-    return NextResponse.json({ error: MESSAGES.E2001("メッセージ送信") }, { status: 500 });
+    // 5. エラー処理 (画像だけアップロード成功してDB登録失敗した場合のリカバリー)
+    if (imageUrl) {
+      console.error("エラー発生。アップロード済みの画像を削除します:", imageUrl);
+      await deleteImage(imageUrl).catch(e => console.error("削除失敗:", e));
+    }
+    console.error("質問作成エラー:", error);
+    return NextResponse.json({ error: MESSAGES.E2001("質問") }, { status: 500 });
   }
 }
 
