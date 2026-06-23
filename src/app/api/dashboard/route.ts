@@ -48,7 +48,6 @@ export async function GET() {
           
         type3: spacesWithTaskCount.filter(s => s.space_type === 3),
       },
-      tasksCount,       // 未完了タスクの合計件数など
       goal,             // 目標データ
       login_management, // ログイン管理情報
     };
