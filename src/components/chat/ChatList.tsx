@@ -15,6 +15,7 @@ interface ChatListProps {
   onBackgroundChange?: (id: number, color: number) => void;
   setEditValue: (val: string) => void;
   onNiceFlag?: (id: number, flag: number) => void;
+  onDownload: (url: string) => void;
   type: string;
 }
 
@@ -29,11 +30,12 @@ const ChatList = forwardRef<HTMLDivElement, ChatListProps>(({
   onBackgroundChange, 
   setEditValue ,
   onNiceFlag,
+  onDownload,
   type
 }, ref) => {
   
   const [openItemId, setOpenItemId] = useState<number | null>(null);
-  const [zoomUrl, setZoomUrl] = useState<string | null>(null);
+  const [zoomData, setZoomData] = useState<{ url: string; caption: string } | null>(null);
   
 
   return (
@@ -58,7 +60,8 @@ const ChatList = forwardRef<HTMLDivElement, ChatListProps>(({
             onBackgroundChange={onBackgroundChange}
             setEditValue={setEditValue}
             onNiceFlag={onNiceFlag}
-            onImageClick={(url) => setZoomUrl(url)}
+            onImageClick={(url) => setZoomData({ url, caption: message.message || "" })}
+            onDownload={onDownload}
             type={type}
           />
         ))}
@@ -66,9 +69,11 @@ const ChatList = forwardRef<HTMLDivElement, ChatListProps>(({
         <div className="h-20 flex-shrink-0" />
       </ScrollShadow>
       <ImageZoomModal 
-        isOpen={!!zoomUrl} 
-        onClose={() => setZoomUrl(null)} 
-        imageUrl={zoomUrl} 
+        isOpen={!!zoomData} 
+        onClose={() => setZoomData(null)} 
+        imageUrl={zoomData?.url || null} 
+        caption={zoomData?.caption} // ここにセットしたメッセージが入ります
+        onDownload={onDownload}
       />
     </>
   );

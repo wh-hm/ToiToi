@@ -5,6 +5,7 @@ import { PreviewModal } from "@/components/chat/PreviewModal";
 import { Input, Button, Popover, PopoverTrigger, PopoverContent } from "@nextui-org/react";
 import { Paperclip, SendHorizontal, Smile, X } from "lucide-react";
 import { CHARACTER_STAMPS } from "@/constants/stamp";
+
 interface ChatInputProps {
   value: string;
   onChange: (value: string) => void;
@@ -76,6 +77,15 @@ export default function ChatInput({
             size="lg"
             variant="bordered"
             disabled={disabled}
+            onKeyDown={(e) => {
+              // EnterキーかつShiftが押されていない場合のみ送信
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault(); // 改行が入るのを防ぐ
+                if (value.trim() || selectedFiles.length > 0) {
+                  onSend();
+                }
+              }
+            }}
             startContent={
               <Button 
                 isIconOnly 

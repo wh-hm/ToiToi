@@ -61,15 +61,32 @@ export async function POST(request: NextRequest) {
       imageUrls = await uploadImages(files, auth.user_id, space_id);
     }
 
-    // 4. DB登録
+    // 4. DB登録 (ループで1枚ずつ登録)
     const newChat = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      return await registerChat({
-        user_id: auth.user_id,
-        space_id: space_id,
-        message: message || undefined,
-        image_url: imageUrls ? JSON.stringify(imageUrls) : undefined, // DB保存用に文字列化するか、スキーマに合わせて調整してください
-        stamp: stamp || undefined,
-      }, tx);
+      // 画像がない場合（メッセージかスタンプのみ）
+      if (!imageUrls || imageUrls.length === 0) {
+        return await registerChat({
+          user_id: auth.user_id,
+          space_id: space_id,
+          message: message || undefined,
+          stamp: stamp || undefined,
+        }, tx);
+      }
+
+      // 画像がある場合はループして個別に登録
+      const results = [];
+      for (let i = 0; i < imageUrls.length; i++) {
+        const res = await registerChat({
+          user_id: auth.user_id,
+          space_id: space_id,
+          // 1枚目の画像登録時にのみメッセージ/スタンプを付与する（必要に応じて変更してください）
+          message: i === 0 ? (message || undefined) : undefined,
+          image_url: imageUrls[i], // JSONではなく、1枚のURLを直接渡す
+          stamp: i === 0 ? (stamp || undefined) : undefined,
+        }, tx);
+        results.push(res);
+      }
+      return results; // 複数のレコードが作成される
     });
 
     return NextResponse.json({ newChat }, { status: 201 });

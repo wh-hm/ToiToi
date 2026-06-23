@@ -130,23 +130,39 @@ export async function deleteImages(user_id: string) {
     // 画像を持っているチャット等を特定して delete_flag = 1 にする
     
     // 画像に関連するチャットを論理削除
+    // 画像に関連するチャットを論理削除
     await prisma.chat.updateMany({
       where: {
-        userId: user_id,
+        user_id: user_id,
         delete_flag: 0,
-        images: { some: {} } // 画像が存在するもののみ
+        NOT: {
+          OR: [
+            { image_url: null },
+            { image_url: "" }
+          ]
+        }
       },
-      data: { delete_flag: 1 }
+      data: {
+        delete_flag: 1
+      }
     });
 
-    // 画像に関連する質問チャットを論理削除
+
+    // 画像に関連するチャットを論理削除
     await prisma.questionChats.updateMany({
       where: {
-        userId: user_id,
+        user_id: user_id,
         delete_flag: 0,
-        images: { some: {} }
+        NOT: {
+          OR: [
+            { image_url: null },
+            { image_url: "" }
+          ]
+        }
       },
-      data: { delete_flag: 1 }
+      data: {
+        delete_flag: 1
+      }
     });
     
     return { count: listedObjects.Contents?.length || 0 };
