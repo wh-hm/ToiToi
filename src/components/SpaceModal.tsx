@@ -19,7 +19,7 @@ type SpaceModalProps = {
 export default function SpaceModal({ isOpen, onClose, spaceType, onSuccess, editingSpace }: SpaceModalProps) {
   const [name, setName] = useState("");
   const [favorite_flag, setFavoriteFlag] = useState(0);
-  const [is_archived, setIsArchived] = useState(0); // 🌟 アーカイブ状態を管理するState (0か1)
+  const [is_archived, setIsArchived] = useState(0); 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // モーダルが開いたとき、または編集対象が変わったときに初期値をセット
@@ -27,7 +27,7 @@ export default function SpaceModal({ isOpen, onClose, spaceType, onSuccess, edit
     if (isOpen) {
       setName(editingSpace ? editingSpace.name : "");
       setFavoriteFlag(editingSpace ? editingSpace.favorite : 0);
-      setIsArchived(editingSpace ? editingSpace.is_archived ?? 0 : 0); // 🌟 既存のアーカイブ状態をセット
+      setIsArchived(editingSpace ? editingSpace.is_archived ?? 0 : 0); 
     }
   }, [isOpen, editingSpace]);
 
@@ -42,36 +42,31 @@ export default function SpaceModal({ isOpen, onClose, spaceType, onSuccess, edit
 
     setIsSubmitting(true);
     try {
-      // 🌟 1. 「目標(99)」の処理か、「スペース(チャット・ToDo・質問)」の処理かをハッキリ分ける
       const isGoal = spaceType === 99;
       
-      // 🌟 2. 既存スペースの編集（idが存在する）かどうかを判定
       const isEditingExistingSpace = editingSpace && editingSpace.id !== "new_goal" && editingSpace.id !== "edit_goal";
 
-      // 🌟 3. 正しいURLの割り振り
       let url = "";
       if (isGoal) {
-        url = "/api/dashboard"; // 目標ならダッシュボードAPI
+        url = "/api/dashboard"; 
       } else if (isEditingExistingSpace) {
-        url = `/api/spaces/${editingSpace.id}`; // 既存スペースの編集
+        url = `/api/spaces/${editingSpace.id}`; 
       } else {
-        url = "/api/spaces"; // 🔥 【ここを修正】通常の新規作成なら /api/spaces に送る！
+        url = "/api/spaces"; 
       }
 
-      // 🌟 4. 正しいデータの形を割り振り
       const bodyData = isGoal
         ? { content: name }
         : { name, space_type: spaceType, favorite_flag, is_archived };
 
-      // 🌟 5. 正しいメソッドの割り振り
       let method = "POST";
       if (isEditingExistingSpace) {
-        method = "PATCH"; // 編集なら PATCH (サーバーに合わせて PUT にしてもOK)
+        method = "PATCH"; 
       } else {
-        method = "POST";  // 新規作成（目標含む）なら POST
+        method = "POST";  
       }
 
-      console.log(`通信を開始します: ${method} ${url}`, bodyData); // デバッグ用
+      console.log(`通信を開始します: ${method} ${url}`, bodyData); 
 
       const res = await fetch(url, {
         method: method,
@@ -99,76 +94,152 @@ export default function SpaceModal({ isOpen, onClose, spaceType, onSuccess, edit
     return editingSpace ? `${typeNames[spaceType] || "スペース"}の編集` : `${typeNames[spaceType] || "スペース"}の作成`;
   };
 
-  return (
-    <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000 }}>
-      <div style={{ background: "white", padding: "30px", borderRadius: "8px", width: "100%", maxWidth: "500px", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
-        <h2 style={{ fontSize: "22px", fontWeight: "bold", marginBottom: "20px" }}>{getTitle()}</h2>
+return (
+    <div style={{
+      position: "fixed",
+      top: 0, left: 0, width: "100%", height: "100%",
+      backgroundColor: "rgba(15, 23, 42, 0.3)", 
+      backdropFilter: "blur(6px)",            
+      display: "flex", justifyContent: "center", alignItems: "center",
+      zIndex: 1000
+    }}>
+      <div style={{
+        backgroundColor: "#ffffff",
+        padding: "24px 28px",
+        borderRadius: "14px", 
+        width: "100%",
+        maxWidth: "460px",    
+        boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.03)"
+      }}>
+        
+        {/* 【1. ヘッダー】 */}
+        <div style={{ marginBottom: "20px" }}>
+          <h3 style={{ margin: 0, fontSize: "19px", fontWeight: "700", color: "#0f172a", letterSpacing: "-0.025em" }}>
+            {spaceType === 99 ? "目標の管理" : editingSpace?.id ? "スペースの編集" : "新規スペース作成"}
+          </h3>
+        </div>
 
-        <input
-          type="text"
-          placeholder={spaceType === 99 ? "今週の目標を入力" : "名前を入力"}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          maxLength={spaceType === 99 ? 50 : undefined} 
-          style={{ width: "100%", padding: "10px", fontSize: "16px", border: "1px solid #ddd", borderRadius: "6px", marginBottom: "20px", boxSizing: "border-box" }}
-        />
-
-        {/* ボタン操作エリア */}
-        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-
-          {/* 目標(99)以外の時だけ、お気に入りとアーカイブボタンを表示 */}
+        {/* 【2. 入力エリア】お気に入りの星を入力欄の中に埋め込む */}
+        <div style={{ marginBottom: "24px", position: "relative", display: "flex", alignItems: "center" }}>
+          <input
+            type="text"
+            value={editingSpace?.name || ""} 
+            placeholder="名前を入力"
+            style={{
+              width: "100%",
+              boxSizing: "border-box",
+              padding: "12px 44px 12px 14px", 
+              borderRadius: "8px",
+              border: "1px solid #cbd5e1",
+              fontSize: "15px",
+              color: "#334155",
+              outline: "none",
+              background: "#f8fafc",
+              transition: "border-color 0.2s",
+            }}
+          />
+          
+          {/* 入力欄の右端に浮かぶ星マーク */}
           {spaceType !== 99 && (
-            <>
-              {/* お気に入りボタン */}
-              <button
-                type="button"
-                onClick={() => setFavoriteFlag(favorite_flag === 0 ? 1 : 0)}
-                style={{
-                  flex: 1, minWidth: "100px", height: "40px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold", fontSize: "14px",
-                  background: favorite_flag === 1 ? "#eab308" : "#f4f4f5",
-                  color: favorite_flag === 1 ? "white" : "#3f3f46",
-                  border: favorite_flag === 1 ? "none" : "1px solid #e4e4e7"
-                }}
-              >
-                {favorite_flag === 1 ? "★ お気に入り" : "☆ お気に入り"}
-              </button>
+            <button
+              type="button"
+              onClick={() => setFavoriteFlag(favorite_flag === 0 ? 1 : 0)}
+              style={{
+                position: "absolute",
+                right: "12px",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontSize: "20px",
+                color: favorite_flag === 1 ? "#eab308" : "#94a3b8",
+                padding: "4px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "transform 0.1s ease"
+              }}
+              title="お気に入り"
+              onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.85)"}
+              onMouseUp={(e) => e.currentTarget.style.transform = "scale(1)"}
+            >
+              {favorite_flag === 1 ? "★" : "☆"}
+            </button>
+          )}
+        </div>
 
-              {/* 追加：アーカイブボタン（数値の0と1で切り替え） */}
-              <button
-                type="button"
-                onClick={() => setIsArchived(is_archived === 0 ? 1 : 0)}
-                style={{
-                  flex: 1, minWidth: "100px", height: "40px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold", fontSize: "14px",
-                  background: is_archived === 1 ? "#475569" : "#f4f4f5", 
-                  color: is_archived === 1 ? "white" : "#3f3f46",
-                  border: is_archived === 1 ? "none" : "1px solid #e4e4e7"
-                }}
-              >
-                {is_archived === 1 ? "アーカイブ済" : "アーカイブする"}
-              </button>
-            </>
+        {/* 【3. ボトムアクションエリア】すべてを1行に綺麗に集約 */}
+        <div style={{
+          display: "flex",
+          justifyContent: "flex-end", 
+          alignItems: "center",
+          borderTop: "1px solid #f1f5f9",
+          paddingTop: "16px",
+          gap: "8px"
+        }}>
+          {spaceType !== 99 && (
+            <button
+              type="button"
+              onClick={() => setIsArchived(is_archived === 0 ? 1 : 0)}
+              style={{
+                marginRight: "auto", 
+                padding: "0 20px", 
+                height: "38px", 
+                borderRadius: "6px", 
+                cursor: "pointer", 
+                fontWeight: "bold", 
+                fontSize: "13px",
+                transition: "all 0.2s ease",
+                background: is_archived === 1 ? "#e2e8f0" : "#ffffff", 
+                color: is_archived === 1 ? "#334155" : "#475569",
+                border: is_archived === 1 ? "1px solid #cbd5e1" : "1px solid #e4e4e7"
+              }}
+            >
+              {is_archived === 1 ? "アーカイブ済" : "アーカイブ"}
+            </button>
           )}
 
-          {/* 保存・キャンセルボタン */}
-          <div style={{ width: "100%", display: "flex", gap: "10px", marginTop: "10px" }}>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={isSubmitting}
-              style={{ flex: 1, height: "40px", background: "#0070f3", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontWeight: "bold", fontSize: "14px" }}
-            >
-              {isSubmitting ? "保存中..." : "保存"}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{ flex: 1, height: "40px", background: "#aaa", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontWeight: "bold", fontSize: "14px" }}
-            >
-              キャンセル
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isSubmitting}
+            style={{
+              padding: "0 18px",
+              height: "38px",
+              background: isSubmitting ? "#60a5fa" : "#2563eb", 
+              color: "white",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontWeight: "600",
+              fontSize: "14px",
+              boxShadow: "0 1px 2px rgba(37, 99, 235, 0.2)"
+            }}
+          >
+            {isSubmitting ? "保存中..." : "保存する"}
+          </button>
 
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              padding: "0 16px",
+              height: "38px",
+              background: "#ffffff",
+              color: "#64748b",
+              border: "1px solid #e2e8f0",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontWeight: "600",
+              fontSize: "14px",
+              transition: "background 0.2s"
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f8fafc"}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "#ffffff"}
+          >
+            キャンセル
+          </button>
         </div>
+
       </div>
     </div>
   );

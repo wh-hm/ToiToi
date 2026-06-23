@@ -7,11 +7,20 @@ type Space = {
   name: string;
   space_type: number;
   favorite: number;
-  is_archived?: number; 
+  is_archived: number; 
 };
 
-export default function SpaceList(props: any) {
-  const { items, title, onEdit, onDelete } = props;
+type SpaceListProps = {
+  title: string;
+  items: Space[];
+  showArchived: number;
+  onToggleArchive: (checked: boolean) => void;
+  onEdit: (space: Space) => void;
+  onDelete: (id: string, spaceType: number) => void;
+};
+
+export default function SpaceList(props: SpaceListProps) {
+  const { items, title, showArchived, onToggleArchive, onEdit, onDelete } = props;
   const [open, setOpen] = useState(true);
   const [localItems, setLocalItems] = useState<Space[]>(items);
 
@@ -30,23 +39,51 @@ export default function SpaceList(props: any) {
 
   return (
     <div style={{ marginBottom: "20px" }}>
-      <h2
-        onClick={() => setOpen(!open)}
-        style={{
-          cursor: "pointer",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          background: "#f3f3f3",
-          padding: "10px",
-          borderRadius: "4px",
-          border: "1px solid #ddd",
-          userSelect: "none",
-        }}
-      >
-        {title}
-        <span>{open ? "▲" : "▼"}</span>
-      </h2>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f3f3f3", padding: "10px", borderRadius: "4px", border: "1px solid #ddd" }}>
+        
+        {/* タイトル開閉エリア */}
+        <h2
+          onClick={() => setOpen(!open)}
+          style={{
+            cursor: "pointer",
+            margin: 0,
+            fontSize: "18px",
+            fontWeight: "bold",
+            display: "flex",
+            alignItems: "center",
+            gap: "10px", 
+            userSelect: "none",
+            flexGrow: 1
+          }}
+        >
+          <span style={{
+            display: "inline-block",
+            width: 0,
+            height: 0,
+            borderLeft: "5px solid transparent",
+            borderRight: "5px solid transparent",
+            borderTop: "6px solid #1e293b", 
+            transform: open ? "rotate(0deg)" : "rotate(-90deg)", 
+            transition: "transform 0.2s ease",
+            transformOrigin: "center 3px" 
+          }}></span>
+
+          {title}
+        </h2>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", userSelect: "none", paddingLeft: "15px" }}>
+          <input
+            type="checkbox"
+            id={`archiveToggle-${title}`}
+            checked={showArchived === 1}
+            onChange={(e) => onToggleArchive(e.target.checked)}
+            style={{ width: "15px", height: "15px", cursor: "pointer" }}
+          />
+          <label htmlFor={`archiveToggle-${title}`} style={{ fontSize: "12px", color: "#475569", fontWeight: "bold", cursor: "pointer" }}>
+            アーカイブを表示
+          </label>
+        </div>
+      </div>
 
       {open && (
         <ul style={{ marginTop: "10px", paddingLeft: "0", listStyle: "none" }}>
@@ -99,8 +136,8 @@ export default function SpaceList(props: any) {
                     <span 
                       style={{ 
                         padding: "2px 6px", 
-                        background: "#cbd5e1", // 薄いグレー
-                        color: "#475569",     // 濃いグレーの文字
+                        background: "#cbd5e1", 
+                        color: "#475569",     
                         borderRadius: "4px", 
                         fontSize: "11px",
                         fontWeight: "bold",

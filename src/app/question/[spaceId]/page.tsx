@@ -2,14 +2,16 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
+import toast from "react-hot-toast";
+import { MESSAGES } from "@/constants/messages";
 import { useRouter, useParams } from "next/navigation";
-import TaskModal from "@/components/TaskModal"; 
+import TaskModal from "@/components/TaskModal";
 
 export default function QuestionPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const params = useParams();
-  
+
   const spaceId = params?.spaceId;
 
   // 状態管理
@@ -18,7 +20,7 @@ export default function QuestionPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit' | 'detail'>('create');
   const [selectedQuestion, setSelectedQuestion] = useState<any>(null);
-  
+
   // 検索用ステート（仕様：タグ検索 ＆ ナレッジ検索）
   const [searchTag, setSearchTag] = useState<string>("");
   const [searchKnowledge, setSearchKnowledge] = useState<string>("");
@@ -30,18 +32,18 @@ export default function QuestionPage() {
     }
   }, [status, router]);
 
- // 2. 質問サービス：getQuestions の実行
+  // 2. 質問サービス：getQuestions の実行
   const fetchQuestions = useCallback(async () => {
     if (!spaceId) return;
     try {
       setIsLoading(true);
-      
+
       const res = await fetch(`/api/questions?spaceId=${spaceId}&space_id=${spaceId}`, {
         cache: "no-store",
       });
-      
+
       if (!res.ok) throw new Error("質問データの取得に失敗しました。");
-      
+
       const data = await res.json();
       const list = Array.isArray(data) ? data : (data.questions || []);
       setQuestions(list);
@@ -62,12 +64,12 @@ export default function QuestionPage() {
   const handleStatusToggle = async (question: any) => {
     // 0: 未解決 / 1: 解決
     const newStatus = question.status === 1 ? 0 : 1;
-    
+
     try {
       const res = await fetch(`/api/questions/${question.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           status: newStatus,
           spaceId: spaceId
         }),
@@ -80,14 +82,13 @@ export default function QuestionPage() {
       } else {
         alert("ステータスを未解決に戻しました。");
       }
-      
+
       fetchQuestions();
     } catch (error: any) {
       alert(error.message);
     }
   };
 
-  // 4. 削除ボタン押下 (deleteQuestion)
   const handleDelete = async (id: number) => {
     if (!window.confirm("この質問を削除してもよろしいですか？")) return;
 
@@ -96,13 +97,16 @@ export default function QuestionPage() {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
       });
-      if (!res.ok) throw new Error("削除に失敗しました。DBの論理削除は行われませんでした。");
-      
-      // 成功時：メッセージを表示
-      alert("質問を削除しました（論理削除完了）。");
-      fetchQuestions();
-    } catch (error: any) {
-      alert(error.message);
+
+      if (res.ok) {
+        toast.success(MESSAGES.S1003("質問"));
+        fetchQuestions(); // 一覧の再取得関数
+      } else {
+        toast.error(MESSAGES.E2004("質問"));
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error(MESSAGES.E2004("質問"));
     }
   };
 
@@ -111,19 +115,20 @@ export default function QuestionPage() {
     // 表示されているデータから「タグ」と「ナレッジ」で絞り込み
     const filtered = questions.filter((q) => {
       const matchTag = searchTag ? String(q.tag) === searchTag : true;
-      const matchKnowledge = searchKnowledge 
-        ? q.title.includes(searchKnowledge) || q.description.includes(searchKnowledge)
+      const matchKnowledge = searchKnowledge
+      ? (q.title?.includes(searchKnowledge) ||
+        (q.question || q.description || "").includes(searchKnowledge))
         : true;
       return matchTag && matchKnowledge;
     });
     const incomplete = filtered.filter((q) => Number(q.is_resolved ?? q.status) !== 1);
     const complete = filtered.filter((q) => Number(q.is_resolved ?? q.status) === 1);
 
-    return { 
-      incomplete, 
-      complete, 
+    return {
+      incomplete,
+      complete,
       totalFiltered: filtered.length,
-      hasOriginalData: questions.length > 0 
+      hasOriginalData: questions.length > 0
     };
   }, [questions, searchTag, searchKnowledge]);
 
@@ -174,7 +179,7 @@ export default function QuestionPage() {
         <div className="text-center py-12 text-slate-400 font-medium">該当のデータはありません</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          
+
           {/* 未解決エリア */}
           <div className="space-y-3">
             <h2 className="font-bold text-red-500 border-b border-red-100 pb-2 flex justify-between items-center">
@@ -183,9 +188,9 @@ export default function QuestionPage() {
             </h2>
             {processedQuestions.incomplete.map((q) => (
               <div key={q.id} className="p-4 bg-white border border-slate-200 rounded-xl shadow-sm flex justify-between items-center hover:border-slate-300 transition-all">
-               {/* 仕様：データクリック時・直接質問チャット画面に遷移する */}
-                <div 
-                  className="cursor-pointer flex-1 pr-4" 
+                {/* 仕様：データクリック時・直接質問チャット画面に遷移する */}
+                <div
+                  className="cursor-pointer flex-1 pr-4"
                   onClick={() => {
                     router.push(`/question/${spaceId}/chat/${q.id}`);
                   }}
@@ -194,22 +199,22 @@ export default function QuestionPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   {/* 仕様：チェックマーク押下で解決へ移動 */}
-                  <input 
-                    type="checkbox" 
-                    checked={false} 
-                    onChange={() => handleStatusToggle(q)} 
-                    className="w-4 h-4 cursor-pointer rounded text-indigo-600 focus:ring-indigo-500" 
+                  <input
+                    type="checkbox"
+                    checked={false}
+                    onChange={() => handleStatusToggle(q)}
+                    className="w-4 h-4 cursor-pointer rounded text-indigo-600 focus:ring-indigo-500"
                   />
                   {/* 仕様：編集ボタン押下 */}
-                  <button 
-                    onClick={() => { setSelectedQuestion(q); setModalMode('edit'); setIsModalOpen(true); }} 
+                  <button
+                    onClick={() => { setSelectedQuestion(q); setModalMode('edit'); setIsModalOpen(true); }}
                     className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
                   >
                     編集
                   </button>
                   {/* 仕様：削除ボタン押下 */}
-                  <button 
-                    onClick={() => handleDelete(q.id)} 
+                  <button
+                    onClick={() => handleDelete(q.id)}
                     className="text-xs font-medium text-red-500 hover:text-red-700"
                   >
                     削除
@@ -231,8 +236,8 @@ export default function QuestionPage() {
             {processedQuestions.complete.map((q) => (
               <div key={q.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center opacity-75 hover:opacity-100 transition-all">
                 {/* 詳細表示 */}
-                <div 
-                  className="cursor-pointer flex-1 pr-4" 
+                <div
+                  className="cursor-pointer flex-1 pr-4"
                   onClick={() => { setSelectedQuestion(q); setModalMode('detail'); setIsModalOpen(true); }}
                 >
                   <p className="font-semibold text-slate-500 line-through">{q.title}</p>
@@ -240,14 +245,14 @@ export default function QuestionPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   {/* チェックを外して未解決に戻す */}
-                  <input 
-                    type="checkbox" 
-                    checked={true} 
-                    onChange={() => handleStatusToggle(q)} 
-                    className="w-4 h-4 cursor-pointer rounded text-indigo-600 focus:ring-indigo-500" 
+                  <input
+                    type="checkbox"
+                    checked={true}
+                    onChange={() => handleStatusToggle(q)}
+                    className="w-4 h-4 cursor-pointer rounded text-indigo-600 focus:ring-indigo-500"
                   />
-                  <button 
-                    onClick={() => handleDelete(q.id)} 
+                  <button
+                    onClick={() => handleDelete(q.id)}
                     className="text-xs font-medium text-red-500 hover:text-red-700"
                   >
                     削除
@@ -263,15 +268,23 @@ export default function QuestionPage() {
         </div>
       )}
 
-      {/* モーダル表示（拡張したTaskModalを再利用） */}
       {isModalOpen && (
         <TaskModal
           task={selectedQuestion}
           mode={modalMode}
           spaceId={spaceId}
-          type="question" // 💡 これを渡すことで質問用の挙動にスイッチ！
+          type="question"
           onClose={() => setIsModalOpen(false)}
-          onSuccess={() => { setIsModalOpen(false); fetchQuestions(); }}
+          onSuccess={() => { 
+            if (modalMode === "edit") {
+              toast.success(MESSAGES.S1002("質問")); 
+            } else {
+              toast.success(MESSAGES.S1001("質問"));
+            }
+            
+            setIsModalOpen(false); 
+            fetchQuestions(); 
+          }}
         />
       )}
     </div>
