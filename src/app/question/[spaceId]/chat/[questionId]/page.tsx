@@ -76,60 +76,138 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
     if (isSubmitting) return;
     if (!inputText.trim() && !stampId && selectedFiles.length === 0) return;
 
+    // 1. メッセージ内容が即座に見えるように「仮のメッセージ」を作成
+    const tempId = Date.now();
+    const tempMessage: any = {
+      id: tempId,
+      message: inputText || "",
+      stamp: stampId || null,
+      created_at: new Date().toISOString(),
+      isPending: true, // 送信中であることを示すフラグがあると便利
+      
+    };
+
+    // 2. 楽観的更新：即座に画面へ追加
+    setMessages((prev) => [...prev, tempMessage]);
+    setInputText("");
+    setSelectedFiles([]);
+
     setIsSubmitting(true);
+    
     const formData = new FormData();
     formData.append("questionId", questionId);
     formData.append("space_id", spaceId);
     if (inputText.trim()) formData.append("message", inputText);
     if (stampId) formData.append("stamp", stampId);
-    
-    // 画像配列を append
-    selectedFiles.forEach((file) => {
-      formData.append("images", file);
-    });
+    selectedFiles.forEach((file) => formData.append("images", file));
 
     try {
       const res = await fetch(`/api/questions/${questionId}/messages`, { method: "POST", body: formData });
       if (!res.ok) throw new Error("送信失敗");
       
-      setInputText("");
-      setSelectedFiles([]);
+      // 3. サーバーから正式なリストを取得し、仮データを置き換える
       await fetchMessages();
       setSend(0);
     } catch (e: any) {
-      toast.error(e.message);
+      toast.error("送信に失敗しました");
+      // 4. 失敗したら仮メッセージを削除
+      setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleUpdate = async (chatId: number) => {
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-    await fetch(`/api/questions/${questionId}/messages/${chatId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ questionId, message: editValue }),
-    });
+    if (isSubmitting || !editValue.trim()) return;
+
+    // 1. 更新前の状態を保存
+    const previousMessages = [...messages];
+
+    // 2. 楽観的更新：即座に画面を書き換える
+    setMessages((prev) => 
+      prev.map((msg) => 
+        msg.id === chatId ? { ...msg, message: editValue } : msg
+      )
+    );
+    // 3. UIを即座に閉じる
     setEditingId(null);
     setEditValue("");
-    setIsSubmitting(false);
-    fetchMessages();
+
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(`/api/questions/${questionId}/messages/${chatId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questionId, message: editValue }),
+      });
+
+      if (!res.ok) throw new Error("更新失敗");
+
+      // 成功したら、サーバーから返された正式なデータでリストを更新するのが理想的です
+      // API側が更新後のデータを返しているなら、以下の処理でより正確になります
+      const updatedData = await res.json();
+      setMessages((prev) => prev.map(m => m.id === chatId ? updatedData : m));
+
+    } catch (e: any) {
+      toast.error("更新に失敗しました");
+      // 4. 失敗したら元の状態へロールバック
+      setMessages(previousMessages);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleNiceFlag = async (chatId: number) => {
-    await fetch(`/api/questions/${questionId}/messages/${chatId}/status`, { method: "PATCH" });
-    fetchMessages();
+    // 1. 更新前の状態を保存
+    const previousMessages = [...messages];
+
+    // 2. 楽観的更新：即座に「ナイス！」状態を反転させる
+    // ※現在の状態と逆の状態（!current）にする前提です
+    setMessages((prev) => 
+      prev.map((msg) => 
+        msg.id === chatId 
+          ? { ...msg, nice_flag: msg.nice_flag === 1 ? 0 : 1 } // ★ここを修正！
+          : msg
+      )
+    );
+
+    try {
+      const res = await fetch(`/api/questions/${questionId}/messages/${chatId}/status`, { 
+        method: "PATCH" 
+      });
+      
+      if (!res.ok) throw new Error("更新失敗");
+      
+    } catch (e: any) {
+      toast.error("更新に失敗しました");
+      // 3. 失敗したら元の状態に戻す
+      setMessages(previousMessages);
+    }
   };
 
   const handleDeleteClick = async (chatId: number) => {
     if (!confirm("本当に削除しますか？")) return;
-    await fetch(`/api/questions/${questionId}/messages/${chatId}`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question_id: questionId }),
-    });
-    fetchMessages();
+
+    // 1. 削除前の状態を保存
+    const previousMessages = [...messages];
+
+    // 2. 楽観的更新：即座に画面から消す
+    setMessages((prev) => prev.filter((msg) => msg.id !== chatId));
+
+    try {
+      const res = await fetch(`/api/questions/${questionId}/messages/${chatId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question_id: questionId }),
+      });
+
+      if (!res.ok) throw new Error("削除失敗");
+
+    } catch (e: any) {
+      toast.error("削除に失敗しました");
+      // 3. 失敗したら元の状態に戻す
+      setMessages(previousMessages);
+    }
   };
 
   const handleDownload = async (imageUrl: string) => {
@@ -161,6 +239,12 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
     a.remove();
     window.URL.revokeObjectURL(url);
   };
+
+  const scrollToBottom = () => {
+  if (scrollRef.current) {
+    scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+  }
+};
 
   return (
     <div ref={containerRef} className="flex flex-col h-[calc(100vh-64px)] w-full overflow-hidden bg-gray-50">
@@ -194,6 +278,7 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
           setEditValue={setEditValue}
           onNiceFlag={handleNiceFlag}
           onDownload={handleDownload}
+          onScrollBottom={scrollToBottom}
           type="question"
         />
       </div>

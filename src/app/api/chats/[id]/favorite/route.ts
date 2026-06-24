@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth-guard";
-import { toggleFavorite, changeBackground } from "@/services/ChatService";
+import { toggleFavorite } from "@/services/ChatService";
 import { MESSAGES } from "@/constants/messages";
 
 export async function PATCH(
@@ -10,27 +10,21 @@ export async function PATCH(
   const { id } = await params;
   const chatId = parseInt(id);
 
-  // 1. 認証とユーザーID取得
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   try {
     const body = await request.json();
-    const { space_id } = body;
-    const url = new URL(request.url);
+    // body に favorite_flag が含まれていることを前提にします
+    const { space_id, favorite_flag } = body;
 
-    let updatedChat;
-
-    // 2. パスによって処理を切り替え
-    if (url.pathname.includes("/favorite")) {
-      updatedChat = await toggleFavorite(chatId, space_id, auth.user_id, body.favorite_flag);
-    } 
-    else if (url.pathname.includes("/background")) {
-      updatedChat = await changeBackground(chatId, space_id, auth.user_id, body.background);
-    } 
-    else {
-      return NextResponse.json({ error: "無効なエンドポイントです" }, { status: 404 });
-    }
+    // ★修正：ここで実際に toggleFavorite を呼び出す
+    const updatedChat = await toggleFavorite(
+      chatId, 
+      space_id, 
+      auth.user_id, 
+      favorite_flag
+    );
 
     if (!updatedChat) {
       return NextResponse.json({ error: "更新失敗：権限がないかデータがありません" }, { status: 403 });
