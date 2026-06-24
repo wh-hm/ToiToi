@@ -138,7 +138,7 @@ export default function TaskPage() {
           </button>
           <button
             onClick={async () => {
-              toast.dismiss(t.id); 
+              toast.dismiss(t.id);
               const previousTaskData = { ...taskData };
               setTaskData({
                 incomplete: taskData.incomplete.filter((t) => t.id !== id),
@@ -151,8 +151,9 @@ export default function TaskPage() {
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ space_id: Number(spaceId) }),
                 });
+                const data = await res.json();
                 if (res.ok) {
-                  toast.success(MESSAGES.S1003("タスク"));
+                  toast.success(data.message || "削除しました",);
                   const refreshRes = await fetch(`/api/task?spaceId=${spaceId}&space_id=${spaceId}`);
                   if (refreshRes.ok) {
                     const data = await refreshRes.json();
@@ -163,12 +164,12 @@ export default function TaskPage() {
                   }
                 } else {
                   toast.error(MESSAGES.E2004("タスク") + " 元に戻します。");
-                  setTaskData(previousTaskData); 
+                  setTaskData(previousTaskData);
                 }
               } catch (error) {
                 console.error(error);
                 toast.error("通信エラーが発生したため、元に戻します。");
-                setTaskData(previousTaskData); 
+                setTaskData(previousTaskData);
               }
             }}
             className="px-2.5 py-1 text-xs bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-medium transition-colors"
@@ -178,7 +179,7 @@ export default function TaskPage() {
         </div>
       </div>
     ), {
-      duration: Infinity, 
+      duration: Infinity,
       position: "top-center",
     });
   };
@@ -214,7 +215,7 @@ export default function TaskPage() {
       });
       if (res.ok) {
         if (newStatus === 1) {
-          triggerCelebration(); 
+          triggerCelebration();
         } else {
           toast("未完了に戻しました");
         }
@@ -229,11 +230,11 @@ export default function TaskPage() {
         }
       } else {
         toast.error("更新に失敗しました。元に戻します。");
-        setTaskData(previousTaskData); 
+        setTaskData(previousTaskData);
       }
     } catch (error) {
       toast.error("通信エラーが発生したため、元に戻します。");
-      setTaskData(previousTaskData); 
+      setTaskData(previousTaskData);
     }
   };
 
@@ -283,12 +284,19 @@ export default function TaskPage() {
           <select
             value={searchTag}
             onChange={(e) => setSearchTag(e.target.value)}
-            className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="px-3 pr-10 py-2 bg-white border border-slate-300 rounded-lg text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
+            style={{
+              backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`,
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "right 14px center",
+              backgroundSize: "16px"
+            }}
           >
             <option value="">全てのタグ</option>
-            <option value="1">学習 / カテゴリ1</option>
-            <option value="2">重要 / カテゴリ2</option>
-            <option value="3">プライベート / カテゴリ3</option>
+            <option value="1">学習</option>
+            <option value="2">重要</option>
+            <option value="3">プライベート</option>
+            <option value="4">なし</option>
           </select>
         </div>
 

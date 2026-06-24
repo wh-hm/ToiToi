@@ -59,7 +59,7 @@ export default function Dashboard() {
     text: "",
     image: ""
   });
-  
+
 
   const updateLoginMessage = (streakDays: number, isStreakAchieved: boolean) => {
     // 1. 全イベント発生時の現在時刻をリアルタイムに取得
@@ -84,7 +84,7 @@ export default function Dashboard() {
         image: "/stamps/shikiji_default.png",
         normal: [
           "おはよう よく来たな 共に頑張ろう",
-          "Good Morning ん？ わしは英語も話せるじいじだぞ？",
+          "Good Morning! ...ん？ わしは英語も話せるじいじだぞ？",
           "勉強しに来るとは偉いぞ！ どれじいじがお菓子をあげよう"
         ],
         success: `おお！ 連続ログイン日数${streakDays}日が達成したぞ！ おめでとう！`
@@ -210,13 +210,13 @@ export default function Dashboard() {
         setLoginInfo(data.login_management);
         const streakDays = data.login_management.streak_days ?? 0;
         setConsecutiveLoginDays(streakDays);
-        setLoginError(null); 
+        setLoginError(null);
         const isStreakAchieved = data.login_management.is_streak_achieved ?? false;
         updateLoginMessage(streakDays, isStreakAchieved);
       } else {
         setLoginError("ログイン情報の取得に失敗しました。");
         setIsLoading(false);
-        return null; 
+        return null;
       }
 
       if (data.loginMessage) setLoginMessage(data.loginMessage);
@@ -299,7 +299,7 @@ export default function Dashboard() {
             display: "flex",
             alignItems: "center",
             gap: "16px",
-            background: "#f8fafc",    
+            background: "#f8fafc",
             border: "1px solid #e2e8f0",
             borderRadius: "12px",
             padding: "16px 20px",
@@ -324,7 +324,7 @@ export default function Dashboard() {
 
             {/* 右側：コンテンツエリア（ログイン日数 ＋ セリフ） */}
             <div style={{ display: "flex", flexDirection: "column", gap: "8px", flexGrow: 1 }}>
-              
+
               {/* 連続ログイン日数をフキダシ内の最上部にスマートに配置 */}
               {!loginError && (
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", color: "#64748b" }}>
@@ -510,17 +510,21 @@ export default function Dashboard() {
           onDelete={handleDelete}
         />
 
-        <div style={{ marginTop: "30px", position: "relative", display: "inline-block" }}>
-          <button 
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "30px" }}>
+
+          <button
             type="button"
-            onClick={() => setIsCreateMenuOpen(!isCreateMenuOpen)}
-            style={{ 
-              padding: "12px 24px", 
-              margin:"0",
-              background: "#2563eb", 
-              color: "white", 
-              border: "none", 
-              borderRadius: "8px", 
+            onClick={() => {
+              setEditingSpace(null);
+              openModal(1);
+            }}
+            style={{
+              padding: "12px 24px",
+              margin: "0",
+              background: "#2563eb",
+              color: "white",
+              border: "none",
+              borderRadius: "8px",
               cursor: "pointer",
               fontWeight: "bold",
               fontSize: "14px",
@@ -536,56 +540,6 @@ export default function Dashboard() {
             <span>＋</span> 新規作成
           </button>
 
-          {isCreateMenuOpen && (
-            <>
-              {/* メニューの外をクリックしたときに閉じる透明な背面幕 */}
-              <div 
-                onClick={() => setIsCreateMenuOpen(false)} 
-                style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}
-              />
-
-              <div style={{
-                position: "absolute",
-                top: "calc(100% + 6px)",
-                left: 0,
-                backgroundColor: "#ffffff",
-                border: "1px solid #e2e8f0",
-                borderRadius: "8px",
-                padding: "6px",
-                width: "180px",
-                boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.05)",
-                zIndex: 1000,
-                display: "flex",
-                flexDirection: "column",
-                gap: "2px"
-              }}>
-                <button
-                  onClick={() => { setIsCreateMenuOpen(false); setEditingSpace(null); openModal(1); }}
-                  style={{ width: "100%", background: "none", border: "none", padding: "10px 12px", textAlign: "left", cursor: "pointer", fontSize: "13px", fontWeight: "600", color: "#334155", borderRadius: "6px" }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f1f5f9"}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-                >
-                  チャットを作成
-                </button>
-                <button
-                  onClick={() => { setIsCreateMenuOpen(false); setEditingSpace(null); openModal(2); }}
-                  style={{ width: "100%", background: "none", border: "none", padding: "10px 12px", textAlign: "left", cursor: "pointer", fontSize: "13px", fontWeight: "600", color: "#334155", borderRadius: "6px" }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f1f5f9"}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-                >
-                  ToDoリストを作成
-                </button>
-                <button
-                  onClick={() => { setIsCreateMenuOpen(false); setEditingSpace(null); openModal(3); }}
-                  style={{ width: "100%", background: "none", border: "none", padding: "10px 12px", textAlign: "left", cursor: "pointer", fontSize: "13px", fontWeight: "600", color: "#334155", borderRadius: "6px" }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f1f5f9"}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-                >
-                  質問を作成
-                </button>
-              </div>
-            </>
-          )}
         </div>
       </section>
 
