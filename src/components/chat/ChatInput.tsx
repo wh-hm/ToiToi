@@ -5,6 +5,8 @@ import { PreviewModal } from "@/components/chat/PreviewModal";
 import { Input, Button, Popover, PopoverTrigger, PopoverContent } from "@nextui-org/react";
 import { Paperclip, SendHorizontal, Smile, X } from "lucide-react";
 import { CHARACTER_STAMPS } from "@/constants/stamp";
+import { toast } from "react-hot-toast";
+import { MESSAGES } from "@/constants/messages";
 
 interface ChatInputProps {
   value: string;
@@ -80,7 +82,15 @@ export default function ChatInput({
           <Input
             ref={inputRef} // ★フォーカス対象に設定
             value={value}
-            onValueChange={onChange}
+            onValueChange={(val) => {
+              // 100文字を超えたら、先頭から1000文字まででカットして更新
+              if (val.length <= 100) {
+                onChange(val);
+              } else {
+                onChange(val.slice(0, 100));
+                toast.error(MESSAGES.E1002("チャット", 100));
+              }
+            }}
             placeholder="メッセージを入力..."
             radius="full"
             size="lg"

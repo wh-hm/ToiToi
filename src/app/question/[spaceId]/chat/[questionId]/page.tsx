@@ -15,18 +15,28 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [send, setSend] = useState(0);
   const [question, setQuestion] = useState<Question>();
-  
-  // ★画像配列管理
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const { questionId, spaceId } = use(params);
   const numericSpaceId = Number(spaceId);
   const { status } = useSession();
   const router = useRouter();
+  // メッセージが更新されたら、一度だけ一番下に飛ぶ
+  const isInitialLoad = useRef(true);
+
+  // 1. スクロール処理の強化（page.tsxと同じロジック）
+  const scrollToBottom = (force: boolean = false) => {
+    setTimeout(() => {
+      if (!scrollRef.current) return;
+      const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+      const isNearBottom = (scrollHeight - scrollTop - clientHeight < 200);
+      if (isNearBottom || force) {
+        scrollRef.current.scrollTo({ top: scrollHeight, behavior: 'smooth' });
+      }
+    }, 0);
+  };
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -36,12 +46,12 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
   }, [status, router]);
 
   useEffect(() => {
-    if (messages.length > 0 && scrollRef.current && send === 0) {
-      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-      setSend(1);
+    if (messages.length > 0 && isInitialLoad.current) {
+      scrollToBottom(true);
+      isInitialLoad.current = false; // 初回だけ実行するようにフラグを折る
     }
-  }, [messages]);
-  
+  }, [messages]); // messages が更新された（＝描画された）瞬間に実行される
+
   useEffect(() => {
     if (questionId) fetchMessages();
   }, [questionId]);
@@ -49,7 +59,6 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
   const fetchMessages = async () => {
     try {
       const res = await fetch(`/api/questions/${questionId}/messages`);
-      if (!res.ok) throw new Error("通信エラー");
       const data = await res.json();
       setMessages(data.messages || []);
       setQuestion(data.question);
@@ -58,60 +67,100 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
     }
   };
 
-  // ★画像追加（5枚制限）
-  const handleFileSelect = (file: File) => {
-    if (selectedFiles.length >= 5) {
+  const handleFileSelect = (input: File | File[]) => {
+    const newFiles = Array.isArray(input) ? input : [input];
+    if (selectedFiles.length + newFiles.length > 5) {
       toast.error("一度に送信できるのは5枚までです");
       return;
     }
-    setSelectedFiles((prev) => [...prev, file]);
+    setSelectedFiles((prev) => [...prev, ...newFiles]);
   };
 
-  // ★画像削除
   const handleRemoveFile = (index: number) => {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleSend = async (stampId?: string) => {
+ const handleSend = async (stampId?: string) => {
     if (isSubmitting) return;
-    if (!inputText.trim() && !stampId && selectedFiles.length === 0) return;
+    if (!stampId && !inputText.trim() && selectedFiles.length === 0) return;
 
-    // 1. メッセージ内容が即座に見えるように「仮のメッセージ」を作成
-    const tempId = Date.now();
-    const tempMessage: any = {
-      id: tempId,
-      message: inputText || "",
-      stamp: stampId || null,
-      created_at: new Date().toISOString(),
-      isPending: true, // 送信中であることを示すフラグがあると便利
-      
-    };
+    // ★送信失敗時の復元用にバックアップ
+    const backupInputText = inputText;
+    const backupFiles = [...selectedFiles];
 
-    // 2. 楽観的更新：即座に画面へ追加
-    setMessages((prev) => [...prev, tempMessage]);
-    setInputText("");
-    setSelectedFiles([]);
+    // 1. 仮メッセージ（pending）を作成
+    const now = new Date().toISOString();
+    const pendingMessages: ChatMessage[] = [];
 
+    if (stampId) {
+      pendingMessages.push({ id: Date.now(), stamp: stampId, isPending: true, created_at: now } as ChatMessage);
+    } else {
+      if (selectedFiles.length > 0) {
+        selectedFiles.forEach((file, i) => {
+          pendingMessages.push({
+            id: Date.now() + i,
+            signedImageUrl: URL.createObjectURL(file), // 表示用URL
+            isPending: true,
+            created_at: now,
+            message: inputText, // 画像と一緒に送るメッセージ
+          } as ChatMessage);
+        });
+      } else {
+        pendingMessages.push({ id: Date.now(), message: inputText, isPending: true, created_at: now } as ChatMessage);
+      }
+    }
+
+    // 2. 楽観的更新
+    setMessages((prev) => [...prev, ...pendingMessages]);
+    scrollToBottom(false); // 賢いスクロール
+
+    // 入力リセット
+    if (!stampId) {
+      setInputText("");
+      setSelectedFiles([]);
+    }
     setIsSubmitting(true);
-    
+
+    // 3. FormDataの構築
     const formData = new FormData();
     formData.append("questionId", questionId);
     formData.append("space_id", spaceId);
-    if (inputText.trim()) formData.append("message", inputText);
-    if (stampId) formData.append("stamp", stampId);
-    selectedFiles.forEach((file) => formData.append("images", file));
+    if (stampId) {
+      formData.append("stamp", stampId);
+    } else {
+      if (inputText.trim()) formData.append("message", inputText);
+      selectedFiles.forEach((file) => formData.append("images", file));
+    }
 
     try {
       const res = await fetch(`/api/questions/${questionId}/messages`, { method: "POST", body: formData });
-      if (!res.ok) throw new Error("送信失敗");
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || "送信失敗");
       
-      // 3. サーバーから正式なリストを取得し、仮データを置き換える
-      await fetchMessages();
-      setSend(0);
+      // 4. サーバーからのレスポンスで置き換え
+      // ※ APIが新規メッセージの配列(data.newMessagesなど)を返す前提です
+      const serverItems = Array.isArray(data.newMessages) ? [...data.newMessages] : [data.message];
+      
+      setMessages((prev) => prev.map((msg) => {
+        if (msg.isPending) {
+          const match = serverItems.shift();
+          return match ? { ...msg, ...match, isPending: false } : msg;
+        }
+        return msg;
+      }));
+
     } catch (e: any) {
-      toast.error("送信に失敗しました");
-      // 4. 失敗したら仮メッセージを削除
-      setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
+      toast.error(e.message || "送信に失敗しました");
+      
+      // ★エラー時にバックアップから復元
+      if (!stampId) {
+        setInputText(backupInputText);
+        setSelectedFiles(backupFiles);
+      }
+      setMessages((prev) => prev.filter((m) => !m.isPending));
+      scrollToBottom(true); // エラー時は強制スクロール
+
     } finally {
       setIsSubmitting(false);
     }
@@ -240,14 +289,9 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
     window.URL.revokeObjectURL(url);
   };
 
-  const scrollToBottom = () => {
-  if (scrollRef.current) {
-    scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  }
-};
+return (
+    <div className="flex flex-col h-[calc(100vh-64px)] w-full overflow-hidden bg-gray-50">
 
-  return (
-    <div ref={containerRef} className="flex flex-col h-[calc(100vh-64px)] w-full overflow-hidden bg-gray-50">
       {/* 1. 質問エリア */}
       {question && (
         <div className="flex-shrink-0 bg-white border-b border-gray-200 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.1)] z-20">
@@ -265,8 +309,7 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
           </details>
         </div>
       )}
-
-      {/* 2. チャットリスト */}
+      
       <div className="flex-1 overflow-y-auto relative w-full p-4">
         <ChatList 
           messages={messages}
@@ -283,17 +326,6 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
         />
       </div>
 
-      {/* 3. 編集通知エリア */}
-      {editingId && (
-        <div className="flex-shrink-0 px-4 pb-2">
-          <div className="bg-blue-100 p-2 text-sm text-blue-800 rounded-lg flex justify-between">
-            <span>編集モード中</span>
-            <button onClick={() => { setEditingId(null); setEditValue(""); }}>キャンセル</button>
-          </div>
-        </div>
-      )}
-
-      {/* 4. 入力エリア */}
       <div className="flex-shrink-0 w-full">
         <ChatInput 
           value={editingId ? editValue : inputText}
