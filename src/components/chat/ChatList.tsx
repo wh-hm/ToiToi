@@ -17,6 +17,7 @@ interface ChatListProps {
   onNiceFlag?: (id: number, flag: number) => void;
   onDownload: (url: string) => void;
   type: string;
+  onScrollBottom: (force?: boolean) => void;
 }
 
 // forwardRef を使用して外部から ref を受け取れるようにします
@@ -31,12 +32,13 @@ const ChatList = forwardRef<HTMLDivElement, ChatListProps>(({
   setEditValue ,
   onNiceFlag,
   onDownload,
-  type
+  onScrollBottom,
+  type,
 }, ref) => {
   
   const [openItemId, setOpenItemId] = useState<number | null>(null);
-  const [zoomData, setZoomData] = useState<{ url: string; caption: string } | null>(null);
-  
+  const [zoomData, setZoomData] = useState<{ url: string; caption: string; msg:ChatMessage } | null>(null);
+  const currentZoomData = zoomData;
 
   return (
     <>
@@ -48,7 +50,7 @@ const ChatList = forwardRef<HTMLDivElement, ChatListProps>(({
       >
         {messages.map((message) => (
           <ChatMessageItem
-            key={message.id}
+            key={`msg-${message.id}`}
             message={message}
             spaceId={spaceId}
             isSubmitting={isSubmitting}
@@ -60,21 +62,25 @@ const ChatList = forwardRef<HTMLDivElement, ChatListProps>(({
             onBackgroundChange={onBackgroundChange}
             setEditValue={setEditValue}
             onNiceFlag={onNiceFlag}
-            onImageClick={(url) => setZoomData({ url, caption: message.message || "" })}
+            onImageClick={(url) => setZoomData({ url, caption: message.message || "",  msg: message})}
             onDownload={onDownload}
+            onScrollBottom={(force) => onScrollBottom(force)}
             type={type}
           />
         ))}
         {/* 下部の余白用div */}
         <div className="h-20 flex-shrink-0" />
       </ScrollShadow>
-      <ImageZoomModal 
-        isOpen={!!zoomData} 
-        onClose={() => setZoomData(null)} 
-        imageUrl={zoomData?.url || null} 
-        caption={zoomData?.caption} // ここにセットしたメッセージが入ります
-        onDownload={onDownload}
-      />
+      {currentZoomData && (
+        <ImageZoomModal 
+          isOpen={!!currentZoomData} 
+          onClose={() => setZoomData(null)} 
+          imageUrl={currentZoomData.url} 
+          caption={currentZoomData.caption}
+          onDownload={onDownload}
+          msg={currentZoomData.msg} // これで「確実に存在している」と認識されます
+        />
+      )}
     </>
   );
 });

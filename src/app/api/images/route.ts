@@ -32,35 +32,49 @@ const s3Client = new S3Client({
 const BUCKET_NAME = process.env.R2_BUCKET_NAME!;
 export async function POST(req: Request) {
   const { targetUrl } = await req.json();
-  
-  // 1. 認証チェック
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-  // 2. URL から Key を特定
-  const url = new URL(targetUrl);
-  // URLの先頭が "/" で始まる場合は削除する
-  const key = url.pathname.startsWith('/') ? url.pathname.substring(1) : url.pathname;
+  // 1. Key を特定するロジックを強化
+  let key = targetUrl;
+  if (targetUrl.startsWith('blob:')) {
+     // ここで「どうやってblobからファイル名を復元するか」を考える必要があります
+     // 一番良いのは、コンポーネント側で msg.image_url (DBのファイル名) を渡すことです
+     console.error("エラー: blob: URLが渡されています");
+     return NextResponse.json({ error: "Invalid file reference" }, { status: 400 });
+  }
+  try {
+    // URLの形式になっているか確認（httpで始まる場合）
+    if (targetUrl.startsWith('http')) {
+      const url = new URL(targetUrl);
+      // pathname から先頭の / を削る
+      key = url.pathname.startsWith('/') ? url.pathname.substring(1) : url.pathname;
+    }
+  } catch (e) {
+    // URLとして解釈できない場合は、そのままファイル名として扱う
+    console.warn("URLとしての解析はスキップされました:", targetUrl);
+  }
+
+  // デバッグ用ログ：ここが重要です！
+  console.log("R2に送るKey:", key);
 
   // 3. R2から取得
   try {
     const command = new GetObjectCommand({
       Bucket: BUCKET_NAME,
-      Key: key,
+      Key: key, // ここが正しければ取得できる
     });
     
     const response = await s3Client.send(command);
     
-    // 4. ストリームとしてレスポンスを返す
     return new Response(response.Body as ReadableStream, {
       headers: {
-        // ここを image/png から application/octet-stream に変えるのが最大の対策です
         "Content-Type": "application/octet-stream", 
         "Content-Disposition": 'attachment; filename="download.png"',
       },
     });
   } catch (error) {
-    console.error("R2 fetch error:", error);
+    console.error("R2 fetch error for key:", key, error);
     return NextResponse.json({ error: "File not found" }, { status: 404 });
   }
 }

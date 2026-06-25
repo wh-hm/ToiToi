@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
     }
 }
 
+
 export async function POST(request: NextRequest) {
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
@@ -33,7 +34,9 @@ export async function POST(request: NextRequest) {
   // 1. 変数を用意（配列に変更）
   let imageUrls: string[] | undefined;
 
+  
   try {
+    
     const formData = await request.formData();
     const message = formData.get("message") as string;
     const files = formData.getAll("images") as File[];
@@ -50,46 +53,55 @@ export async function POST(request: NextRequest) {
 
     console.log(files);
 
+    if(files.length > 5){
+        return NextResponse.json({ error: MESSAGES.E1006 }, { status: 400 });
+    }
+
     // 3. 画像アップロード
     if (files.length > 0) {
+
+      
       // 全ファイルのバリデーション
       for (const file of files) {
         if (file.size > 2 * 1024 * 1024 || !["image/png", "image/jpeg", "image/jpg"].includes(file.type)) {
           return NextResponse.json({ error: MESSAGES.E1005 }, { status: 400 });
         }
       }
+
+      
       imageUrls = await uploadImages(files, auth.user_id, space_id);
     }
 
     // 4. DB登録 (ループで1枚ずつ登録)
     const newChat = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // 画像がない場合（メッセージかスタンプのみ）
+      // 画像がない場合
       if (!imageUrls || imageUrls.length === 0) {
-        return await registerChat({
+        const res = await registerChat({
           user_id: auth.user_id,
           space_id: space_id,
           message: message || undefined,
           stamp: stamp || undefined,
         }, tx);
+        return [res]; // ★単一の結果も必ず配列 [res] にして返す
       }
 
-      // 画像がある場合はループして個別に登録
+      // 画像がある場合
       const results = [];
       for (let i = 0; i < imageUrls.length; i++) {
         const res = await registerChat({
           user_id: auth.user_id,
           space_id: space_id,
-          // 1枚目の画像登録時にのみメッセージ/スタンプを付与する（必要に応じて変更してください）
-          message: i === 0 ? (message || undefined) : undefined,
-          image_url: imageUrls[i], // JSONではなく、1枚のURLを直接渡す
+          message: message || undefined,
+          image_url: imageUrls[i],
           stamp: i === 0 ? (stamp || undefined) : undefined,
         }, tx);
         results.push(res);
       }
-      return results; // 複数のレコードが作成される
+      return results; // これは元から配列
     });
-
+    // ここで newChat は常に配列として返る
     return NextResponse.json({ newChat }, { status: 201 });
+
 
   } catch (error) {
     // 5. エラー処理（配列対応）

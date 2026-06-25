@@ -5,13 +5,15 @@ import { PreviewModal } from "@/components/chat/PreviewModal";
 import { Input, Button, Popover, PopoverTrigger, PopoverContent } from "@nextui-org/react";
 import { Paperclip, SendHorizontal, Smile, X } from "lucide-react";
 import { CHARACTER_STAMPS } from "@/constants/stamp";
+import { toast } from "react-hot-toast";
+import { MESSAGES } from "@/constants/messages";
 
 interface ChatInputProps {
   value: string;
   onChange: (value: string) => void;
   onSend: () => void;
   onSendStamp: (stampId: string) => void;
-  onUploadImage: (file: File) => void;
+  onUploadImage: (file: File[]) => void;
   onRemoveFile: (index: number) => void;
   selectedFiles: File[];
   disabled?: boolean;
@@ -21,6 +23,7 @@ export default function ChatInput({
   value, onChange, onSend, onSendStamp, onUploadImage, onRemoveFile, selectedFiles, disabled 
 }: ChatInputProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null); // ★フォーカス制御用
   
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
@@ -35,13 +38,20 @@ export default function ChatInput({
     setIsPreviewModalOpen(false);
   };
 
+  // ★画像アップロード後に強制フォーカスを戻す処理
+  const handleUpload = (files: File[]) => {
+    onUploadImage(files);
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100);
+  };
+
   return (
     <>
       <PreviewModal
         isOpen={isPreviewModalOpen}
         onClose={() => setIsPreviewModalOpen(false)}
         onConfirm={handleConfirmAndSend}
-        // ★修正：PreviewModalのPropsに合わせて正しく渡す
         imageFiles={selectedFiles}
         index={previewIndex}
       />
@@ -70,18 +80,30 @@ export default function ChatInput({
           )}
 
           <Input
+            ref={inputRef} // ★フォーカス対象に設定
             value={value}
-            onValueChange={onChange}
+            onValueChange={(val) => {
+              // 100文字を超えたら、先頭から1000文字まででカットして更新
+              if (val.length <= 100) {
+                onChange(val);
+              } else {
+                onChange(val.slice(0, 100));
+                toast.error(MESSAGES.E1002("チャット", 100));
+              }
+            }}
             placeholder="メッセージを入力..."
             radius="full"
             size="lg"
             variant="bordered"
             disabled={disabled}
             onKeyDown={(e) => {
-              // EnterキーかつShiftが押されていない場合のみ送信
+              // EnterキーかつShiftが押されていない場合
               if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault(); // 改行が入るのを防ぐ
-                if (value.trim() || selectedFiles.length > 0) {
+                e.preventDefault();
+                
+                const canSend = value.trim().length > 0 || selectedFiles.length > 0;
+                
+                if (canSend && !disabled) {
                   onSend();
                 }
               }
@@ -145,18 +167,15 @@ export default function ChatInput({
             accept="image/*" 
             multiple
             onChange={(e) => {
-              if (e.target.files) {
-                // ★修正：複数ファイルをループしてすべて追加する
-                Array.from(e.target.files).forEach((file) => {
-                  onUploadImage(file);
-                });
+              if (e.target.files && e.target.files.length > 0) {
+                const filesArray = Array.from(e.target.files);
+                handleUpload(filesArray); // ★修正：handleUpload経由で呼ぶ
               }
               e.target.value = '';
-            }} 
+            }}
           />
         </div>
       </div>
     </>
   );
 }
-
