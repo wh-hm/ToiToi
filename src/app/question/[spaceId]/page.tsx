@@ -37,18 +37,15 @@ export default function QuestionPage() {
     if (!spaceId) return;
     try {
       setIsLoading(true);
-
       const res = await fetch(`/api/questions?spaceId=${spaceId}&space_id=${spaceId}`, {
         cache: "no-store",
       });
-
       if (!res.ok) throw new Error("質問データの取得に失敗しました。");
-
       const data = await res.json();
       const list = Array.isArray(data) ? data : (data.questions || []);
       setQuestions(list);
     } catch (error: any) {
-      alert(error.message || "通信エラーが発生しました。");
+      toast.error(error.message || "通信エラーが発生しました。");
     } finally {
       setIsLoading(false);
     }
@@ -60,64 +57,131 @@ export default function QuestionPage() {
     }
   }, [status, fetchQuestions]);
 
-  // 3. チェックマーク押下・ステータス更新 (updateQuestionStatus)
+  // 3. チェックマーク押下・ステータス更新
   const handleStatusToggle = async (question: any) => {
-    // 0: 未解決 / 1: 解決
-    const newStatus = question.status === 1 ? 0 : 1;
+    const currentStatus = Number(question.is_resolved ?? question.status);
+    const newStatus = currentStatus === 1 ? 0 : 1;
+    const previousQuestions = [...questions];
+    setQuestions(
+      questions.map((q) =>
+        q.id === question.id
+          ? { ...q, status: newStatus, is_resolved: newStatus }
+          : q
+      )
+    );
 
     try {
       const res = await fetch(`/api/questions/${question.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          ...question,
           status: newStatus,
-          spaceId: spaceId
+          is_resolved: newStatus,
+          spaceId: Number(spaceId),
         }),
       });
 
-      if (!res.ok) throw new Error("ステータスの更新に失敗しました。");
-
-      if (newStatus === 1) {
-        alert("🎉 質問解決おめでとうございます！お祝い演出 🎉");
-      } else {
-        alert("ステータスを未解決に戻しました。");
-      }
-
-      fetchQuestions();
-    } catch (error: any) {
-      alert(error.message);
-    }
-  };
-
-  const handleDelete = async (id: number) => {
-    if (!window.confirm("この質問を削除してもよろしいですか？")) return;
-
-    try {
-      const res = await fetch(`/api/questions/${id}?space_id=${spaceId}`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-      });
-
       if (res.ok) {
-        toast.success(MESSAGES.S1003("質問"));
-        fetchQuestions(); // 一覧の再取得関数
+        if (newStatus === 1) {
+          triggerCelebration();
+        } else {
+          toast("未解決に戻しました。");
+        }
+
+        const refreshRes = await fetch(`/api/questions?spaceId=${spaceId}&space_id=${spaceId}`);
+        if (refreshRes.ok) {
+          const data = await refreshRes.json();
+          const list = Array.isArray(data) ? data : (data.questions || []);
+          setQuestions(list);
+        }
       } else {
-        toast.error(MESSAGES.E2004("質問"));
+        toast.error("更新に失敗しました。元に戻します。");
+        setQuestions(previousQuestions);
       }
     } catch (error) {
       console.error(error);
-      toast.error(MESSAGES.E2004("質問"));
+      toast.error("通信エラーが発生したため、元に戻します。");
+      setQuestions(previousQuestions);
     }
+  };
+
+  const triggerCelebration = () => {
+    toast.success("質問解決おめでとうございます！", {
+      style: {
+        border: '2px solid #10B981',
+        padding: '16px',
+        color: '#065F46',
+        fontWeight: 'bold',
+        background: '#ECFDF5',
+      },
+      duration: 4000,
+    });
+  };
+
+  // 4. 削除処理
+  const handleDelete = async (id: number) => {
+    toast((t) => (
+      <div className="flex flex-col gap-3 p-1">
+        <p className="text-sm font-semibold text-slate-800">
+          本当にこの質問を削除しますか？
+        </p>
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            className="px-2.5 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg font-medium transition-colors"
+          >
+            キャンセル
+          </button>
+          <button
+            onClick={async () => {
+              toast.dismiss(t.id);
+              const previousQuestions = [...questions];
+              setQuestions(questions.filter((q) => q.id !== id));
+
+              try {
+                const res = await fetch(`/api/questions/${id}?space_id=${spaceId}`, {
+                  method: "DELETE",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ space_id: Number(spaceId) }),
+                });
+                const data = await res.json();
+                if (res.ok) {
+                  toast.success(data.message || "削除しました。");
+                  const refreshRes = await fetch(`/api/questions?spaceId=${spaceId}&space_id=${spaceId}`);
+                  if (refreshRes.ok) {
+                    const data = await refreshRes.json();
+                    setQuestions(Array.isArray(data) ? data : (data.questions || []));
+                  }
+                } else {
+                  toast.error(MESSAGES.E2004("質問") + " 元に戻します。");
+                  setQuestions(previousQuestions);
+                }
+              } catch (error) {
+                console.error(error);
+                toast.error("通信エラーが発生したため、元に戻します。");
+                setQuestions(previousQuestions);
+              }
+            }}
+            className="px-2.5 py-1 text-xs bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-medium transition-colors"
+          >
+            削除する
+          </button>
+        </div>
+      </div>
+    ), {
+      duration: Infinity,
+      position: "top-center",
+    });
   };
 
   // 5. 検索機能 ＆ 解決・未解決の仕分けロジック (useMemoでリアルタイム処理)
   const processedQuestions = useMemo(() => {
-    // 表示されているデータから「タグ」と「ナレッジ」で絞り込み
     const filtered = questions.filter((q) => {
       const matchTag = searchTag ? String(q.tag) === searchTag : true;
       const matchKnowledge = searchKnowledge
-      ? (q.title?.includes(searchKnowledge) ||
-        (q.question || q.description || "").includes(searchKnowledge))
+        ? (q.title?.includes(searchKnowledge) ||
+          (q.question || q.description || "").includes(searchKnowledge))
         : true;
       return matchTag && matchKnowledge;
     });
@@ -161,21 +225,26 @@ export default function QuestionPage() {
         <select
           value={searchTag}
           onChange={(e) => setSearchTag(e.target.value)}
-          className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="px-3 pr-10 py-2 bg-white border border-slate-300 rounded-lg text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
+          style={{
+            backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`,
+            backgroundRepeat: "no-repeat",
+            backgroundPosition: "right 14px center",
+            backgroundSize: "16px"
+          }}
         >
           <option value="">全てのタグ</option>
-          <option value="1">学習 / カテゴリ1</option>
-          <option value="2">重要 / カテゴリ2</option>
-          <option value="3">プライベート / カテゴリ3</option>
+          <option value="1">学習</option>
+          <option value="2">重要</option>
+          <option value="3">プライベート</option>
+          <option value="4">なし</option>
         </select>
       </div>
 
       {/* データの表示判定 */}
       {!processedQuestions.hasOriginalData ? (
-        // 仕様：元々のデータがそもそも空の場合
         <div className="text-center py-12 text-slate-400 font-medium">データがありません</div>
       ) : processedQuestions.totalFiltered === 0 ? (
-        // 仕様：検索によって該当データがなくなった場合
         <div className="text-center py-12 text-slate-400 font-medium">該当のデータはありません</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -188,7 +257,6 @@ export default function QuestionPage() {
             </h2>
             {processedQuestions.incomplete.map((q) => (
               <div key={q.id} className="p-4 bg-white border border-slate-200 rounded-xl shadow-sm flex justify-between items-center hover:border-slate-300 transition-all">
-                {/* 仕様：データクリック時・直接質問チャット画面に遷移する */}
                 <div
                   className="cursor-pointer flex-1 pr-4"
                   onClick={() => {
@@ -198,21 +266,18 @@ export default function QuestionPage() {
                   <p className="font-semibold text-slate-900">{q.title}</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  {/* 仕様：チェックマーク押下で解決へ移動 */}
                   <input
                     type="checkbox"
                     checked={false}
                     onChange={() => handleStatusToggle(q)}
                     className="w-4 h-4 cursor-pointer rounded text-indigo-600 focus:ring-indigo-500"
                   />
-                  {/* 仕様：編集ボタン押下 */}
                   <button
                     onClick={() => { setSelectedQuestion(q); setModalMode('edit'); setIsModalOpen(true); }}
                     className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
                   >
                     編集
                   </button>
-                  {/* 仕様：削除ボタン押下 */}
                   <button
                     onClick={() => handleDelete(q.id)}
                     className="text-xs font-medium text-red-500 hover:text-red-700"
@@ -235,7 +300,6 @@ export default function QuestionPage() {
             </h2>
             {processedQuestions.complete.map((q) => (
               <div key={q.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center opacity-75 hover:opacity-100 transition-all">
-                {/* 詳細表示 */}
                 <div
                   className="cursor-pointer flex-1 pr-4"
                   onClick={() => { setSelectedQuestion(q); setModalMode('detail'); setIsModalOpen(true); }}
@@ -244,7 +308,6 @@ export default function QuestionPage() {
                   <p className="text-xs text-slate-400 mt-1">解決済み</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  {/* チェックを外して未解決に戻す */}
                   <input
                     type="checkbox"
                     checked={true}
@@ -268,6 +331,7 @@ export default function QuestionPage() {
         </div>
       )}
 
+      {/* 5. 共通モーダル*/}
       {isModalOpen && (
         <TaskModal
           task={selectedQuestion}
@@ -275,15 +339,22 @@ export default function QuestionPage() {
           spaceId={spaceId}
           type="question"
           onClose={() => setIsModalOpen(false)}
-          onSuccess={() => { 
+          onSuccess={async () => {
+            setIsModalOpen(false);
             if (modalMode === "edit") {
-              toast.success(MESSAGES.S1002("質問")); 
+              toast.success(MESSAGES.S1002("質問"));
             } else {
               toast.success(MESSAGES.S1001("質問"));
             }
-            
-            setIsModalOpen(false); 
-            fetchQuestions(); 
+            try {
+              const res = await fetch(`/api/questions?spaceId=${spaceId}&space_id=${spaceId}`);
+              if (res.ok) {
+                const data = await res.json();
+                setQuestions(Array.isArray(data) ? data : (data.questions || []));
+              }
+            } catch (error) {
+              console.error("裏側でのデータ同期に失敗しました", error);
+            }
           }}
         />
       )}
