@@ -11,6 +11,8 @@ export interface ChatMessage {
   question_id?: number;
   nice_flag?: number;
   signedImageUrl?: string | null;
+  previewImages?: string[] | null;
+  isPending?: boolean;
 }
 
 export interface ChatInputProps {

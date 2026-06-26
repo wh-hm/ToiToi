@@ -21,7 +21,7 @@ export async function PATCH(
     const is_resolved = body.is_resolved !== undefined ? Number(body.is_resolved) : (body.status !== undefined ? Number(body.status) : undefined);
 
     if (!spaceId || isNaN(spaceId)) {
-      return NextResponse.json({ error: MESSAGES.E1001("スペースID") }, { status: 400 });
+      return NextResponse.json({ message: MESSAGES.E1001("スペースID") }, { status: 400 });
     }
 
     if (!title && !question && is_resolved !== undefined) {
@@ -36,12 +36,12 @@ export async function PATCH(
 
     // 💡【ケース2】通常の編集画面からのフル更新（ここから下は必須チェックを行う）
     // --- 単体チェック ---
-    if (!title) return NextResponse.json({ error: MESSAGES.E1001("質問タイトル") }, { status: 400 });
-    if (!question) return NextResponse.json({ error: MESSAGES.E1001("質問詳細") }, { status: 400 });
+    if (!title) return NextResponse.json({ message: MESSAGES.E1001("質問タイトル") }, { status: 400 });
+    if (!question) return NextResponse.json({ message: MESSAGES.E1001("質問詳細") }, { status: 400 });
 
     // 桁数チェック
-    if (title.length > 50) return NextResponse.json({ error: MESSAGES.E1002("質問タイトル", 50) }, { status: 400 });
-    if (question.length > 100) return NextResponse.json({ error: MESSAGES.E1002("質問詳細", 100) }, { status: 400 });
+    if (title.length > 50) return NextResponse.json({ message: MESSAGES.E1002("質問タイトル", 50) }, { status: 400 });
+    if (question.length > 100) return NextResponse.json({ message: MESSAGES.E1002("質問詳細", 100) }, { status: 400 });
 
     const updated = await updateQuestion(
       questionId,
@@ -56,7 +56,7 @@ export async function PATCH(
     return NextResponse.json(updated);
   } catch (error: any) {
     console.error("質問更新中にエラーが発生しました:", error);
-    return NextResponse.json({ error: error.message || MESSAGES.E2002("質問") }, { status: 500 });
+    return NextResponse.json({ message: error.message || MESSAGES.E2002("質問") }, { status: 500 });
   }
 }
 
@@ -66,7 +66,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
     const { id } = await params;
@@ -82,6 +82,6 @@ export async function DELETE(
 
     return NextResponse.json({ message: MESSAGES.S1003("質問") });
   } catch (error) {
-    return NextResponse.json({ error: MESSAGES.E2004("質問") }, { status: 500 });
+    return NextResponse.json({ message: MESSAGES.E2004("質問") }, { status: 500 });
   }
 }

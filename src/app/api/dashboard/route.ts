@@ -46,9 +46,8 @@ export async function GET() {
           
         type3: spacesWithTaskCount.filter(s => s.space_type === 3),
       },
-      tasksCount,       
-      goal,           
-      login_management, 
+      goal,             // 目標データ
+      login_management, // ログイン管理情報
     };
 
     return NextResponse.json(result);

@@ -18,12 +18,13 @@ interface ChatMessageItemProps {
   onNiceFlag?: (id: number, flag: number) => void;
   onImageClick?: (url: string) => void;
   onDownload: (url: string) => void;
+  onScrollBottom: (force: boolean) => void;
   type: string;
 }
 
 export default function ChatMessageItem({ 
   message, spaceId, isOpen, isSubmitting, 
-  onOpenChange, onToggleFavorite, onEdit, onDelete, onBackgroundChange, setEditValue, onNiceFlag, onImageClick, onDownload, type
+  onOpenChange, onToggleFavorite, onEdit, onDelete, onBackgroundChange, setEditValue, onNiceFlag, onImageClick, onDownload, onScrollBottom, type
 }: ChatMessageItemProps) {
   
   const [isHovered, setIsHovered] = useState(false);
@@ -50,6 +51,8 @@ export default function ChatMessageItem({
     onOpenChange(true);
   };
 
+  const hasImage = !!(message.signedImageUrl || (message as any).previewImages || message.image_url);
+
   return (
     <div className="relative flex flex-col items-end w-full">
       <Popover 
@@ -67,7 +70,7 @@ export default function ChatMessageItem({
         
         <PopoverContent className="w-[200px] p-2 data-[placement=bottom-end]:mt-2 data-[placement=top-end]:mb-2">
           <div className="flex flex-col w-full">
-            {!isOnlyStamp && (
+            {!isOnlyStamp && !hasImage && message.message && (
               <button 
                 disabled={isSubmitting}
                 onClick={() => { 
@@ -95,7 +98,7 @@ export default function ChatMessageItem({
                 disabled={isSubmitting}
                 onClick={() => { onOpenChange(false); onNiceFlag?.(message.id, message.nice_flag === 1 ? 0 : 1); }} 
                 className="w-full text-left p-3 text-sm text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              >{message.favorite_flag === 1 ? "いいね解除" : "いいね登録"}</button>
+              >{message.nice_flag === 1 ? "いいね解除" : "いいね登録"}</button>
             )}
           </div>
           
@@ -153,9 +156,9 @@ export default function ChatMessageItem({
             ${(isHovered || isOpen) && !isSubmitting ? "brightness-90" : "brightness-100"}
           `}
         >
-          {(!message.signedImageUrl && message.message) && (
+          {(!message.signedImageUrl && !(message as any).previewImages && !message.image_url && message.message) && (
             <p className="text-lg text-gray-800 whitespace-pre-wrap">{message.message}</p>
-          )}          
+          )}         
           {message.stamp ? (
             <img
               src={`/stamps/${message.stamp}.png`}
@@ -166,14 +169,20 @@ export default function ChatMessageItem({
               }}
             />
           ) : null}
-          {message.signedImageUrl && (
-            <div className="mt-2">
-              <img
-                src={message.signedImageUrl}
-                alt="chat image"
-                className="max-w-[200px] h-auto rounded-lg border border-gray-200 cursor-pointer hover:opacity-80" // cursor-pointerを追加
-                onClick={() => onImageClick?.(message.signedImageUrl!)}
-              />
+          {(message.signedImageUrl || (message as any).previewImages || message.image_url) && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {((message as any).previewImages || [message.signedImageUrl]).filter(Boolean).map((url: string, index: number) => (
+                <img
+                  key={`img-${message.id}-${index}`}
+                  src={url}
+                  alt="chat image"
+                  className="max-w-[200px] h-auto rounded-lg border border-gray-200"
+                  onLoad={() => 
+                    onScrollBottom?.(true)}
+                  onClick={() => onImageClick?.(url)}
+                  
+                />
+              ))}
             </div>
           )}
         </div>
