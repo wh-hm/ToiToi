@@ -5,6 +5,8 @@ import ChatInput from "@/components/chat/ChatInput";
 import ChatList from "@/components/chat/ChatList";
 import { ChatMessage } from "@/types/chat";
 import { MESSAGES } from "@/constants/messages";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -14,10 +16,12 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [editingId, setEditingId] = useState<number | null>(null);
   const [spaceId, setSpaceId] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  
+  const { status } = useSession();
+  const router = useRouter();
   // ★配列で管理に変更
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const isInitialLoad = useRef(true);
+  const [isLoading, setIsLoading] = useState(true); // ★追加
 
 
   // useEffect(() => {
@@ -25,6 +29,13 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   //     scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   //   }
   // }, [messages]);
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      toast.error(MESSAGES.USER001);
+      router.push("/login");
+    }
+  }, [status, router]);
 
 
 
@@ -62,10 +73,17 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   useEffect(() => { fetchMessages(); }, []);
 
   const fetchMessages = async () => {
-    const { id } = await params;
-    const res = await fetch(`/api/chats?spaceId=${id}`);
-    const data = await res.json();
-    setMessages(data);
+    setIsLoading(true); // 開始時にオン
+    try {
+      const { id } = await params;
+      const res = await fetch(`/api/chats?spaceId=${id}`);
+      const data = await res.json();
+      setMessages(data);
+    } catch (e: any) {
+      console.error(e.message);
+    } finally {
+      setIsLoading(false); // 完了したらオフ
+    }
   };
 
   // ★画像追加処理：5枚制限
@@ -360,6 +378,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           setEditValue={setEditValue}
           onDownload={handleDownload}
           onScrollBottom={scrollToBottom}
+          isLoading={isLoading}
           type="chat"
         />
       </div>

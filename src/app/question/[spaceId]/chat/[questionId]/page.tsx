@@ -7,7 +7,9 @@ import toast from "react-hot-toast";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Question } from "@/types/question";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, CheckCircle2 } from "lucide-react";
+import { MESSAGES } from "@/constants/messages";
+import { Switch } from "@nextui-org/react";
 
 export default function ChatPage({ params }: { params: Promise<{ questionId: string, spaceId: string }> }) {
   const [inputText, setInputText] = useState("");
@@ -17,6 +19,7 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [question, setQuestion] = useState<Question>();
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const { questionId, spaceId } = use(params);
@@ -25,6 +28,16 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
   const router = useRouter();
   // メッセージが更新されたら、一度だけ一番下に飛ぶ
   const isInitialLoad = useRef(true);
+
+  // 質問の解決状態を管理する（0:未解決, 1:解決済み）
+  const [isResolved, setIsResolved] = useState(0);
+
+  // useEffect で質問データを取得した際に、初期状態をセットする
+  useEffect(() => {
+    if (question) {
+      setIsResolved(question.is_resolved || 0); // 質問データにあるフラグを反映
+    }
+  }, [question]);
 
   // 1. スクロール処理の強化（page.tsxと同じロジック）
   const scrollToBottom = (force: boolean = false) => {
@@ -40,7 +53,7 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
 
   useEffect(() => {
     if (status === "unauthenticated") {
-      toast.error("ログインが必要です");
+      toast.error(MESSAGES.USER001);
       router.push("/login");
     }
   }, [status, router]);
@@ -57,6 +70,7 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
   }, [questionId]);
 
   const fetchMessages = async () => {
+    setIsLoading(true); // 開始
     try {
       const res = await fetch(`/api/questions/${questionId}/messages`);
       const data = await res.json();
@@ -64,13 +78,15 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
       setQuestion(data.question);
     } catch (error) {
       console.error("メッセージ取得エラー:", error);
+    } finally {
+      setIsLoading(false); // 終了
     }
   };
 
   const handleFileSelect = (input: File | File[]) => {
     const newFiles = Array.isArray(input) ? input : [input];
     if (selectedFiles.length + newFiles.length > 5) {
-      toast.error("一度に送信できるのは5枚までです");
+      toast.error(MESSAGES.E1007);
       return;
     }
     setSelectedFiles((prev) => [...prev, ...newFiles]);
@@ -151,7 +167,7 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
       }));
 
     } catch (e: any) {
-      toast.error(e.message || "送信に失敗しました");
+      toast.error(e.message);
       
       // ★エラー時にバックアップから復元
       if (!stampId) {
@@ -198,7 +214,8 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
       setMessages((prev) => prev.map(m => m.id === chatId ? updatedData : m));
 
     } catch (e: any) {
-      toast.error("更新に失敗しました");
+      toast.error(e.message);
+
       // 4. 失敗したら元の状態へロールバック
       setMessages(previousMessages);
     } finally {
@@ -228,7 +245,7 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
       if (!res.ok) throw new Error("更新失敗");
       
     } catch (e: any) {
-      toast.error("更新に失敗しました");
+      toast.error(e.message);
       // 3. 失敗したら元の状態に戻す
       setMessages(previousMessages);
     }
@@ -253,7 +270,7 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
       if (!res.ok) throw new Error("削除失敗");
 
     } catch (e: any) {
-      toast.error("削除に失敗しました");
+      toast.error(e.message);
       // 3. 失敗したら元の状態に戻す
       setMessages(previousMessages);
     }
@@ -289,6 +306,37 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
     window.URL.revokeObjectURL(url);
   };
 
+  const handleToggleResolved = async (isSelected: boolean) => {
+    const previousStatus = isResolved;
+    const newStatus = isSelected ? 1 : 0;
+
+    // 1. 楽観的更新
+    setIsResolved(newStatus);
+
+    try {
+      const res = await fetch(`/api/questions/${questionId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          is_resolved: newStatus,
+          space_id: spaceId 
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "ステータス更新失敗");
+      }
+      
+      // 成功時は何もしなくてOK（setIsResolvedで既に更新済みのため）
+    } catch (e: any) {
+      toast.error(e.message);
+
+      // 2. 失敗したら前の状態に戻す（Switchも自動的に元の位置に戻ります）
+      setIsResolved(previousStatus); 
+    }
+  };
+
 return (
     <div className="flex flex-col h-[calc(100vh-64px)] w-full overflow-hidden bg-gray-50">
 
@@ -296,16 +344,43 @@ return (
       {question && (
         <div className="flex-shrink-0 bg-white border-b border-gray-200 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.1)] z-20">
           <details className="group relative w-full">
-            <summary className="list-none flex items-center justify-between p-3 cursor-pointer hover:bg-gray-50/80 transition-all">
-              <div className="flex items-center gap-3 pl-0 lg:ml-32">
-                <span className="shrink-0 bg-gradient-to-r from-blue-400 to-emerald-400 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase shadow-sm">QUESTION</span>
-                <h1 className="text-[17px] font-bold text-gray-900 truncate">{question.title}</h1>
-              </div>
-              <ChevronDown className="w-5 h-5 text-gray-500 transition-transform duration-300 group-open:rotate-180" />
-            </summary>
-            <div className="bg-white border-b border-gray-200 shadow-xl opacity-0 group-open:opacity-100 max-h-0 group-open:max-h-[50vh] overflow-hidden transition-all duration-300">
-              <div className="py-3 px-8 lg:px-32"><p className="text-[14px] text-gray-700 whitespace-pre-wrap">{question.question}</p></div>
-            </div>
+<summary className="list-none flex items-center justify-between p-3 cursor-pointer hover:bg-gray-50/80 transition-all">
+  {/* 左側のタイトルエリア：min-w-0を入れてタイトルが長くなってもレイアウト崩れを防ぐ */}
+    <div className="flex items-center gap-3 pl-0 lg:ml-32 min-w-0">
+      <div 
+      className={`shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold border transition-all cursor-default ${
+        isResolved === 1 
+          ? "bg-emerald-50 text-emerald-600 border-emerald-200" 
+          : "bg-gray-100 text-gray-500 border-gray-200"
+      }`}
+    >
+      <CheckCircle2 size={12} />
+      {isResolved === 1 ? "解決済み" : "未解決"}
+    </div>
+    <h1 className="text-[17px] font-bold text-gray-900 truncate">{question.title}</h1>
+  </div>
+
+  {/* 右側のコントロールエリア */}
+  <div className="flex items-center gap-4 mr-2 lg:mr-32">
+    <div className="flex items-center gap-2">
+      <span className="text-[12px] font-bold text-gray-600">解決</span>
+      <Switch 
+        isSelected={isResolved === 1}
+        onValueChange={handleToggleResolved}
+        size="sm"
+        color="success"
+      />
+    </div>
+    <ChevronDown className="w-5 h-5 text-gray-500 transition-transform duration-300 group-open:rotate-180" />
+  </div>
+</summary>
+
+{/* 詳細テキストエリア：タイトルの開始位置と揃えるためのパディング調整 */}
+<div className="bg-white border-b border-gray-200 shadow-xl opacity-0 group-open:opacity-100 max-h-0 group-open:max-h-[50vh] overflow-hidden transition-all duration-300">
+  <div className="py-3 px-8 lg:px-[176px]"> {/* ここを調整してタイトル位置と合わせる */}
+    <p className="text-[14px] text-gray-700 whitespace-pre-wrap">{question.question}</p>
+  </div>
+</div>
           </details>
         </div>
       )}
@@ -322,6 +397,7 @@ return (
           onNiceFlag={handleNiceFlag}
           onDownload={handleDownload}
           onScrollBottom={scrollToBottom}
+          isLoading={isLoading}
           type="question"
         />
       </div>
