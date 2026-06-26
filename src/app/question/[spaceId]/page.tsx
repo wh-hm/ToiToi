@@ -59,10 +59,15 @@ export default function QuestionPage() {
 
   // 3. チェックマーク押下・ステータス更新
   const handleStatusToggle = async (question: any) => {
-    const newStatus = question.status === 1 ? 0 : 1;
+    const currentStatus = Number(question.is_resolved ?? question.status);
+    const newStatus = currentStatus === 1 ? 0 : 1;
     const previousQuestions = [...questions];
     setQuestions(
-      questions.map((q) => (q.id === question.id ? { ...q, status: newStatus } : q))
+      questions.map((q) =>
+        q.id === question.id
+          ? { ...q, status: newStatus, is_resolved: newStatus }
+          : q
+      )
     );
 
     try {
@@ -70,37 +75,48 @@ export default function QuestionPage() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          ...question,
           status: newStatus,
-          spaceId: spaceId
+          is_resolved: newStatus,
+          spaceId: Number(spaceId),
         }),
       });
 
-      if (!res.ok) throw new Error("ステータスの更新に失敗しました。");
+      if (res.ok) {
+        if (newStatus === 1) {
+          triggerCelebration();
+        } else {
+          toast("未解決に戻しました。");
+        }
 
-      if (newStatus === 1) {
-        toast.success("質問解決おめでとうございます！", {
-          style: {
-            border: '2px solid #10B981',
-            padding: '16px',
-            color: '#065F46',
-            fontWeight: 'bold',
-            background: '#ECFDF5',
-          },
-          duration: 4000,
-        });
+        const refreshRes = await fetch(`/api/questions?spaceId=${spaceId}&space_id=${spaceId}`);
+        if (refreshRes.ok) {
+          const data = await refreshRes.json();
+          const list = Array.isArray(data) ? data : (data.questions || []);
+          setQuestions(list);
+        }
       } else {
-        toast("ステータスを未解決に戻しました。");
+        toast.error("更新に失敗しました。元に戻します。");
+        setQuestions(previousQuestions);
       }
-      const refreshRes = await fetch(`/api/questions?spaceId=${spaceId}&space_id=${spaceId}`);
-      if (refreshRes.ok) {
-        const data = await refreshRes.json();
-        setQuestions(Array.isArray(data) ? data : (data.questions || []));
-      }
-    } catch (error: any) {
+    } catch (error) {
       console.error(error);
-      toast.error(error.message || "更新に失敗しました。元に戻します。");
-      setQuestions(previousQuestions); 
+      toast.error("通信エラーが発生したため、元に戻します。");
+      setQuestions(previousQuestions);
     }
+  };
+
+  const triggerCelebration = () => {
+    toast.success("質問解決おめでとうございます！", {
+      style: {
+        border: '2px solid #10B981',
+        padding: '16px',
+        color: '#065F46',
+        fontWeight: 'bold',
+        background: '#ECFDF5',
+      },
+      duration: 4000,
+    });
   };
 
   // 4. 削除処理
@@ -119,7 +135,7 @@ export default function QuestionPage() {
           </button>
           <button
             onClick={async () => {
-              toast.dismiss(t.id); 
+              toast.dismiss(t.id);
               const previousQuestions = [...questions];
               setQuestions(questions.filter((q) => q.id !== id));
 
@@ -207,16 +223,16 @@ export default function QuestionPage() {
           className="flex-1 px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
         <select
-            value={searchTag}
-            onChange={(e) => setSearchTag(e.target.value)}
-            className="px-3 pr-10 py-2 bg-white border border-slate-300 rounded-lg text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
-            style={{
-              backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`,
-              backgroundRepeat: "no-repeat",
-              backgroundPosition: "right 14px center",
-              backgroundSize: "16px"
-            }}
-          >
+          value={searchTag}
+          onChange={(e) => setSearchTag(e.target.value)}
+          className="px-3 pr-10 py-2 bg-white border border-slate-300 rounded-lg text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
+          style={{
+            backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`,
+            backgroundRepeat: "no-repeat",
+            backgroundPosition: "right 14px center",
+            backgroundSize: "16px"
+          }}
+        >
           <option value="">全てのタグ</option>
           <option value="1">学習</option>
           <option value="2">重要</option>

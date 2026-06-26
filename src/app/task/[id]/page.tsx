@@ -219,7 +219,6 @@ export default function TaskPage() {
         } else {
           toast("未完了に戻しました");
         }
-        // 裏で同期
         const refreshRes = await fetch(`/api/task?spaceId=${spaceId}&space_id=${spaceId}`);
         if (refreshRes.ok) {
           const data = await refreshRes.json();
