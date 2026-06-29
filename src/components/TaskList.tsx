@@ -88,8 +88,7 @@ export default function TaskList({
                 >
                   編集
                 </button>
-                <button
-                  onClick={() => { if (confirm("本当に削除しますか？")) onDelete(task.id); }}
+                <button onClick={() => onDelete(task.id)}
                   className="text-xs text-rose-600 hover:bg-rose-50 px-2 py-1.5 rounded-lg transition-colors"
                 >
                   削除

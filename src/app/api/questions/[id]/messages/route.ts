@@ -12,7 +12,7 @@ import { Prisma } from "@prisma/client";
 // 1. メッセージ一覧取得 (GET)
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id : string }> } // パラメータ名は "id" だけでOK
+  { params }: { params: Promise<{ id: string }> } // パラメータ名は "id" だけでOK
 ) {
   const resolvedParams = await params;
   const { id } = resolvedParams;
@@ -25,13 +25,13 @@ export async function GET(
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
   // const { id } = await params; // ここで id (spaceIdのこと) を取得
   try {
-    
+
     // ★ 並列処理に修正：Promise.all で同時に取得する
     const [messages, question] = await Promise.all([
       getQuestionChats(questionId, auth.user_id),
       getQuestion(questionId, auth.user_id)
     ]);
-    
+
     // データが null なら空配列 [] を返すようにする
     // オブジェクトとしてまとめて返す
     return NextResponse.json({

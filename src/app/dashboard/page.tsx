@@ -44,6 +44,8 @@ export default function Dashboard() {
   const [editingSpace, setEditingSpace] = useState<Space | null>(null);
   const [modalFavorite, setModalFavorite] = useState<number>(0);
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
+  const [consecutiveLoginDays, setConsecutiveLoginDays] = useState<number>(0);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   const [goal, setGoal] = useState<Goal | null>(null);
   const [loginInfo, setLoginInfo] = useState<any>(null);
@@ -57,7 +59,7 @@ export default function Dashboard() {
     text: "",
     image: ""
   });
-  
+
 
   const updateLoginMessage = (streakDays: number, isStreakAchieved: boolean) => {
     // 1. 全イベント発生時の現在時刻をリアルタイムに取得
@@ -82,7 +84,7 @@ export default function Dashboard() {
         image: "/stamps/shikiji_default.png",
         normal: [
           "おはよう よく来たな 共に頑張ろう",
-          "Good Morning ん？ わしは英語も話せるじいじだぞ？",
+          "Good Morning! ...ん？ わしは英語も話せるじいじだぞ？",
           "勉強しに来るとは偉いぞ！ どれじいじがお菓子をあげよう"
         ],
         success: `おお！ 連続ログイン日数${streakDays}日が達成したぞ！ おめでとう！`
@@ -204,15 +206,17 @@ export default function Dashboard() {
         setGoal(null);
       }
 
-      if (data.loginInfo) {
-        setLoginInfo(data.loginInfo);
-        const streakDays = data.loginInfo.streak_days ?? 0;
-        const isStreakAchieved = data.loginInfo.is_streak_achieved ?? false;
+      if (data.login_management) {
+        setLoginInfo(data.login_management);
+        const streakDays = data.login_management.streak_days ?? 0;
+        setConsecutiveLoginDays(streakDays);
+        setLoginError(null);
+        const isStreakAchieved = data.login_management.is_streak_achieved ?? false;
         updateLoginMessage(streakDays, isStreakAchieved);
       } else {
-        // APIからログイン情報が届いていない場合のフォールバック（安全装置）
-        console.warn("APIからloginInfoが取得できませんでした。デフォルト値でメッセージを表示します。");
-        updateLoginMessage(0, false);
+        setLoginError("ログイン情報の取得に失敗しました。");
+        setIsLoading(false);
+        return null;
       }
 
       if (data.loginMessage) setLoginMessage(data.loginMessage);
@@ -283,12 +287,22 @@ export default function Dashboard() {
       <section style={{ maxWidth: "900px", margin: "40px auto", padding: "30px", background: "white", borderRadius: "8px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
         <h1 style={{ fontSize: "28px", fontWeight: "bold", marginBottom: "20px" }}>ダッシュボード</h1>
 
+        {loginError && (
+          <div style={{ padding: "12px 16px", background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: "6px", color: "#b91c1c", fontWeight: "bold", marginBottom: "20px" }}>
+            ⚠️ {loginError}
+          </div>
+        )}
+
         {currentLoginMessage.name && (
           <div style={{
             marginBottom: "25px",
             display: "flex",
             alignItems: "center",
-            gap: "16px"
+            gap: "16px",
+            background: "#f8fafc",
+            border: "1px solid #e2e8f0",
+            borderRadius: "12px",
+            padding: "16px 20px",
           }}>
             {/* 左側：キャラクター画像と名前 */}
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", flexShrink: 0, width: "70px" }}>
@@ -308,32 +322,29 @@ export default function Dashboard() {
               </span>
             </div>
 
-            {/* 右側：フキダシ風メッセージコンテナ */}
-            <div style={{
-              position: "relative",
-              flexGrow: 1,
-              padding: "16px",
-              background: "#f8fafc",
-              border: "1px solid #e2e8f0",
-              borderRadius: "8px",
-              fontSize: "14px",
-              color: "#1e293b",
-              fontWeight: "500",
-              lineHeight: "1.5"
-            }}>
-              {/* フキダシの左側の三角形の角 */}
+            {/* 右側：コンテンツエリア（ログイン日数 ＋ セリフ） */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", flexGrow: 1 }}>
+
+              {/* 連続ログイン日数をフキダシ内の最上部にスマートに配置 */}
+              {!loginError && (
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", color: "#64748b" }}>
+                  <span>連続ログイン:</span>
+                  <span style={{ fontSize: "16px", fontWeight: "800", color: "#b45309" }}>
+                    {consecutiveLoginDays}
+                  </span>
+                  <span>日目</span>
+                </div>
+              )}
+
+              {/* キャラクターのセリフ */}
               <div style={{
-                position: "absolute",
-                left: "-6px",
-                top: "50%",
-                transform: "translateY(-50%) rotate(45deg)",
-                width: "10px",
-                height: "10px",
-                background: "#f8fafc",
-                borderLeft: "1px solid #e2e8f0",
-                borderBottom: "1px solid #e2e8f0"
-              }}></div>
-              {currentLoginMessage.text}
+                fontSize: "14px",
+                color: "#1e293b",
+                fontWeight: "500",
+                lineHeight: "1.5"
+              }}>
+                {currentLoginMessage.text}
+              </div>
             </div>
           </div>
         )}
@@ -499,17 +510,21 @@ export default function Dashboard() {
           onDelete={handleDelete}
         />
 
-        <div style={{ marginTop: "30px", position: "relative", display: "inline-block" }}>
-          <button 
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "30px" }}>
+
+          <button
             type="button"
-            onClick={() => setIsCreateMenuOpen(!isCreateMenuOpen)}
-            style={{ 
-              padding: "12px 24px", 
-              margin:"0",
-              background: "#2563eb", 
-              color: "white", 
-              border: "none", 
-              borderRadius: "8px", 
+            onClick={() => {
+              setEditingSpace(null);
+              openModal(1);
+            }}
+            style={{
+              padding: "12px 24px",
+              margin: "0",
+              background: "#2563eb",
+              color: "white",
+              border: "none",
+              borderRadius: "8px",
               cursor: "pointer",
               fontWeight: "bold",
               fontSize: "14px",
@@ -525,56 +540,6 @@ export default function Dashboard() {
             <span>＋</span> 新規作成
           </button>
 
-          {isCreateMenuOpen && (
-            <>
-              {/* メニューの外をクリックしたときに閉じる透明な背面幕 */}
-              <div 
-                onClick={() => setIsCreateMenuOpen(false)} 
-                style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}
-              />
-
-              <div style={{
-                position: "absolute",
-                top: "calc(100% + 6px)",
-                left: 0,
-                backgroundColor: "#ffffff",
-                border: "1px solid #e2e8f0",
-                borderRadius: "8px",
-                padding: "6px",
-                width: "180px",
-                boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.05)",
-                zIndex: 1000,
-                display: "flex",
-                flexDirection: "column",
-                gap: "2px"
-              }}>
-                <button
-                  onClick={() => { setIsCreateMenuOpen(false); setEditingSpace(null); openModal(1); }}
-                  style={{ width: "100%", background: "none", border: "none", padding: "10px 12px", textAlign: "left", cursor: "pointer", fontSize: "13px", fontWeight: "600", color: "#334155", borderRadius: "6px" }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f1f5f9"}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-                >
-                  チャットを作成
-                </button>
-                <button
-                  onClick={() => { setIsCreateMenuOpen(false); setEditingSpace(null); openModal(2); }}
-                  style={{ width: "100%", background: "none", border: "none", padding: "10px 12px", textAlign: "left", cursor: "pointer", fontSize: "13px", fontWeight: "600", color: "#334155", borderRadius: "6px" }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f1f5f9"}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-                >
-                  ToDoリストを作成
-                </button>
-                <button
-                  onClick={() => { setIsCreateMenuOpen(false); setEditingSpace(null); openModal(3); }}
-                  style={{ width: "100%", background: "none", border: "none", padding: "10px 12px", textAlign: "left", cursor: "pointer", fontSize: "13px", fontWeight: "600", color: "#334155", borderRadius: "6px" }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f1f5f9"}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-                >
-                  質問を作成
-                </button>
-              </div>
-            </>
-          )}
         </div>
       </section>
 

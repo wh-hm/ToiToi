@@ -18,8 +18,8 @@ export default function TaskModal({ task, onClose, onSuccess, spaceId, mode = 'c
     if (task) {
       setFormData({
         title: task.title || "",
-        description: task.question || task.description || "", 
-        status: task.status ?? (task.is_resolved ?? 0), 
+        description: task.question || task.description || "",
+        status: task.status ?? (task.is_resolved ?? 0),
         due_date: task.due_date || "",
         is_allday: task.is_allday || 0,
         tag: task.tag || 0,
@@ -70,23 +70,23 @@ export default function TaskModal({ task, onClose, onSuccess, spaceId, mode = 'c
       const isoDueDate = !isNaN(parsedDate.getTime()) ? parsedDate.toISOString() : formData.due_date;
       const payload = type === "question"
         ? {
-            title: formData.title.trim(),
-            question: formData.description.trim(), 
-            is_resolved: isEditMode ? Number(formData.status) : 0, 
-            spaceId: numericSpaceId, 
-            space_id: numericSpaceId,
-            tag: Number(formData.tag) || 0,
-          }
+          title: formData.title.trim(),
+          question: formData.description.trim(),
+          is_resolved: isEditMode ? Number(formData.status) : 0,
+          spaceId: numericSpaceId,
+          space_id: numericSpaceId,
+          tag: Number(formData.tag) || 0,
+        }
         : {
-            title: formData.title.trim(),
-            due_date: isoDueDate,
-            space_id: numericSpaceId,
-            tag: Number(formData.tag) || 0,
-            priority: Number(formData.priority) || 1,
-            is_allday: Number(formData.is_allday),
-            status: Number(formData.status),
-            description: formData.description.trim(),
-          };
+          title: formData.title.trim(),
+          due_date: isoDueDate,
+          space_id: numericSpaceId,
+          tag: Number(formData.tag) || 0,
+          priority: Number(formData.priority) || 1,
+          is_allday: Number(formData.is_allday),
+          status: Number(formData.status),
+          description: formData.description.trim(),
+        };
 
       const response = await fetch(url, {
         method: method,
@@ -98,7 +98,7 @@ export default function TaskModal({ task, onClose, onSuccess, spaceId, mode = 'c
       const resData = await response.json();
 
       if (response.ok) {
-        onSuccess(); 
+        onSuccess();
       } else {
         alert(`保存失敗: ${resData.error || "リクエストが不正です"}`);
         console.log("POST結果:", resData);
@@ -183,61 +183,90 @@ export default function TaskModal({ task, onClose, onSuccess, spaceId, mode = 'c
 
           {type !== "question" ? (
             <div className="grid grid-cols-2 gap-3">
+              {/* 1. 優先度 */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-slate-500">優先度</label>
                 <select
                   value={formData.priority}
                   onChange={e => setFormData({ ...formData, priority: Number(e.target.value) })}
                   disabled={isDetailMode}
-                  className="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:opacity-60"
+                  className="w-full pl-3 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:opacity-60 appearance-none"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`,
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "right 14px center",
+                    backgroundSize: "16px"
+                  }}
                 >
-                  <option value={1}>低</option>
+                  <option value={1}>高</option>
                   <option value={2}>中</option>
-                  <option value={3}>高</option>
+                  <option value={3}>低</option>
                 </select>
               </div>
 
+              {/* 2. タグ */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-slate-500">タグ</label>
                 <select
                   value={formData.tag}
                   onChange={e => setFormData({ ...formData, tag: Number(e.target.value) })}
                   disabled={isDetailMode}
-                  className="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:opacity-60"
+                  className="w-full pl-3 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:opacity-60 appearance-none"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`,
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "right 14px center",
+                    backgroundSize: "16px"
+                  }}
                 >
                   <option value={1}>学習</option>
                   <option value={2}>重要</option>
                   <option value={3}>プライベート</option>
+                  <option value={4}>なし</option>
                 </select>
               </div>
             </div>
           ) : (
             // 2. 質問（question）画面のとき
             <div>
-              {(!isCreateMode) ? (
-                // 質問の【編集モード】および【詳細モード】なら、タグとステータスをきれいな2列にする
+              {!isCreateMode ? (
                 <div className="grid grid-cols-2 gap-3">
+                  {/* 3. 質問時タグ */}
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-semibold text-slate-500">タグ</label>
                     <select
                       value={formData.tag}
                       onChange={e => setFormData({ ...formData, tag: Number(e.target.value) })}
                       disabled={isDetailMode}
-                      className="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:opacity-60"
+                      className="w-full pl-3 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:opacity-60 appearance-none"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`,
+                        backgroundRepeat: "no-repeat",
+                        backgroundPosition: "right 14px center",
+                        backgroundSize: "16px"
+                      }}
                     >
                       <option value={1}>学習</option>
                       <option value={2}>重要</option>
                       <option value={3}>プライベート</option>
+                      <option value={4}>なし</option>
                     </select>
                   </div>
 
+                  {/* 4. 質問時ステータス */}
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-semibold text-slate-500">ステータス</label>
                     <select
                       value={formData.status}
                       onChange={e => setFormData({ ...formData, status: Number(e.target.value) })}
                       disabled={isDetailMode}
-                      className="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:opacity-60"
+                      className="w-full pl-3 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:opacity-60 appearance-none"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`,
+                        backgroundRepeat: "no-repeat",
+                        backgroundPosition: "right 14px center",
+                        backgroundSize: "16px"
+                      }}
                     >
                       <option value={0}>未解決</option>
                       <option value={1}>解決</option>
@@ -246,20 +275,28 @@ export default function TaskModal({ task, onClose, onSuccess, spaceId, mode = 'c
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3">
+                  {/* 5. 新規作成時タグ */}
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-semibold text-slate-500">タグ</label>
                     <select
                       value={formData.tag}
                       onChange={e => setFormData({ ...formData, tag: Number(e.target.value) })}
                       disabled={isDetailMode}
-                      className="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:opacity-60"
+                      className="w-full pl-3 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:opacity-60 appearance-none"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`,
+                        backgroundRepeat: "no-repeat",
+                        backgroundPosition: "right 14px center",
+                        backgroundSize: "16px"
+                      }}
                     >
                       <option value={1}>学習</option>
                       <option value={2}>重要</option>
                       <option value={3}>プライベート</option>
+                      <option value={4}>なし</option>
                     </select>
                   </div>
-                  <div></div> 
+                  <div></div>
                 </div>
               )}
             </div>
@@ -272,7 +309,13 @@ export default function TaskModal({ task, onClose, onSuccess, spaceId, mode = 'c
                 value={formData.status}
                 onChange={e => setFormData({ ...formData, status: Number(e.target.value) })}
                 disabled={isDetailMode}
-                className="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:opacity-60"
+                className="w-full pl-3 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:opacity-60 appearance-none"
+                style={{
+                  backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`,
+                  backgroundRepeat: "no-repeat",
+                  backgroundPosition: "right 14px center",
+                  backgroundSize: "16px"
+                }}
               >
                 <option value={0}>未完了</option>
                 <option value={1}>完了</option>
@@ -280,7 +323,6 @@ export default function TaskModal({ task, onClose, onSuccess, spaceId, mode = 'c
             </div>
           )}
         </div>
-
         {/* ボタンエリア */}
         <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
           <button onClick={onClose} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-sm font-medium">

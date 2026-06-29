@@ -19,7 +19,7 @@ type SpaceModalProps = {
 export default function SpaceModal({ isOpen, onClose, spaceType, onSuccess, editingSpace }: SpaceModalProps) {
   const [name, setName] = useState("");
   const [favorite_flag, setFavoriteFlag] = useState(0);
-  const [is_archived, setIsArchived] = useState(0); 
+  const [is_archived, setIsArchived] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // モーダルが開いたとき、または編集対象が変わったときに初期値をセット
@@ -27,7 +27,7 @@ export default function SpaceModal({ isOpen, onClose, spaceType, onSuccess, edit
     if (isOpen) {
       setName(editingSpace ? editingSpace.name : "");
       setFavoriteFlag(editingSpace ? editingSpace.favorite : 0);
-      setIsArchived(editingSpace ? editingSpace.is_archived ?? 0 : 0); 
+      setIsArchived(editingSpace ? editingSpace.is_archived ?? 0 : 0);
     }
   }, [isOpen, editingSpace]);
 
@@ -43,16 +43,16 @@ export default function SpaceModal({ isOpen, onClose, spaceType, onSuccess, edit
     setIsSubmitting(true);
     try {
       const isGoal = spaceType === 99;
-      
+
       const isEditingExistingSpace = editingSpace && editingSpace.id !== "new_goal" && editingSpace.id !== "edit_goal";
 
       let url = "";
       if (isGoal) {
-        url = "/api/dashboard"; 
+        url = "/api/dashboard";
       } else if (isEditingExistingSpace) {
-        url = `/api/spaces/${editingSpace.id}`; 
+        url = `/api/spaces/${editingSpace.id}`;
       } else {
-        url = "/api/spaces"; 
+        url = "/api/spaces";
       }
 
       const bodyData = isGoal
@@ -61,12 +61,12 @@ export default function SpaceModal({ isOpen, onClose, spaceType, onSuccess, edit
 
       let method = "POST";
       if (isEditingExistingSpace) {
-        method = "PATCH"; 
+        method = "PATCH";
       } else {
-        method = "POST";  
+        method = "POST";
       }
 
-      console.log(`通信を開始します: ${method} ${url}`, bodyData); 
+      console.log(`通信を開始します: ${method} ${url}`, bodyData);
 
       const res = await fetch(url, {
         method: method,
@@ -94,24 +94,24 @@ export default function SpaceModal({ isOpen, onClose, spaceType, onSuccess, edit
     return editingSpace ? `${typeNames[spaceType] || "スペース"}の編集` : `${typeNames[spaceType] || "スペース"}の作成`;
   };
 
-return (
+  return (
     <div style={{
       position: "fixed",
       top: 0, left: 0, width: "100%", height: "100%",
-      backgroundColor: "rgba(15, 23, 42, 0.3)", 
-      backdropFilter: "blur(6px)",            
+      backgroundColor: "rgba(15, 23, 42, 0.3)",
+      backdropFilter: "blur(6px)",
       display: "flex", justifyContent: "center", alignItems: "center",
       zIndex: 1000
     }}>
       <div style={{
         backgroundColor: "#ffffff",
         padding: "24px 28px",
-        borderRadius: "14px", 
+        borderRadius: "14px",
         width: "100%",
-        maxWidth: "460px",    
+        maxWidth: "460px",
         boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.03)"
       }}>
-        
+
         {/* 【1. ヘッダー】 */}
         <div style={{ marginBottom: "20px" }}>
           <h3 style={{ margin: 0, fontSize: "19px", fontWeight: "700", color: "#0f172a", letterSpacing: "-0.025em" }}>
@@ -119,16 +119,54 @@ return (
           </h3>
         </div>
 
-        {/* 【2. 入力エリア】お気に入りの星を入力欄の中に埋め込む */}
+        {!editingSpace && spaceType !== 99 && (
+          <div style={{ marginBottom: "16px" }}>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#475569", marginBottom: "6px" }}>
+              スペースの種類
+            </label>
+            <select
+              defaultValue={spaceType}
+              onChange={(e) => {
+              }}
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                padding: "12px 14px",
+                borderRadius: "8px",
+                border: "1px solid #cbd5e1",
+                fontSize: "15px",
+                color: "#334155",
+                background: "#f8fafc",
+                outline: "none",
+                cursor: "pointer",
+                WebkitAppearance: "none",
+                MozAppearance: "none",
+                appearance: "none",
+                backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`, 
+                backgroundRepeat: "no-repeat",
+                backgroundPosition: "right 14px center",
+                backgroundSize: "16px",
+              }}
+            >
+              <option value={1}>チャット</option>
+              <option value={2}>ToDoリスト</option>
+              <option value={3}>質問</option>
+            </select>
+          </div>
+        )}
+
+        <div style={{ marginBottom: "24px", position: "relative", display: "flex", alignItems: "center" }}></div>
+
         <div style={{ marginBottom: "24px", position: "relative", display: "flex", alignItems: "center" }}>
           <input
             type="text"
-            value={editingSpace?.name || ""} 
+            value={name}
+            onChange={(e) => setName(e.target.value)}
             placeholder="名前を入力"
             style={{
               width: "100%",
               boxSizing: "border-box",
-              padding: "12px 44px 12px 14px", 
+              padding: "12px 44px 12px 14px",
               borderRadius: "8px",
               border: "1px solid #cbd5e1",
               fontSize: "15px",
@@ -138,7 +176,7 @@ return (
               transition: "border-color 0.2s",
             }}
           />
-          
+
           {/* 入力欄の右端に浮かぶ星マーク */}
           {spaceType !== 99 && (
             <button
@@ -170,7 +208,7 @@ return (
         {/* 【3. ボトムアクションエリア】すべてを1行に綺麗に集約 */}
         <div style={{
           display: "flex",
-          justifyContent: "flex-end", 
+          justifyContent: "flex-end",
           alignItems: "center",
           borderTop: "1px solid #f1f5f9",
           paddingTop: "16px",
@@ -181,15 +219,15 @@ return (
               type="button"
               onClick={() => setIsArchived(is_archived === 0 ? 1 : 0)}
               style={{
-                marginRight: "auto", 
-                padding: "0 20px", 
-                height: "38px", 
-                borderRadius: "6px", 
-                cursor: "pointer", 
-                fontWeight: "bold", 
+                marginRight: "auto",
+                padding: "0 20px",
+                height: "38px",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontWeight: "bold",
                 fontSize: "13px",
                 transition: "all 0.2s ease",
-                background: is_archived === 1 ? "#e2e8f0" : "#ffffff", 
+                background: is_archived === 1 ? "#e2e8f0" : "#ffffff",
                 color: is_archived === 1 ? "#334155" : "#475569",
                 border: is_archived === 1 ? "1px solid #cbd5e1" : "1px solid #e4e4e7"
               }}
@@ -205,7 +243,7 @@ return (
             style={{
               padding: "0 18px",
               height: "38px",
-              background: isSubmitting ? "#60a5fa" : "#2563eb", 
+              background: isSubmitting ? "#60a5fa" : "#2563eb",
               color: "white",
               border: "none",
               borderRadius: "6px",
