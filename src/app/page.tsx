@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { signIn, SessionProvider } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 function TopPageContent() {
     const [isAppBrowser, setIsAppBrowser] = useState(false);
+    const [isPending, startTransition] = useTransition();
+    const router = useRouter();
 
     // 1. アプリ内ブラウザの判定
     useEffect(() => {
@@ -15,12 +18,16 @@ function TopPageContent() {
     }, []);
 
     // 2. ログインボタンを押した時の処理
-    const handleGoogleLogin = () => {
-        // NextAuthがGoogleにリクエストを送る際、強制的に「アカウント選択画面」を出させる正しい指定方法です
-        signIn("google", { 
-            callbackUrl: "/dashboard" 
-        }, { 
-            prompt: "select_account" // 第3引数のカスタムパラメータとして渡すことで、確実にGoogleへ伝わります
+    const handleGoogleLogin = async () => {
+        // startTransitionを使って、状態変化を優先的に処理させる
+        startTransition(async () => {
+            await signIn("google", { 
+                callbackUrl: "/dashboard" 
+            }, { 
+                prompt: "select_account" 
+            });
+            // ログイン処理が完了したタイミングでルーターをリフレッシュ
+            router.refresh();
         });
     };
 
@@ -40,12 +47,12 @@ function TopPageContent() {
                 </div>
             ) : (
                 <div style={{ textAlign: "center" }}>
-                    {/* ボタンをクリックするまで、裏での自動遷移やチェックは一切行いません */}
                     <button 
                         onClick={handleGoogleLogin} 
+                        disabled={isPending}
                         style={{ padding: "10px 20px", cursor: "pointer", fontSize: "1.2rem" }}
                     >
-                        Googleアカウントでログイン
+                        {isPending ? "ログイン中..." : "Googleアカウントでログイン"}
                     </button>
                 </div>
             )}
@@ -56,6 +63,7 @@ function TopPageContent() {
 export default function TopPage() {
     return (
         <SessionProvider>
+            {/* AuthGuardでラップすることで、ページ全体でセッション状態の同期を監視 */}
             <TopPageContent />
         </SessionProvider>
     );
