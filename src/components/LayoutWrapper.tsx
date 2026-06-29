@@ -2,8 +2,8 @@
 
 import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useSession } from 'next-auth/react';
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, useDisclosure } from '@nextui-org/react'; // ★ NextUIを追加
+import { useSession, signOut } from 'next-auth/react'; // signOut を追加
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, useDisclosure } from '@nextui-org/react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 
@@ -11,23 +11,36 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   const pathname = usePathname() ?? '';
   const router = useRouter();
   
-  const { status } = useSession();
-  
-  // ★ モーダル制御用のフック（最初から閉じている状態）
+  // data.expires にセッションの期限が入っています
+  const { data: session, status } = useSession();
   const { isOpen, onOpen, onClose } = useDisclosure();
 
-  // 🚨 セッション切れの監視
   useEffect(() => {
-    if (status === 'unauthenticated' && pathname !== '/') {
-      // alertの代わりに、NextUIのモーダルをオープンする！
-      onOpen();
-    }
-  }, [status, pathname, onOpen]);
+    if (status !== 'authenticated' || !session?.expires) return;
 
-  // ★ ログイン画面へ戻るボタンを押した時の処理
-  const handleGoToLogin = () => {
-    onClose();      // モーダルを閉じる
-    router.push('/'); // トップページへ飛ばす
+    // セッション期限までの時間を計算
+    const expiresAt = new Date(session.expires).getTime();
+    const now = Date.now();
+    const timeLeft = expiresAt - now;
+
+    if (timeLeft <= 0) {
+      onOpen(); // 期限が切れていたら即モーダル
+      return;
+    }
+
+    // 期限切れの瞬間にモーダルを出すタイマー
+    const timer = setTimeout(() => {
+      onOpen();
+    }, timeLeft);
+
+    return () => clearTimeout(timer);
+  }, [session, status, onOpen]);
+
+  const handleGoToLogin = async () => {
+    onClose();
+    await signOut({ redirect: false }); // サーバー側でもセッションを破棄
+    router.replace('/');
+    router.refresh(); // 最新の状態を取得
   };
 
   // 各種表示フラグ

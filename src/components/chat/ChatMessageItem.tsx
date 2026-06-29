@@ -29,6 +29,9 @@ export default function ChatMessageItem({
   
   const [isHovered, setIsHovered] = useState(false);
   const [placement, setPlacement] = useState<"top-end" | "bottom-end">("bottom-end");
+  const [isStampError, setIsStampError] = useState(false);
+  const [imageErrors, setImageErrors] = useState(false);
+
   const targetRef = useRef<HTMLDivElement>(null);
   
   const offsetValue = placement === "bottom-end" ? 100 : 10;
@@ -160,28 +163,46 @@ export default function ChatMessageItem({
             <p className="text-lg text-gray-800 whitespace-pre-wrap">{message.message}</p>
           )}         
           {message.stamp ? (
-            <img
-              src={`/stamps/${message.stamp}.png`}
-              className="w-32 h-32 object-contain aspect-square"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
-                e.currentTarget.nextSibling!.textContent = "スタンプが読み込めません";
-              }}
-            />
+            !isStampError ? (
+              <img
+                src={`/stamps/${message.stamp}.png`}
+                className="w-32 h-32 object-contain aspect-square"
+                onError={() => setIsStampError(true)}
+              />
+            ) : (
+              <div className="w-32 h-32 flex flex-col items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-2 text-center">
+                <span className="text-gray-700 font-bold text-[11px] leading-tight">
+                  スタンプが<br />見つかりません
+                </span>
+              </div>
+            )
           ) : null}
           {(message.signedImageUrl || (message as any).previewImages || message.image_url) && (
             <div className="mt-2 flex flex-wrap gap-2">
               {((message as any).previewImages || [message.signedImageUrl]).filter(Boolean).map((url: string, index: number) => (
-                <img
+                !imageErrors ? (
+                  <img
                   key={`img-${message.id}-${index}`}
                   src={url}
                   alt="chat image"
                   className="max-w-[200px] h-auto rounded-lg border border-gray-200"
                   onLoad={() => 
                     onScrollBottom?.(true)}
-                  onClick={() => onImageClick?.(url)}
-                  
+                  onClick={() => onImageClick?.(url)
+                  }
+                  onError={() => setImageErrors(true)}
                 />
+                ) : (
+                  <div 
+                    key={`img-error-${message.id}-${index}`} 
+                    className="w-32 h-32 flex flex-col items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-2 text-center"
+                  >
+                    <span className="text-gray-700 font-bold text-[11px] leading-tight">
+                      画像が<br />見つかりません
+                    </span>
+                  </div>
+                )
+                
               ))}
             </div>
           )}
