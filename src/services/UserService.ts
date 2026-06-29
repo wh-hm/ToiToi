@@ -97,7 +97,10 @@ export async function deleteUser(user_id: string): Promise<boolean> {
 
       await tx.user.update({
         where: { id: user_id },
-        data: { delete_flag: 1 },
+        data: { 
+          delete_flag: 1,
+          username: "" // ★ null の代わりに空文字を入れる
+        }
       });
     });
     return true;
