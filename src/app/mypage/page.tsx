@@ -6,7 +6,7 @@ import { signOut } from "next-auth/react";
 import { Trash2, User, Settings, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, useDisclosure } from "@nextui-org/react";
-
+import { Loading } from "@/components/LoadingSpinner";
 export default function MyPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -17,6 +17,7 @@ export default function MyPage() {
   const [newName, setNewName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [archiveCount, setArchiveCount] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false); // 削除中フラグ
 
   // データ再取得用の関数を useCallback で定義
   const fetchData = useCallback(async () => {
@@ -68,16 +69,14 @@ export default function MyPage() {
   const handleAction = async (action: string, label: string) => {
     if (!confirm(`${label}を実行しますか？`)) return;
 
+    setIsDeleting(true); // ★ローディング開始
     try {
-      // 修正: 画像削除の場合はボディを含める必要がある
       const options: RequestInit = {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
       };
 
       const res = await fetch(`/api/${action}`, options);
-      
-      // ボディが空の可能性がある場合のエラーハンドリングを強化
       const text = await res.text();
       const result = text ? JSON.parse(text) : {};
 
@@ -94,6 +93,8 @@ export default function MyPage() {
     } catch (e: any) {
       console.error(e);
       toast.error(e.message || "処理に失敗しました");
+    } finally {
+      setIsDeleting(false); // ★ローディング終了
     }
   };
 
@@ -142,7 +143,7 @@ export default function MyPage() {
       </div>
 
       {/* モーダル */}
-      <Modal isOpen={isOpen} onClose={onClose}>
+      <Modal isOpen={isOpen} onClose={onClose} placement="center">
         <ModalContent>
           <form onSubmit={(e) => { e.preventDefault(); handleUpdateUsername(); }}>
             <ModalHeader>ユーザー名の変更</ModalHeader>
@@ -197,6 +198,13 @@ export default function MyPage() {
         <button onClick={() => signOut({ callbackUrl: "/" })} className="w-full bg-gray-100 hover:bg-gray-200 py-3 rounded-xl font-bold transition-all">ログアウト</button>
         <button onClick={() => handleAction("user/account", "アカウント削除")} className="w-full text-red-500 hover:bg-red-50 font-medium py-3 rounded-xl transition-all">アカウントを削除</button>
       </div>
+      {isDeleting && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-100">
+            <Loading size="lg" text="データを削除中..." />
+          </div>
+        </div>
+      )}
     </section>
   );
 }
