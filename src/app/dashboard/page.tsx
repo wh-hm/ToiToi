@@ -23,10 +23,6 @@ type SpacesState = {
   type1: Space[];
   type2: Space[];
   type3: Space[];
-  type1Empty: boolean;
-  type2Empty: boolean;
-  type3Empty: boolean;
-  allEmpty: boolean;
 };
 
 export default function Dashboard() {
@@ -34,8 +30,9 @@ export default function Dashboard() {
   const router = useRouter();
 
   const [spaces, setSpaces] = useState<SpacesState>({
-    type1: [], type2: [], type3: [],
-    type1Empty: false, type2Empty: false, type3Empty: false, allEmpty: false,
+    type1: [],
+    type2: [],
+    type3: [],
   });
 
   const [isLoading, setIsLoading] = useState(true);
@@ -60,7 +57,6 @@ export default function Dashboard() {
     image: ""
   });
 
-
   const updateLoginMessage = (streakDays: number, isStreakAchieved: boolean) => {
     // 1. 全イベント発生時の現在時刻をリアルタイムに取得
     const now = new Date();
@@ -76,8 +72,6 @@ export default function Dashboard() {
     } else {
       timeZone = "夜";
     }
-
-    // 3. メッセージ一覧マスターデータの定義（仕様書を完全再現）
     const messageMaster = {
       "朝": {
         charName: "しきじー",
@@ -110,10 +104,8 @@ export default function Dashboard() {
         success: `ホー！（おめでとうございます。 無事連続ログイン日数${streakDays}日が達成されました。 今日は自身を労ってくださいね。）`
       }
     };
-
     const selectedZone = messageMaster[timeZone];
     let finalMessageText = "";
-
     // 4. 分岐条件の判定
     if (isStreakAchieved) {
       finalMessageText = selectedZone.success;
@@ -121,14 +113,12 @@ export default function Dashboard() {
       const randomIndex = Math.floor(Math.random() * 3);
       finalMessageText = selectedZone.normal[randomIndex];
     }
-
     setCurrentLoginMessage({
       name: selectedZone.charName,
       text: finalMessageText,
       image: selectedZone.image
     });
   };
-
   const handleModalFavoriteToggle = () => {
     setModalFavorite(prev => (prev === 1 ? 0 : 1));
   };
@@ -150,7 +140,6 @@ export default function Dashboard() {
     setSelectedType(space.space_type);
     setIsModalOpen(true);
   };
-
   const handleToggleGoalStatus = async () => {
     try {
       const res = await fetch("/api/dashboard", {
@@ -166,7 +155,6 @@ export default function Dashboard() {
       console.error("ステータス更新失敗:", error);
     }
   };
-
   const handleDelete = async (id: string, spaceType: number) => {
     if (!confirm("本当に削除しますか？")) return;
     try {
@@ -181,21 +169,16 @@ export default function Dashboard() {
       console.error("削除失敗:", error);
     }
   };
-
   useEffect(() => {
     if (status === "unauthenticated") router.push("/");
   }, [status, router]);
-
   const fetchSpaces = async () => {
     if (!session?.user?.id) return null;
     setIsLoading(true);
-
     try {
       const res = await fetch("/api/dashboard/");
       if (!res.ok) return null;
-
       const data = await res.json();
-
       if (data.goal) {
         if (Array.isArray(data.goal)) {
           setGoal(data.goal[0] || null);
@@ -205,7 +188,6 @@ export default function Dashboard() {
       } else {
         setGoal(null);
       }
-
       if (data.login_management) {
         setLoginInfo(data.login_management);
         const streakDays = data.login_management.streak_days ?? 0;
@@ -218,10 +200,8 @@ export default function Dashboard() {
         setIsLoading(false);
         return null;
       }
-
       if (data.loginMessage) setLoginMessage(data.loginMessage);
       const targetData = data.spaces || data;
-
       const convertAndFilter = (list: any[]): Space[] => {
         if (!Array.isArray(list)) return [];
         return list.map((s) => ({
@@ -232,7 +212,6 @@ export default function Dashboard() {
           is_archived: Number(s.is_archived),
         }));
       };
-
       const sortSpaces = (list: Space[]): Space[] => {
         return [...list].sort((a, b) => {
           if (a.is_archived !== b.is_archived) {
@@ -244,27 +223,20 @@ export default function Dashboard() {
           return 0;
         });
       };
-
       const filterByArchiveSetting = (list: Space[], isShowArchived: number): Space[] => {
         if (isShowArchived === 1) {
           return sortSpaces(list);
         }
         return sortSpaces(list.filter(s => s.is_archived === 0));
       };
-
       const type1 = filterByArchiveSetting(convertAndFilter(targetData.type1), showArchivedType1);
       const type2 = filterByArchiveSetting(convertAndFilter(targetData.type2), showArchivedType2);
       const type3 = filterByArchiveSetting(convertAndFilter(targetData.type3), showArchivedType3);
-
-      const newState = {
-        type1, type2, type3,
-        type1Empty: type1.length === 0,
-        type2Empty: type2.length === 0,
-        type3Empty: type3.length === 0,
-        allEmpty: type1.length + type2.length + type3.length === 0,
-      };
-
-      setSpaces(newState);
+      setSpaces({
+        type1,
+        type2,
+        type3,
+      });
       return targetData;
     } catch (error) {
       console.error("取得失敗:", error);
@@ -273,15 +245,11 @@ export default function Dashboard() {
       setIsLoading(false);
     }
   };
-
   useEffect(() => {
     if (status === "authenticated") fetchSpaces();
   }, [status, showArchivedType1, showArchivedType2, showArchivedType3]);
-
   if (status === "loading") return <div>読み込み中...</div>;
-
   const showActiveGoal = !!(goal && goal.content && goal.content.trim() !== "");
-
   return (
     <>
       <section style={{ maxWidth: "900px", margin: "40px auto", padding: "30px", background: "white", borderRadius: "8px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
@@ -292,7 +260,6 @@ export default function Dashboard() {
             ⚠️ {loginError}
           </div>
         )}
-
         {currentLoginMessage.name && (
           <div style={{
             marginBottom: "25px",
@@ -304,7 +271,6 @@ export default function Dashboard() {
             borderRadius: "12px",
             padding: "16px 20px",
           }}>
-            {/* 左側：キャラクター画像と名前 */}
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", flexShrink: 0, width: "70px" }}>
               <img
                 src={currentLoginMessage.image}
@@ -321,11 +287,7 @@ export default function Dashboard() {
                 {currentLoginMessage.name}
               </span>
             </div>
-
-            {/* 右側：コンテンツエリア（ログイン日数 ＋ セリフ） */}
             <div style={{ display: "flex", flexDirection: "column", gap: "8px", flexGrow: 1 }}>
-
-              {/* 連続ログイン日数をフキダシ内の最上部にスマートに配置 */}
               {!loginError && (
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", color: "#64748b" }}>
                   <span>連続ログイン:</span>
@@ -335,8 +297,6 @@ export default function Dashboard() {
                   <span>日目</span>
                 </div>
               )}
-
-              {/* キャラクターのセリフ */}
               <div style={{
                 fontSize: "14px",
                 color: "#1e293b",
@@ -348,9 +308,7 @@ export default function Dashboard() {
             </div>
           </div>
         )}
-
         {loginMessage && <div style={{ padding: "15px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: "6px", marginBottom: "20px" }}>{loginMessage}</div>}
-
         {/* 目標管理エリア */}
         <div style={{ marginBottom: "25px" }}>
           {showActiveGoal ? (
@@ -366,7 +324,6 @@ export default function Dashboard() {
                 gap: "16px"
               }}
             >
-              {/* 左側エリア：バッジ ⇄ 目標文 の横並び */}
               <div style={{
                 display: "flex",
                 alignItems: "center",
@@ -398,7 +355,6 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
-
               {/* 右側エリア：ステータス切り替え・編集ボタン */}
               <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
                 <button
@@ -478,7 +434,6 @@ export default function Dashboard() {
             </div>
           )}
         </div>
-
         {/* 各スペース一覧 */}
         <SpaceList
           key={`type1_${spaces.type1.map(s => `${s.id}-${s.favorite}-${s.is_archived}`).join(',')}`}
@@ -511,7 +466,6 @@ export default function Dashboard() {
         />
 
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "30px" }}>
-
           <button
             type="button"
             onClick={() => {
@@ -539,7 +493,6 @@ export default function Dashboard() {
           >
             <span>＋</span> 新規作成
           </button>
-
         </div>
       </section>
 

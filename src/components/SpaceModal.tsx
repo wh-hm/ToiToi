@@ -18,6 +18,8 @@ type SpaceModalProps = {
 
 export default function SpaceModal({ isOpen, onClose, spaceType, onSuccess, editingSpace }: SpaceModalProps) {
   const [name, setName] = useState("");
+  // 🌟 追加: セレクトボックスで切り替えた種類を正しく保持するState
+  const [selectedType, setSelectedType] = useState(spaceType); 
   const [favorite_flag, setFavoriteFlag] = useState(0);
   const [is_archived, setIsArchived] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -26,10 +28,12 @@ export default function SpaceModal({ isOpen, onClose, spaceType, onSuccess, edit
   useEffect(() => {
     if (isOpen) {
       setName(editingSpace ? editingSpace.name : "");
+      // 🌟 新規作成時・編集時どちらも親からの初期値を正しく同期します
+      setSelectedType(editingSpace ? editingSpace.space_type : spaceType);
       setFavoriteFlag(editingSpace ? editingSpace.favorite : 0);
       setIsArchived(editingSpace ? editingSpace.is_archived ?? 0 : 0);
     }
-  }, [isOpen, editingSpace]);
+  }, [isOpen, editingSpace, spaceType]);
 
   if (!isOpen) return null;
 
@@ -43,7 +47,6 @@ export default function SpaceModal({ isOpen, onClose, spaceType, onSuccess, edit
     setIsSubmitting(true);
     try {
       const isGoal = spaceType === 99;
-
       const isEditingExistingSpace = editingSpace && editingSpace.id !== "new_goal" && editingSpace.id !== "edit_goal";
 
       let url = "";
@@ -55,9 +58,10 @@ export default function SpaceModal({ isOpen, onClose, spaceType, onSuccess, edit
         url = "/api/spaces";
       }
 
+      // 🌟 修正: space_type に、現在選択されている正しい種類（selectedType）を割り当てます
       const bodyData = isGoal
         ? { content: name }
-        : { name, space_type: spaceType, favorite_flag, is_archived };
+        : { name: name.trim(), space_type: Number(selectedType), favorite_flag, is_archived };
 
       let method = "POST";
       if (isEditingExistingSpace) {
@@ -87,11 +91,6 @@ export default function SpaceModal({ isOpen, onClose, spaceType, onSuccess, edit
     } finally {
       setIsSubmitting(false);
     }
-  };
-  const getTitle = () => {
-    if (spaceType === 99) return editingSpace?.id === "new_goal" ? "目標の登録" : "目標の編集";
-    const typeNames: Record<number, string> = { 1: "チャット", 2: "ToDo", 3: "質問" };
-    return editingSpace ? `${typeNames[spaceType] || "スペース"}の編集` : `${typeNames[spaceType] || "スペース"}の作成`;
   };
 
   return (
@@ -125,9 +124,10 @@ export default function SpaceModal({ isOpen, onClose, spaceType, onSuccess, edit
               スペースの種類
             </label>
             <select
-              defaultValue={spaceType}
-              onChange={(e) => {
-              }}
+              // 🌟 修正: value を selectedType に変更
+              value={selectedType}
+              // 🌟 修正: 変更された値を正しく数値化してStateを更新します
+              onChange={(e) => setSelectedType(Number(e.target.value))}
               style={{
                 width: "100%",
                 boxSizing: "border-box",
@@ -205,7 +205,7 @@ export default function SpaceModal({ isOpen, onClose, spaceType, onSuccess, edit
           )}
         </div>
 
-        {/* 【3. ボトムアクションエリア】すべてを1行に綺麗に集約 */}
+        {/* 【3. ボトムアクションエリア】 */}
         <div style={{
           display: "flex",
           justifyContent: "flex-end",
