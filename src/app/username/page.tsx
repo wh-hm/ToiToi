@@ -294,10 +294,6 @@ export default function Username() {
             </div>
         </main>
 
-        {/* フッター */}
-        <footer className="py-4 text-center text-xs text-slate-400 border-t border-slate-100 bg-white relative z-20">
-            © 2026 ToiToi
-        </footer>
     </div>
   );
 }
