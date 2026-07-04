@@ -10,35 +10,32 @@ export async function PATCH(
 ) {
   const { id, msgId } = await params;
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
     const { message } = await request.json();
     const updated = await updateQuestionChat(parseInt(msgId),parseInt(id), auth.user_id, message);
     
-    if (!updated) return NextResponse.json({ error: MESSAGES.E2001("チャット") }, { status: 404 });
+    if (!updated) return NextResponse.json({ message: MESSAGES.E2001("チャット") }, { status: 404 });
     return NextResponse.json(updated);
   } catch (error) {
-    console.error("更新エラー:", error);
-    return NextResponse.json({ error: MESSAGES.E2001("チャット") }, { status: 500 });
+    return NextResponse.json({ message: MESSAGES.E2001("チャット") }, { status: 500 });
   }
 }
 
 export async function DELETE(
-  request: Request,
   { params }: { params: Promise<{ id: string; msgId: string }> } // [id] と [msgId] の両方が必要
 ) {
   const { id, msgId } = await params;
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
     const success = await deleteQuestionChat(parseInt(msgId), parseInt(id), auth.user_id);
-    if (!success) return NextResponse.json({ error: MESSAGES.E2004("チャット")  }, { status: 404 });
+    if (!success) return NextResponse.json({ message: MESSAGES.E2004("チャット")  }, { status: 404 });
     
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("削除エラー:", error);
-    return NextResponse.json({ error: MESSAGES.E2004("チャット") }, { status: 500 });
+    return NextResponse.json({ message: MESSAGES.E2004("チャット") }, { status: 500 });
   }
 }

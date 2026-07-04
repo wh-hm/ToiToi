@@ -48,7 +48,7 @@ export default function SpaceModal({ isOpen, onClose, spaceType, onSuccess, edit
 
       let url = "";
       if (isGoal) {
-        url = "/api/dashboard";
+        url = "/api/goal";
       } else if (isEditingExistingSpace) {
         url = `/api/spaces/${editingSpace.id}`;
       } else {

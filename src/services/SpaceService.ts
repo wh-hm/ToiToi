@@ -31,6 +31,33 @@ export async function getSpaces(
   }
 }
 
+//スペースが生きているかどうかの確認
+export async function getSpaceCheck(
+  user_id: string,
+  space_id: number
+): Promise<boolean>{
+  try{
+    const space = await prisma.space.findFirst({
+      where: {
+        user_id: user_id,
+        id: space_id
+      },
+    });
+    if (!space) {
+      return false;
+    }
+    if(space.delete_flag === 1){
+      return false;
+    }
+    return true;
+  } catch (error) {
+    // 例外処理：例外発生時は、呼び出し元にエラーをそのまま返し、画面側でのエラー表示処理に委ねる
+    console.error("❌ getSpaceCheckのクエリ内で発生した本当のエラー原因:");
+    console.dir(error, { depth: null });
+    throw error;
+  }
+}
+
 // 概要：スペースの登録
 export async function registerSpace(
   user_id: string,

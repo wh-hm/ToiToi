@@ -4,6 +4,7 @@ import SpaceModal from "@/components/SpaceModal";
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import SpaceList from "@/components/SpaceList";
+import { fetchWithTimeout } from "@/lib/api"; 
 
 type Space = {
   id: string;
@@ -152,11 +153,15 @@ export default function Dashboard() {
   };
 
   const handleToggleGoalStatus = async () => {
-    try {
-      const res = await fetch("/api/dashboard", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ toggleStatus: true })
+  try {
+      const res = await fetchWithTimeout("/api/goal/status", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          status: goal?.status === 1 ? 0 : 1,
+        }),
       });
 
       if (res.ok) {
@@ -170,7 +175,7 @@ export default function Dashboard() {
   const handleDelete = async (id: string, spaceType: number) => {
     if (!confirm("本当に削除しますか？")) return;
     try {
-      const res = await fetch(`/api/spaces/${id}?space_type=${spaceType}`, {
+      const res = await fetchWithTimeout(`/api/spaces/${id}?space_type=${spaceType}`, {
         method: "DELETE",
       })
       if (res.ok) {
@@ -191,7 +196,8 @@ export default function Dashboard() {
     setIsLoading(true);
 
     try {
-      const res = await fetch("/api/dashboard/");
+      await fetchWithTimeout("/api/user/login-update", { method: "PATCH" });
+      const res = await fetchWithTimeout("/api/dashboard/");
       if (!res.ok) return null;
 
       const data = await res.json();

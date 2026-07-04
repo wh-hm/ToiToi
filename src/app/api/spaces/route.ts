@@ -5,9 +5,9 @@ import { MESSAGES } from "@/constants/messages";
 
 
 // 1. GET: スペース一覧取得
-export async function GET(request: Request) {
+export async function GET() {
     const auth = await getAuthContext();
-    if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+    if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
     try {
         // あなたのサービスの取得関数を呼び出す（例: getSpacesByUserId など）
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
         return NextResponse.json(result);
     } catch (error) {
         console.error("GET spaces error:", error);
-        return NextResponse.json({ error: MESSAGES.E2001("スペース一覧") }, { status: 500 });
+        return NextResponse.json({ message: MESSAGES.E2001("スペース一覧") }, { status: 500 });
     }
 }
 
@@ -35,54 +35,47 @@ export async function GET(request: Request) {
 // 2. POST: スペース登録（単体チェックを追加）
 export async function POST(request: Request) {
     const auth = await getAuthContext();
-    if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+    if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
     try {
         const { name, space_type, favorite_flag } = await request.json();
         
         // --- 単体チェック ---
         // 1. 必須チェック (E1001)
-        if (!name) return NextResponse.json({ error: MESSAGES.E1001("スペース名") }, { status: 400 });
+        if (!name) return NextResponse.json({ message: MESSAGES.E1001("スペース名") }, { status: 400 });
 
         // 2. 桁数チェック (E1002: 20文字)
-        if (name.length > 20) return NextResponse.json({ error: MESSAGES.E1002("スペース名", 20) }, { status: 400 });
+        if (name.length > 20) return NextResponse.json({ message: MESSAGES.E1002("スペース名", 20) }, { status: 400 });
 
         // 3. 不適切文字チェック (E1003: 記号制限)
         const safeRegex = /[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uFF01-\uFF5E]/;
 
-        if (!safeRegex.test(name)) {
-            return NextResponse.json({ error: MESSAGES.E1003("スペース名", "記号") }, { status: 400 });
+        if (safeRegex.test(name)) {
+            return NextResponse.json({ message: MESSAGES.E1003("スペース名", "記号") }, { status: 400 });
         }
 
         const success = await registerSpace(auth.user_id, name, space_type, favorite_flag);
-        if (!success) return NextResponse.json({ error: MESSAGES.E2001("スペース") }, { status: 500 });
+        if (!success) return NextResponse.json({ message: MESSAGES.E2001("スペース") }, { status: 500 });
 
         return NextResponse.json({ message: MESSAGES.S1001("スペース") });
     } catch (error) {
-        return NextResponse.json({ error: MESSAGES.E2001("スペース") }, { status: 500 });
+        return NextResponse.json({ message: MESSAGES.E2001("スペース") }, { status: 500 });
     }
 }
 
 // 3. DELETE: スペース削除（パラメータチェックを追加）
-export async function DELETE(request: Request) {
+export async function DELETE() {
     const auth = await getAuthContext();
-    if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+    if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
     try {
-        const { searchParams } = new URL(request.url);
-        const id = Number(searchParams.get("id"));
-        const spaceType = searchParams.get("space_type");
 
-        // パラメータチェック
-        if (isNaN(id) || !spaceType) {
-            return NextResponse.json({ error: MESSAGES.E1001("削除対象") }, { status: 400 });
-        }
 
-        const success = await deleteSpaces(auth.user_id, spaceType, );
-        if (!success) return NextResponse.json({ error: MESSAGES.E2004("スペース") }, { status: 500 });
+        const success = await deleteSpaces(auth.user_id, "ALL", );
+        if (!success) return NextResponse.json({ message: MESSAGES.E2004("スペース") }, { status: 500 });
         
         return NextResponse.json({ message: MESSAGES.S1003("スペース") });
     } catch (error) {
-        return NextResponse.json({ error: MESSAGES.E2004("スペース") }, { status: 500 });
+        return NextResponse.json({ message: MESSAGES.E2004("スペース") }, { status: 500 });
     }
 }

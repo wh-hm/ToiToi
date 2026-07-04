@@ -9,7 +9,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
     const { id } = await params;
@@ -17,17 +17,17 @@ export async function PATCH(
     const body = await request.json();
 
     const { title, question, tag } = body;
-    const spaceId = Number(body.spaceId || body.space_id);
+    const space_id = Number(body.space_id || body.space_id);
     const is_resolved = body.is_resolved !== undefined ? Number(body.is_resolved) : (body.status !== undefined ? Number(body.status) : undefined);
 
-    if (!spaceId || isNaN(spaceId)) {
+    if (!space_id || isNaN(space_id)) {
       return NextResponse.json({ message: MESSAGES.E1001("スペースID") }, { status: 400 });
     }
 
     if (!title && !question && is_resolved !== undefined) {
       const updatedStatus = await updateQuestionStatus(
         questionId,
-        spaceId,
+        space_id,
         auth.user_id, // ⚠️ サービス側の仕様に合わせ作成者IDを渡します
         is_resolved
       );
@@ -45,7 +45,7 @@ export async function PATCH(
 
     const updated = await updateQuestion(
       questionId,
-      spaceId,
+      space_id,
       auth.user_id,
       title,
       question,
@@ -55,8 +55,7 @@ export async function PATCH(
 
     return NextResponse.json(updated);
   } catch (error: any) {
-    console.error("質問更新中にエラーが発生しました:", error);
-    return NextResponse.json({ message: error.message || MESSAGES.E2002("質問") }, { status: 500 });
+    return NextResponse.json({ message: MESSAGES.E2002("質問") }, { status: 500 });
   }
 }
 
@@ -71,14 +70,14 @@ export async function DELETE(
   try {
     const { id } = await params;
     const { searchParams } = new URL(request.url);
-    const spaceId = Number(searchParams.get("space_id"));
+    const space_id = Number(searchParams.get("space_id"));
 
-    if (!spaceId || isNaN(spaceId)) {
-      return NextResponse.json({ error: MESSAGES.E1001("スペースID") }, { status: 400 });
+    if (!space_id || isNaN(space_id)) {
+      return NextResponse.json({ message: MESSAGES.E1001("スペースID") }, { status: 400 });
     }
 
-    const success = await deleteQuestion(Number(id), spaceId, auth.user_id);
-    if (!success) return NextResponse.json({ error: MESSAGES.E2004("質問") }, { status: 500 });
+    const success = await deleteQuestion(Number(id), space_id, auth.user_id);
+    if (!success) return NextResponse.json({ message: MESSAGES.E2004("質問") }, { status: 500 });
 
     return NextResponse.json({ message: MESSAGES.S1003("質問") });
   } catch (error) {

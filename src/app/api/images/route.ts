@@ -4,18 +4,17 @@ import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth-guard";
 import { deleteImages } from "@/services/StorageService"; // ストレージサービスと仮定
 import { MESSAGES } from "@/constants/messages";
-export async function DELETE(request: Request) {
+export async function DELETE() {
   // 1. 認証チェック
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
     await deleteImages(auth.user_id);
 
-    return NextResponse.json({ message: "画像を一括削除しました" });
+    return NextResponse.json({ message: MESSAGES.S1004("画像")});
   } catch (error) {
-    console.error("画像一括削除エラー:", error);
-    return NextResponse.json({ error: MESSAGES.E2001("画像削除") }, { status: 500 });
+    return NextResponse.json({ message: MESSAGES.E2004("画像") }, { status: 500 });
   }
 }
 
@@ -33,15 +32,17 @@ const BUCKET_NAME = process.env.R2_BUCKET_NAME!;
 export async function POST(req: Request) {
   const { targetUrl } = await req.json();
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   // 1. Key を特定するロジックを強化
   let key = targetUrl;
   if (targetUrl.startsWith('blob:')) {
      // ここで「どうやってblobからファイル名を復元するか」を考える必要があります
      // 一番良いのは、コンポーネント側で msg.image_url (DBのファイル名) を渡すことです
-     console.error("エラー: blob: URLが渡されています");
-     return NextResponse.json({ error: "Invalid file reference" }, { status: 400 });
+    return NextResponse.json(
+      { message: MESSAGES.E1009 },
+      { status: 400 }
+    );
   }
   try {
     // URLの形式になっているか確認（httpで始まる場合）
@@ -74,7 +75,9 @@ export async function POST(req: Request) {
       },
     });
   } catch (error) {
-    console.error("R2 fetch error for key:", key, error);
-    return NextResponse.json({ error: "File not found" }, { status: 404 });
+    return NextResponse.json(
+      { message: MESSAGES.E3002 },
+      { status: 404 }
+    );
   }
 }

@@ -43,10 +43,9 @@ export default function Username() {
     try {
       // ※ もしこれでも404になる場合は、バックエンドのフォルダが /api/user/route.ts になっている可能性があります
       const res = await fetch('/api/user/username', {
-        method: 'POST',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          google_id: session?.user?.id,
           username: formData.name
         }),
       });

@@ -8,11 +8,11 @@ import { ArrowDown, MessageSquare } from "lucide-react";
 import { Loading } from "@/components/LoadingSpinner";
 interface ChatListProps {
   messages: ChatMessage[];
-  spaceId: number;
+  space_id: number;
   isSubmitting: boolean;
   onToggleFavorite?: (id: number, flag: number) => void;
   onEdit: (id: number) => void;
-  onDelete: (id: number, spaceId: number) => void;
+  onDelete: (id: number, space_id: number) => void;
   onBackgroundChange?: (id: number, color: number) => void;
   setEditValue: (val: string) => void;
   onNiceFlag?: (id: number, flag: number) => void;
@@ -25,7 +25,7 @@ interface ChatListProps {
 // forwardRef を使用して外部から ref を受け取れるようにします
 const ChatList = forwardRef<HTMLDivElement, ChatListProps>(({ 
   messages, 
-  spaceId, 
+  space_id, 
   isSubmitting, 
   onToggleFavorite, 
   onEdit, 
@@ -85,7 +85,7 @@ return (
             <ChatMessageItem
               key={`msg-${message.id}`}
               message={message}
-              spaceId={spaceId}
+              space_id={space_id}
               isSubmitting={isSubmitting}
               isOpen={openItemId === message.id}
               onOpenChange={(open) => setOpenItemId(open ? message.id : null)}

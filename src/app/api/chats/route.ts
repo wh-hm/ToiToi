@@ -5,36 +5,46 @@ import { uploadImages, deleteImage } from "@/services/StorageService";
 import { MESSAGES } from "@/constants/messages";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { getSpaceCheck, getSpaces } from "@/services/SpaceService";
+
+
 
 // 1. GET: チャット一覧取得
 export async function GET(request: NextRequest) {
     const auth = await getAuthContext();
-    if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+    if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
     const { searchParams } = new URL(request.url);
-    const spaceId = Number(searchParams.get("spaceId"));
+    const space_id = Number(searchParams.get("space_id"));
 
-    if (!spaceId || isNaN(spaceId)) {
-        return NextResponse.json({ error: MESSAGES.E1001("スペースID") }, { status: 400 });
+    if (!space_id || isNaN(space_id)) {
+        return NextResponse.json({ message: MESSAGES.E1001("スペースID") }, { status: 400 });
     }
 
     try {
-        const questions = await getChatsWithImages(auth.user_id, spaceId);
-        return NextResponse.json(questions);
+        const isSpaceAlive = await getSpaceCheck(auth.user_id, space_id);
+        
+        if (!isSpaceAlive) {
+            // ステータスは 404 (Not Found) にするのが、削除済みデータアクセス対策として最適です
+            // return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+            return NextResponse.json({ message: "スペースが見つかりません。" }, { status: 404 });
+        }
+
+        const chats = await getChatsWithImages(auth.user_id, space_id);
+        return NextResponse.json(chats);
     } catch (error) {
-        return NextResponse.json({ error: MESSAGES.E2003("チャット") }, { status: 500 });
+        return NextResponse.json({ message: MESSAGES.E2003("チャット") }, { status: 500 });
     }
 }
 
 
 export async function POST(request: NextRequest) {
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   // 1. 変数を用意（配列に変更）
   let imageUrls: string[] | undefined;
 
-  
   try {
     
     const formData = await request.formData();
@@ -45,16 +55,16 @@ export async function POST(request: NextRequest) {
 
     // 2. バリデーションチェック
     if (!message && files.length === 0 && !stamp) {
-      return NextResponse.json({ error: MESSAGES.E1001("チャット内容") }, { status: 400 });
+      return NextResponse.json({ message: MESSAGES.E1001("チャット内容") }, { status: 400 });
     }
     if (message && message.length > 100) {
-      return NextResponse.json({ error: MESSAGES.E1002("チャット内容", 100) }, { status: 400 });
+      return NextResponse.json({ message: MESSAGES.E1002("チャット内容", 100) }, { status: 400 });
     }
 
     console.log(files);
 
     if(files.length > 5){
-        return NextResponse.json({ error: MESSAGES.E1006 }, { status: 400 });
+        return NextResponse.json({ message: MESSAGES.E1006 }, { status: 400 });
     }
 
     // 3. 画像アップロード
@@ -64,7 +74,7 @@ export async function POST(request: NextRequest) {
       // 全ファイルのバリデーション
       for (const file of files) {
         if (file.size > 2 * 1024 * 1024 || !["image/png", "image/jpeg", "image/jpg"].includes(file.type)) {
-          return NextResponse.json({ error: MESSAGES.E1005 }, { status: 400 });
+          return NextResponse.json({ message: MESSAGES.E1005 }, { status: 400 });
         }
       }
 
@@ -99,19 +109,17 @@ export async function POST(request: NextRequest) {
       }
       return results; // これは元から配列
     });
-    // ここで newChat は常に配列として返る
+    // ここで newChat は常に配列として返る。チャットのため成功時のメッセージは送らない
     return NextResponse.json({ newChat }, { status: 201 });
 
 
   } catch (error) {
     // 5. エラー処理（配列対応）
     if (imageUrls && imageUrls.length > 0) {
-      console.error("エラー発生。アップロード済みの画像を削除します:", imageUrls);
       for (const url of imageUrls) {
         await deleteImage(url).catch(e => console.error("削除失敗:", e));
       }
     }
-    console.error("API処理エラー:", error);
-    return NextResponse.json({ error: MESSAGES.E2001("チャット") }, { status: 500 });
+    return NextResponse.json({ message: MESSAGES.E2001("チャット") }, { status: 500 });
   }
 }

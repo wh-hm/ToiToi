@@ -11,7 +11,7 @@ export default function TaskPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const params = useParams();
-  const spaceId = params?.id;
+  const space_id = params?.id;
 
   // 1. 状態管理（State）の設計
   const [taskData, setTaskData] = useState<{ incomplete: any[]; complete: any[] }>({
@@ -33,10 +33,10 @@ export default function TaskPage() {
 
   // 2. タスクデータの取得
   const fetchTasks = useCallback(async () => {
-    if (!spaceId) return;
+    if (!space_id) return;
 
     try {
-      const res = await fetch(`/api/task?spaceId=${spaceId}&space_id=${spaceId}`, {
+      const res = await fetch(`/api/task?space_id=${space_id}&space_id=${space_id}`, {
         cache: "no-store",
       });
       if (!res.ok) throw new Error("API error");
@@ -53,7 +53,7 @@ export default function TaskPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [spaceId]);
+  }, [space_id]);
 
   // セッションチェックと自動フェッチ
   useEffect(() => {
@@ -63,10 +63,10 @@ export default function TaskPage() {
       router.push("/");
       return;
     }
-    if (spaceId) {
+    if (space_id) {
       fetchTasks();
     }
-  }, [spaceId, status, router, fetchTasks]);
+  }, [space_id, status, router, fetchTasks]);
 
   // 3. 検索・ソート・完了未完了の分配ロジック（質問画面ベースの安全版）
   const processedTasks = useMemo(() => {
@@ -146,15 +146,15 @@ export default function TaskPage() {
               });
 
               try {
-                const res = await fetch(`/api/task/${id}?space_id=${spaceId}`, {
+                const res = await fetch(`/api/task/${id}?space_id=${space_id}`, {
                   method: "DELETE",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ space_id: Number(spaceId) }),
+                  body: JSON.stringify({ space_id: Number(space_id) }),
                 });
                 const data = await res.json();
                 if (res.ok) {
                   toast.success(data.message || "削除しました",);
-                  const refreshRes = await fetch(`/api/task?spaceId=${spaceId}&space_id=${spaceId}`);
+                  const refreshRes = await fetch(`/api/task?space_id=${space_id}&space_id=${space_id}`);
                   if (refreshRes.ok) {
                     const data = await refreshRes.json();
                     setTaskData({
@@ -210,7 +210,7 @@ export default function TaskPage() {
         body: JSON.stringify({
           ...task,
           status: newStatus,
-          space_id: Number(spaceId),
+          space_id: Number(space_id),
         }),
       });
       if (res.ok) {
@@ -219,7 +219,7 @@ export default function TaskPage() {
         } else {
           toast("未完了に戻しました");
         }
-        const refreshRes = await fetch(`/api/task?spaceId=${spaceId}&space_id=${spaceId}`);
+        const refreshRes = await fetch(`/api/task?space_id=${space_id}&space_id=${space_id}`);
         if (refreshRes.ok) {
           const data = await refreshRes.json();
           setTaskData({
@@ -317,7 +317,7 @@ export default function TaskPage() {
         <TaskModal
           mode={modalMode}
           task={editingTask}
-          spaceId={spaceId}
+          space_id={space_id}
           type="task"
           onClose={() => setIsModalOpen(false)}
           onSuccess={async () => {
@@ -328,7 +328,7 @@ export default function TaskPage() {
               toast.success(MESSAGES.S1001("タスク"));
             }
             try {
-              const res = await fetch(`/api/task?spaceId=${spaceId}&space_id=${spaceId}`);
+              const res = await fetch(`/api/task?space_id=${space_id}&space_id=${space_id}`);
               if (res.ok) {
                 const data = await res.json();
                 setTaskData({

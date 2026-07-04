@@ -73,7 +73,9 @@ export const deleteLoginManagement = async (
         delete_flag: 0 
       },
       data: {
-        delete_flag: 1
+        delete_flag: 1,
+        current_streak: 1,
+        total_login_days: 1
       }
     });
 
@@ -88,12 +90,124 @@ export const deleteLoginManagement = async (
 // ==========================================
 // 4. 設定済みの目標内容、または目標達成状況（ステータス）を更新する (ログイン管理日付判定)
 // ==========================================
+// export const updateLoginManagement = async (
+//   user_id: string,
+//   total_login_days?: number | null,
+//   delete_flag?: number | null, // これを確実に処理する
+//   tx?: any
+// ): Promise<any> => {
+//   try {
+//     const db = tx || prisma;
+
+//     const currentData = await db.loginManagement.findUnique({ 
+//       where: { user_id: user_id } 
+//     });
+    
+//     if (!currentData) {
+//       return await registerLoginManagement(user_id, db);
+//     }
+    
+//     // 現在の streak / total を取得
+//     let newStreak = currentData.current_streak;
+//     let newTotalDays = currentData.total_login_days;
+
+//     // 日付判定ロジック
+//     const today = new Date();
+//     today.setHours(0, 0, 0, 0);
+//     const lastLogin = new Date(currentData.last_login_at);
+//     lastLogin.setHours(0, 0, 0, 0);
+//     const diffDays = (today.getTime() - lastLogin.getTime()) / (1000 * 60 * 60 * 24);
+
+//     if (diffDays !== 0) {
+//       newTotalDays += 1;
+//       if (diffDays === 1) {
+//         newStreak += 1;
+//       } else {
+//         newStreak = 1;
+//       }
+//     }
+
+//     // ★ここで delete_flag を確実に 0 に戻す処理を追加
+//     return await db.loginManagement.update({
+//       where: { user_id: user_id },
+//       data: {
+//         last_login_at: new Date(),
+//         total_login_days: newTotalDays,
+//         current_streak: newStreak,
+//         delete_flag: delete_flag !== undefined && delete_flag !== null ? delete_flag : currentData.delete_flag
+//       }
+//     });
+//   } catch (error) {
+//     console.error(`user_id: ${user_id} のログイン更新エラー:`, error);
+//     throw error; // false を返すよりエラーを投げる方が安全
+//   }
+// };
+
+
+
+// export const updateLoginManagement = async (
+//   user_id: string,
+//   total_login_days?: number | null,
+//   delete_flag?: number | null, 
+//   tx?: any
+// ): Promise<any> => {
+//   try {
+//     const db = tx || prisma;
+
+//     const currentData = await db.loginManagement.findUnique({ 
+//       where: { user_id: user_id } 
+//     });
+    
+//     if (!currentData) {
+//       return await registerLoginManagement(user_id, db);
+//     }
+    
+//     let newStreak = currentData.current_streak;
+//     let newTotalDays = currentData.total_login_days;
+
+//     // 日付判定ロジック
+//     const today = new Date();
+//     today.setHours(0, 0, 0, 0);
+//     const lastLogin = new Date(currentData.last_login_at);
+//     lastLogin.setHours(0, 0, 0, 0);
+//     const diffDays = (today.getTime() - lastLogin.getTime()) / (1000 * 60 * 60 * 24);
+
+//     if (diffDays !== 0) {
+//       newTotalDays += 1;
+//       if (diffDays === 1) {
+//         newStreak += 1;
+//       } else {
+//         newStreak = 1;
+//       }
+//     }
+
+//     // ★改善ポイント：delete_flag の更新ロジックを整理
+//     // 引数で明示的に指定があればそれを優先し、なければ強制的に 0 (アクティブ) に戻す
+//     const nextDeleteFlag = delete_flag !== undefined && delete_flag !== null 
+//       ? delete_flag 
+//       : 0; 
+
+//     return await db.loginManagement.update({
+//       where: { user_id: user_id },
+//       data: {
+//         last_login_at: new Date(),
+//         total_login_days: total_login_days ?? newTotalDays, // 引数があればそれを使う
+//         current_streak: newStreak,
+//         delete_flag: nextDeleteFlag
+//       }
+//     });
+//   } catch (error) {
+//     console.error(`user_id: ${user_id} のログイン更新エラー:`, error);
+//     throw error;
+//   }
+// };
+
+
+
 export const updateLoginManagement = async (
   user_id: string,
-  total_login_days?: number | null,
-  delete_flag?: number | null, // これを確実に処理する
   tx?: any
-): Promise<any> => {
+): Promise<any> => { // 引数から total_login_days を削除
   try {
     const db = tx || prisma;
 
@@ -105,38 +219,42 @@ export const updateLoginManagement = async (
       return await registerLoginManagement(user_id, db);
     }
     
-    // 現在の streak / total を取得
     let newStreak = currentData.current_streak;
     let newTotalDays = currentData.total_login_days;
-
+    const now = new Date();
+    
     // 日付判定ロジック
-    const today = new Date();
+    const today = new Date(now);
     today.setHours(0, 0, 0, 0);
     const lastLogin = new Date(currentData.last_login_at);
     lastLogin.setHours(0, 0, 0, 0);
-    const diffDays = (today.getTime() - lastLogin.getTime()) / (1000 * 60 * 60 * 24);
+    
+    // getTime() で比較する際、タイムゾーンのずれを考慮して
+    // 日付の差分を計算（整数化）
+    const diffDays = Math.floor((today.getTime() - lastLogin.getTime()) / (1000 * 60 * 60 * 24));
 
-    if (diffDays !== 0) {
+    if (diffDays > 0) {
+      // 日付が変わっている場合のみカウントアップ
       newTotalDays += 1;
+      
       if (diffDays === 1) {
-        newStreak += 1;
+        newStreak += 1; // 連続ログイン
       } else {
-        newStreak = 1;
+        newStreak = 1;  // 途切れたのでリセット
       }
     }
 
-    // ★ここで delete_flag を確実に 0 に戻す処理を追加
     return await db.loginManagement.update({
       where: { user_id: user_id },
       data: {
-        last_login_at: new Date(),
-        total_login_days: newTotalDays,
+        last_login_at: now, // 現在時刻で更新
+        total_login_days: newTotalDays, // 計算した値を使う
         current_streak: newStreak,
-        delete_flag: delete_flag !== undefined && delete_flag !== null ? delete_flag : currentData.delete_flag
+        delete_flag: 0 // ログインしたなら確実にアクティブ
       }
     });
   } catch (error) {
     console.error(`user_id: ${user_id} のログイン更新エラー:`, error);
-    throw error; // false を返すよりエラーを投げる方が安全
+    throw error;
   }
 };

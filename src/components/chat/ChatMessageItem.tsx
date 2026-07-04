@@ -6,13 +6,13 @@ import { formatDateTime } from "@/lib/formData";
 
 interface ChatMessageItemProps {
   message: ChatMessage;
-  spaceId: number;
+  space_id: number;
   isOpen: boolean;
   isSubmitting: boolean;
   onOpenChange: (open: boolean) => void;
   onToggleFavorite?: (id: number, flag: number) => void;
   onEdit: (id: number) => void;
-  onDelete: (id: number, spaceId: number) => void;
+  onDelete: (id: number, space_id: number) => void;
   onBackgroundChange?: (id: number, color: number) => void;
   setEditValue: (val: string) => void;
   onNiceFlag?: (id: number, flag: number) => void;
@@ -23,7 +23,7 @@ interface ChatMessageItemProps {
 }
 
 export default function ChatMessageItem({ 
-  message, spaceId, isOpen, isSubmitting, 
+  message, space_id, isOpen, isSubmitting, 
   onOpenChange, onToggleFavorite, onEdit, onDelete, onBackgroundChange, setEditValue, onNiceFlag, onImageClick, onDownload, onScrollBottom, type
 }: ChatMessageItemProps) {
   
@@ -86,7 +86,7 @@ export default function ChatMessageItem({
             )}
             <button 
               disabled={isSubmitting}
-              onClick={() => { onOpenChange(false); onDelete(message.id, spaceId); }} 
+              onClick={() => { onOpenChange(false); onDelete(message.id, space_id); }} 
               className="w-full text-left p-3 text-sm text-red-500 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >削除</button>
             {type === "chat" && (

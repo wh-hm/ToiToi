@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 
 type ModalMode = 'create' | 'edit' | 'detail';
 
-export default function TaskModal({ task, onClose, onSuccess, spaceId, mode = 'create', type = 'task' }: any) {
+export default function TaskModal({ task, onClose, onSuccess, space_id, mode = 'create', type = 'task' }: any) {
 
   const [formData, setFormData] = useState({
     title: task?.title || "",
@@ -59,9 +59,8 @@ export default function TaskModal({ task, onClose, onSuccess, spaceId, mode = 'c
     const url = isEditMode
       ? `/api/${baseApiRoute}/${task.id}`
       : `/api/${baseApiRoute}`;
-    const numericSpaceId = parseInt(spaceId as string);
-
-    if (!numericSpaceId || isNaN(numericSpaceId)) {
+    const numericspace_id = parseInt(space_id as string);
+    if (!numericspace_id || isNaN(numericspace_id)) {
       return alert("有効なスペースIDが見つかりません。");
     }
 
@@ -73,14 +72,13 @@ export default function TaskModal({ task, onClose, onSuccess, spaceId, mode = 'c
           title: formData.title.trim(),
           question: formData.description.trim(),
           is_resolved: isEditMode ? Number(formData.status) : 0,
-          spaceId: numericSpaceId,
-          space_id: numericSpaceId,
+          space_id: numericspace_id,
           tag: Number(formData.tag) || 0,
         }
         : {
           title: formData.title.trim(),
           due_date: isoDueDate,
-          space_id: numericSpaceId,
+          space_id: numericspace_id,
           tag: Number(formData.tag) || 0,
           priority: Number(formData.priority) || 1,
           is_allday: Number(formData.is_allday),

@@ -11,7 +11,7 @@ export async function PATCH(
   const chatId = parseInt(id);
 
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
     const body = await request.json();
@@ -27,12 +27,11 @@ export async function PATCH(
     );
 
     if (!updatedChat) {
-      return NextResponse.json({ error: "更新失敗：権限がないかデータがありません" }, { status: 403 });
+      return NextResponse.json({ message: MESSAGES.E2001("お気に入り") }, { status: 403 });
     }
 
     return NextResponse.json(updatedChat);
   } catch (error) {
-    console.error("更新エラー:", error);
-    return NextResponse.json({ error: MESSAGES.E2001("更新") }, { status: 500 });
+    return NextResponse.json({ message: MESSAGES.E2001("お気に入り") }, { status: 500 });
   }
 }

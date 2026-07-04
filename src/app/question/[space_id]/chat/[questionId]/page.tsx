@@ -11,7 +11,7 @@ import { ChevronDown, CheckCircle2 } from "lucide-react";
 import { MESSAGES } from "@/constants/messages";
 import { Switch } from "@nextui-org/react";
 
-export default function ChatPage({ params }: { params: Promise<{ questionId: string, spaceId: string }> }) {
+export default function ChatPage({ params }: { params: Promise<{ questionId: string, space_id: string }> }) {
   const [inputText, setInputText] = useState("");
   const [editValue, setEditValue] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -22,8 +22,8 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
   const [isLoading, setIsLoading] = useState(true);
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { questionId, spaceId } = use(params);
-  const numericSpaceId = Number(spaceId);
+  const { questionId, space_id } = use(params);
+  const numericspace_id = Number(space_id);
   const { status } = useSession();
   const router = useRouter();
   // メッセージが更新されたら、一度だけ一番下に飛ぶ
@@ -53,8 +53,8 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
 
   useEffect(() => {
     if (status === "unauthenticated") {
-      toast.error(MESSAGES.USER001);
-      router.push("/login");
+      toast.error(MESSAGES.AUTH003);
+      router.push("/");
     }
   }, [status, router]);
 
@@ -140,7 +140,7 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
     // 3. FormDataの構築
     const formData = new FormData();
     formData.append("questionId", questionId);
-    formData.append("space_id", spaceId);
+    formData.append("space_id", space_id);
     if (stampId) {
       formData.append("stamp", stampId);
     } else {
@@ -319,7 +319,7 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           is_resolved: newStatus,
-          space_id: spaceId 
+          space_id: space_id 
         }),
       });
 
@@ -388,7 +388,7 @@ return (
       <div className="flex-1 overflow-y-auto relative w-full p-4">
         <ChatList 
           messages={messages}
-          spaceId={numericSpaceId}
+          space_id={numericspace_id}
           isSubmitting={isSubmitting}
           ref={scrollRef}
           onEdit={(id) => { setEditingId(id); setEditValue(messages.find((m: any) => m.id === id)?.message || ""); }}

@@ -12,7 +12,7 @@ export async function PATCH(
 
   // 1. 認証とユーザーID取得を共通化
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
     const { background, space_id } = await request.json();
@@ -21,12 +21,11 @@ export async function PATCH(
     const updatedChat = await changeBackground(chatId, space_id, auth.user_id, background);
 
     if (!updatedChat) {
-      return NextResponse.json({ error: "更新失敗：権限がないかデータがありません" }, { status: 403 });
+      return NextResponse.json({ message: MESSAGES.E2001("背景色") }, { status: 403 });
     }
 
     return NextResponse.json(updatedChat);
   } catch (error) {
-    console.error("背景変更エラー:", error);
-    return NextResponse.json({ error: MESSAGES.E2001("背景変更") }, { status: 500 });
+    return NextResponse.json({ message: MESSAGES.E2001("背景色") }, { status: 500 });
   }
 }

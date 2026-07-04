@@ -8,7 +8,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
     const { id } = await params;
@@ -20,7 +20,7 @@ export async function PATCH(
 
     // 必須チェック (statusとspace_idは更新に必須とする)
     if (status === undefined || !space_id) {
-      return NextResponse.json({ error: MESSAGES.E1001("ステータスまたはスペースID") }, { status: 400 });
+      return NextResponse.json({ message: MESSAGES.E1001("ステータスまたはスペースID") }, { status: 400 });
     }
 
     // 更新処理
@@ -32,12 +32,11 @@ export async function PATCH(
     );
 
     if (!updated) {
-      return NextResponse.json({ error: MESSAGES.E2002("タスクステータス") }, { status: 500 });
+      return NextResponse.json({ message: MESSAGES.E2002("タスクステータス") }, { status: 500 });
     }
 
     return NextResponse.json(updated);
   } catch (error) {
-    console.error("ステータス更新エラー:", error);
-    return NextResponse.json({ error: MESSAGES.E2002("タスクステータス") }, { status: 500 });
+    return NextResponse.json({ message: MESSAGES.E2002("タスクステータス") }, { status: 500 });
   }
 }

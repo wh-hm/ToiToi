@@ -1,15 +1,60 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { signIn, SessionProvider } from "next-auth/react";
 import Image from "next/image";
+import { useRouter } from 'next/navigation';
+import { useSession, signOut } from 'next-auth/react';
 
 function TopPageContent() {
     const router = useRouter();
     const [isAppBrowser, setIsAppBrowser] = useState(false);
     const [isCopied, setIsCopied] = useState(false);
-    const [isPending, startTransition] = useTransition();
+    const { data: session, status } = useSession();
+    const [hasRegistered, setHasRegistered] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+    // status が authenticated になった瞬間に初期化処理を走らせる
+    useEffect(() => {
+    if (status === 'authenticated' && !hasRegistered) {
+        initializeUser();
+    }
+    }, [status, hasRegistered]);
+
+      // 統合されたログイン・遷移制御ロジック
+    const initializeUser = async () => {
+        try {
+            setHasRegistered(true);
+            setErrorMessage(null);
+
+        // 1. ユーザー登録APIを実行（ここで await することで完了を待つ）
+        const registerRes = await fetch("/api/auth/login", {
+            method: "POST",
+        });
+
+        if (!registerRes.ok) {
+            const errorData = await registerRes.json(); // ここでパースする
+            throw new Error(errorData.message);
+        }
+
+        // 2. 登録成功後、ユーザー状態を確認して遷移
+        const checkRes = await fetch("/api/user/username/check");
+        const data = await checkRes.json();
+
+        if (data.hasUsername) {
+            router.push('/dashboard');
+        } else {
+            router.push('/username');
+        }
+        } catch (err: any) {
+        console.error("Initialization error:", err);
+        setErrorMessage(err.message);
+        await signOut({redirect: false});
+        // setHasRegistered(false); // エラー時はリトライ可能にする
+        }
+    };
+    
+    
 
     // 1. アプリ内ブラウザの判定
     useEffect(() => {
@@ -21,17 +66,9 @@ function TopPageContent() {
 
     // 2. ログインボタンを押した時の処理
     const handleGoogleLogin = () => {
-        startTransition(async () => {
-            // NextAuthのサインインを実行
-            // ※ログイン後の遷移先や新規登録チェックのロジックに合わせて callbackUrl を調整してください
-            await signIn("google", { 
-                callbackUrl: "/dashboard" 
-            }, { 
-                prompt: "select_account" 
-            });
-            
-            router.refresh();
-        });
+            // callbackUrl を指定しない
+           setHasRegistered(false); // ボタンを押した時だけフラグを解除
+            signIn("google", { prompt: "select_account" });
     };
 
     const handleCopy = async () => {
@@ -185,12 +222,17 @@ function TopPageContent() {
                         ) : (
                             /* 通常のログインUI */
                             <div className="space-y-4">
+                                {errorMessage && (
+                                    <div className="mb-4 p-3 bg-red-50 text-red-600 text-xs font-bold rounded-lg border border-red-100 animate-in fade-in">
+                                        {errorMessage}
+                                    </div>
+                                )}
                                 <button
                                     onClick={handleGoogleLogin}
-                                    disabled={isPending}
+                                    disabled={status === 'loading'}
                                     className="flex w-full items-center justify-center gap-3 rounded-xl border-2 border-slate-100 bg-white py-3.5 px-4 text-sm font-bold text-slate-600 shadow-sm transition-all hover:bg-slate-50 hover:border-slate-200 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    {isPending ? (
+                                    {status === 'loading' ? (
                                         <div className="animate-spin h-5 w-5 border-2 border-slate-500 rounded-full border-t-transparent"></div>
                                     ) : (
                                         <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -200,7 +242,7 @@ function TopPageContent() {
                                             />
                                         </svg>
                                     )}
-                                    {isPending ? "ログイン中..." : "Googleアカウントでログイン"}
+                                    {status === 'loading' ? "ログイン中..." : "Googleアカウントでログイン"}
                                 </button>
                             </div>
                         )}
@@ -218,10 +260,7 @@ function TopPageContent() {
                 />
             </div>
 
-            {/* フッター */}
-            <footer className="py-4 text-center text-xs text-slate-400 border-t border-slate-100 bg-white relative z-20">
-                © 2026 ToiToi
-            </footer>
+            
         </div>
     );
 }

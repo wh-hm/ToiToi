@@ -1,26 +1,33 @@
 import { NextResponse } from "next/server";
 import {  registerUser } from "@/services/UserService";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { MESSAGES } from "@/constants/messages";
 
-export async function POST(request: Request) {
+export async function POST() {
     try {
-        const { google_id, email } = await request.json();
 
-        if (!google_id) {
-        return NextResponse.json({ error: "IDが必要です" }, { status: 400 });
+        const session = await getServerSession(authOptions);
+
+        if (!session?.user?.id) {
+            return NextResponse.json({ message: MESSAGES.AUTH001 }, { status: 401 });
         }
 
-        // 2. 「登録または復活」をサービスに任せる
-        // registerUser はサービス側で「削除済みなら復活、新規なら作成」を判定しています
-        const user = await registerUser(google_id, email || "");
+        const google_id = session.user.id;
+        const email = session.user.email;
+
+        if (!email) {
+            return NextResponse.json({ message: MESSAGES.AUTH001 }, { status: 400 });
+        }
+
+        const user = await registerUser(google_id, email);
         
-        // 3. 結果を返す
         return NextResponse.json({ 
-            message: "ユーザーを準備しました", 
+            message: MESSAGES.USER001, 
             user: user 
         }, { status: 200 });
         
     } catch (error) {
-        console.error("API Error:", error);
-        return NextResponse.json({ error: "サーバーエラーが発生しました" }, { status: 500 });
+        return NextResponse.json({ message: MESSAGES.AUTH003}, { status: 500 });
     }
 }

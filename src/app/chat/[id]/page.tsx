@@ -14,7 +14,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [editValue, setEditValue] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [spaceId, setSpaceId] = useState<number | null>(null);
+  const [space_id, setspace_id] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { status } = useSession();
   const router = useRouter();
@@ -32,8 +32,8 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
   useEffect(() => {
     if (status === "unauthenticated") {
-      toast.error(MESSAGES.USER001);
-      router.push("/login");
+      toast.error(MESSAGES.AUTH003);
+      router.push("/");
     }
   }, [status, router]);
 
@@ -67,7 +67,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 };
 
   useEffect(() => {
-    params.then((p) => setSpaceId(Number(p.id)));
+    params.then((p) => setspace_id(Number(p.id)));
   }, [params]);
 
   useEffect(() => { fetchMessages(); }, []);
@@ -76,7 +76,16 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     setIsLoading(true); // 開始時にオン
     try {
       const { id } = await params;
-      const res = await fetch(`/api/chats?spaceId=${id}`);
+      const res = await fetch(`/api/chats?space_id=${id}`);
+      if (res.status === 404) {
+      // 例: トップ画面か404専用ページに飛ばす。トースト等を出してもOK
+        router.push('/404'); 
+        return; // 処理をここで終了させる
+      }
+    if (!res.ok) {
+      throw new Error("データの取得に失敗しました。");
+    }
+
       const data = await res.json();
       setMessages(data);
     } catch (e: any) {
@@ -215,7 +224,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   };
 
   const handleUpdate = async () => {
-    if (isSubmitting || !editingId || spaceId === null) return;
+    if (isSubmitting || !editingId || space_id === null) return;
     
     // 1. 保存前の状態を保存（失敗した時に戻すため）
     const previousMessages = [...messages];
@@ -236,7 +245,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       const res = await fetch(`/api/chats/${editingId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: editValue, space_id: spaceId }),
+        body: JSON.stringify({ message: editValue, space_id: space_id }),
       });
       
       if (!res.ok) throw new Error("更新失敗");
@@ -368,7 +377,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       <div className="flex-1 overflow-y-auto relative w-full">
         <ChatList 
           messages={messages}
-          spaceId={spaceId || 0}
+          space_id={space_id || 0}
           isSubmitting={isSubmitting}
           ref={scrollRef}
           onToggleFavorite={handleToggleFavorite}
