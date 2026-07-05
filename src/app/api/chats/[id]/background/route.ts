@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth-guard";
 import { changeBackground } from "@/services/ChatService";
 import { MESSAGES } from "@/constants/messages";
+import { getSpaceCheck } from "@/services/SpaceService";
+import { getChatCheck } from "@/services/ChatService";
 
 export async function PATCH(
   request: Request,
@@ -16,6 +18,18 @@ export async function PATCH(
 
   try {
     const { background, space_id } = await request.json();
+
+    const isSpaceAlive = await getSpaceCheck(auth.user_id, space_id);
+    
+    if (!isSpaceAlive) {
+        return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+    }
+
+    const isChatAlive = await getChatCheck(auth.user_id, space_id, chatId);
+
+    if (!isChatAlive) {
+        return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
+    }
 
     // 2. 背景変更を実行
     const updatedChat = await changeBackground(chatId, space_id, auth.user_id, background);

@@ -31,6 +31,31 @@ type PrismaClientOrTransaction =
   }));
 }
 
+
+export const getChatCheck = async (user_id: string, space_id: number, chat_id: number): Promise<boolean> => {
+  try {
+    const  result = await prisma.chat.findFirst({
+      where: { 
+        id: chat_id,
+        user_id: user_id, 
+        delete_flag: 0, 
+        space_id: space_id, 
+      }
+    });
+
+    if(!result){
+      return false;
+    }
+    return true;
+
+  } catch (error) {
+    throw error;
+  }
+};
+
+
+
+
 export const getChats = async (user_id: string, space_id: number): Promise<Chat[]> => {
   try {
     return await prisma.chat.findMany({

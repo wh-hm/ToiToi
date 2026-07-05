@@ -58,6 +58,30 @@ export async function getSpaceCheck(
   }
 }
 
+//スペース名取得
+export async function getSpaceName(
+  user_id: string,
+  space_id: number
+): Promise<string>{
+  try{
+    const space = await prisma.space.findFirst({
+      where: {
+        user_id: user_id,
+        id: space_id,
+        delete_flag: 0
+      },
+    });
+
+    if (!space) {
+      throw new Error("指定されたスペースが見つかりません。");
+    }
+
+    return space.name;
+  } catch (error) {
+    throw error;
+  }
+}
+
 // 概要：スペースの登録
 export async function registerSpace(
   user_id: string,

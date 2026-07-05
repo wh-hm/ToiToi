@@ -5,7 +5,7 @@ import { uploadImages, deleteImage } from "@/services/StorageService";
 import { MESSAGES } from "@/constants/messages";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { getSpaceCheck, getSpaces } from "@/services/SpaceService";
+import { getSpaceCheck, getSpaceName } from "@/services/SpaceService";
 
 
 
@@ -25,14 +25,21 @@ export async function GET(request: NextRequest) {
         const isSpaceAlive = await getSpaceCheck(auth.user_id, space_id);
         
         if (!isSpaceAlive) {
-            // ステータスは 404 (Not Found) にするのが、削除済みデータアクセス対策として最適です
-            // return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
-            return NextResponse.json({ message: "スペースが見つかりません。" }, { status: 404 });
+            return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
         }
+      
+        const [spaceName, chats] = await Promise.all([
+            getSpaceName(auth.user_id, space_id),
+            getChatsWithImages(auth.user_id, space_id)
+        ]);
 
-        const chats = await getChatsWithImages(auth.user_id, space_id);
-        return NextResponse.json(chats);
+        if (!spaceName) {
+            return NextResponse.json({ message: MESSAGES.E1010("スペース名") }, { status: 404 });
+        }
+        
+        return NextResponse.json({spaceName:spaceName, chats: chats,});
     } catch (error) {
+        console.error("GET API Error:", error);
         return NextResponse.json({ message: MESSAGES.E2003("チャット") }, { status: 500 });
     }
 }
@@ -53,8 +60,17 @@ export async function POST(request: NextRequest) {
     const space_id = Number(formData.get("space_id"));
     const stamp = formData.get("stamp") as string | null;
 
+    const isSpaceAlive = await getSpaceCheck(auth.user_id, space_id);
+      
+    if (!isSpaceAlive) {
+        return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+    }
+
     // 2. バリデーションチェック
     if (!message && files.length === 0 && !stamp) {
+      return NextResponse.json({ message: MESSAGES.E1001("チャット内容") }, { status: 400 });
+    }
+    if (message && message.trim() === "") {
       return NextResponse.json({ message: MESSAGES.E1001("チャット内容") }, { status: 400 });
     }
     if (message && message.length > 100) {
@@ -70,11 +86,14 @@ export async function POST(request: NextRequest) {
     // 3. 画像アップロード
     if (files.length > 0) {
 
-      
+      const MAX_FILE_SIZE = 2 * 1024 * 1024;
       // 全ファイルのバリデーション
-      for (const file of files) {
-        if (file.size > 2 * 1024 * 1024 || !["image/png", "image/jpeg", "image/jpg"].includes(file.type)) {
-          return NextResponse.json({ message: MESSAGES.E1005 }, { status: 400 });
+      for (const [index, file] of files.entries()) {
+        if(file.size === 0){
+          return NextResponse.json({ message: MESSAGES.E1012(index + 1)},{ status: 400 });
+        }
+        if (file.size > MAX_FILE_SIZE || !["image/png", "image/jpeg", "image/jpg"].includes(file.type)) {
+          return NextResponse.json({ message: MESSAGES.E1005(index + 1) }, { status: 400 });
         }
       }
 
