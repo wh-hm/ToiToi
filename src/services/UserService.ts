@@ -6,7 +6,21 @@ import { updateLoginManagement, deleteLoginManagement, registerLoginManagement }
 import { deleteSpaces } from './SpaceService';
 
 
+export async function checkUser(user_id: string): Promise<boolean>{
 
+  const user = await prisma.user.findUnique({
+    where: {
+      id: user_id,
+    },
+  });
+
+  // 検索条件：delete_flag = 0 
+  if (!user || user.delete_flag !== 0) {
+    return false;
+  }
+
+  return true;
+}
 /**
  * メソッド名称：getUser
  * 概要：ユーザー情報を取得
