@@ -101,6 +101,8 @@ export async function deleteGoal(user_id: string, tx?: any): Promise<Goal> {
 export async function updateGoal(
   user_id: string,
   content: string,
+  status?: number,
+  delete_flag?: number,
   tx?: any
 ): Promise<Goal> {
 
@@ -115,7 +117,8 @@ export async function updateGoal(
     },
     update: {
       content,
-      delete_flag: 0,
+      status: status !== undefined ? status : undefined,
+      delete_flag: delete_flag !== undefined ? delete_flag : undefined,
       deleted_at: deletedAt,
     },
     create: {
