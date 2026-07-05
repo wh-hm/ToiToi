@@ -1,12 +1,5 @@
 import { X } from "lucide-react";
-
-interface PreviewModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
-  imageFiles: File[] | null;
-  index: number | null;
-}
+import { PreviewModalProps } from "@/types/chat";
 
 export const PreviewModal = ({ isOpen, onClose, onConfirm, imageFiles, index }: PreviewModalProps) => {
   if (!isOpen || index === null || !imageFiles || !imageFiles[index]) return null;

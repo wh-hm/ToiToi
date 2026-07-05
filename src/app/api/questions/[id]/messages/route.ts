@@ -72,6 +72,7 @@ export async function POST(
     let imageUrls: string[] = [];
     if (files.length > 0) {
     for (const [index, file] of files.entries()) {
+      if(file.size === 0) return NextResponse.json({ message: MESSAGES.E1012(index + 1)},{ status: 400 });
       if (
         file.size > 2 * 1024 * 1024 ||
         !["image/png", "image/jpeg", "image/jpg"].includes(file.type)

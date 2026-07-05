@@ -20,13 +20,11 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
   const [question, setQuestion] = useState<Question>();
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-
   const scrollRef = useRef<HTMLDivElement>(null);
   const { questionId, space_id } = use(params);
   const numericspace_id = Number(space_id);
   const { status } = useSession();
   const router = useRouter();
-  // メッセージが更新されたら、一度だけ一番下に飛ぶ
   const isInitialLoad = useRef(true);
 
   // 質問の解決状態を管理する（0:未解決, 1:解決済み）
@@ -387,7 +385,7 @@ return (
       
       <div className="flex-1 overflow-y-auto relative w-full p-4">
         <ChatList 
-          messages={messages}
+          chats={messages}
           space_id={numericspace_id}
           isSubmitting={isSubmitting}
           ref={scrollRef}

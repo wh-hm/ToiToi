@@ -3,24 +3,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@nextui-org/react";
 import { Star, ThumbsUp } from "lucide-react";
 import { ChatMessage, CHAT_COLOR_PALETTE } from "@/types/chat";
 import { formatDateTime } from "@/lib/formData";
+import { ChatMessageItemProps } from "@/types/chat";
 
-interface ChatMessageItemProps {
-  message: ChatMessage;
-  space_id: number;
-  isOpen: boolean;
-  isSubmitting: boolean;
-  onOpenChange: (open: boolean) => void;
-  onToggleFavorite?: (id: number, flag: number) => void;
-  onEdit: (id: number) => void;
-  onDelete: (id: number, space_id: number) => void;
-  onBackgroundChange?: (id: number, color: number) => void;
-  setEditValue: (val: string) => void;
-  onNiceFlag?: (id: number, flag: number) => void;
-  onImageClick?: (url: string) => void;
-  onDownload: (url: string) => void;
-  onScrollBottom: (force: boolean) => void;
-  type: string;
-}
 
 export default function ChatMessageItem({ 
   message, space_id, isOpen, isSubmitting, 
@@ -160,7 +144,7 @@ export default function ChatMessageItem({
           `}
         >
           {(!message.signedImageUrl && !(message as any).previewImages && !message.image_url && message.message) && (
-            <p className="text-lg text-gray-800 whitespace-pre-wrap">{message.message}</p>
+            <p className="text-lg text-gray-800 whitespace-pre-wrap select-none">{message.message}</p>
           )}         
           {message.stamp ? (
             !isStampError ? (
@@ -171,19 +155,22 @@ export default function ChatMessageItem({
               />
             ) : (
               <div className="w-32 h-32 flex flex-col items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-2 text-center">
-                <span className="text-gray-700 font-bold text-[11px] leading-tight">
+                <span className="text-gray-700 font-bold text-[11px] leading-tight select-none">
                   スタンプが<br />見つかりません
                 </span>
               </div>
             )
           ) : null}
+          
           {(message.signedImageUrl || (message as any).previewImages || message.image_url) && (
             <div className="mt-2 flex flex-wrap gap-2">
               {((message as any).previewImages || [message.signedImageUrl]).filter(Boolean).map((url: string, index: number) => (
                 !imageErrors ? (
                   <img
                   key={`img-${message.id}-${index}`}
-                  src={url}
+                  src={
+                      `/api/images/view?key=${encodeURIComponent(url)}&spaceId=${space_id}`
+                  } 
                   alt="chat image"
                   className="max-w-[200px] h-auto rounded-lg border border-gray-200"
                   onLoad={() => 
@@ -197,7 +184,7 @@ export default function ChatMessageItem({
                     key={`img-error-${message.id}-${index}`} 
                     className="w-32 h-32 flex flex-col items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-2 text-center"
                   >
-                    <span className="text-gray-700 font-bold text-[11px] leading-tight">
+                    <span className="text-gray-700 font-bold text-[11px] leading-tight select-none">
                       画像が<br />見つかりません
                     </span>
                   </div>

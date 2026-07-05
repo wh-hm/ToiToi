@@ -17,10 +17,65 @@ export interface ChatMessage {
 
 export interface ChatInputProps {
   value: string;
-  onChange: (val: string) => void;
+  onChange: (value: string) => void;
   onSend: () => void;
-  onSendStamp?: (url: string) => void;
-  onUploadImage?: (file: File) => void;
+  onSendStamp: (stampId: string) => void;
+  onUploadImage: (file: File[]) => void;
+  onRemoveFile: (index: number) => void;
+  selectedFiles: File[];
+  disabled?: boolean;
+}
+
+export interface ChatListProps {
+  chats: ChatMessage[];
+  space_id: number;
+  isSubmitting: boolean;
+  onToggleFavorite?: (id: number, flag: number) => void;
+  onEdit: (id: number) => void;
+  onDelete: (id: number, space_id: number) => void;
+  onBackgroundChange?: (id: number, color: number) => void;
+  setEditValue: (val: string) => void;
+  onNiceFlag?: (id: number, flag: number) => void;
+  onDownload: (url: string) => void;
+  isLoading: boolean;
+  type: string;
+  onScrollBottom: (force?: boolean) => void;
+}
+
+export interface ChatMessageItemProps {
+  message: ChatMessage;
+  space_id: number;
+  isOpen: boolean;
+  isSubmitting: boolean;
+  onOpenChange: (open: boolean) => void;
+  onToggleFavorite?: (id: number, flag: number) => void;
+  onEdit: (id: number) => void;
+  onDelete: (id: number, space_id: number) => void;
+  onBackgroundChange?: (id: number, color: number) => void;
+  setEditValue: (val: string) => void;
+  onNiceFlag?: (id: number, flag: number) => void;
+  onImageClick?: (url: string) => void;
+  onDownload: (url: string) => void;
+  onScrollBottom: (force: boolean) => void;
+  type: string;
+}
+
+export interface ImageZoomModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  imageUrl: string | null;
+  caption?: string;
+  onDownload: (url: string) => void;
+  msg: ChatMessage;
+  isPending?: boolean; // 👈 途切れていたプロパティを正しく定義
+}
+
+export interface PreviewModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  imageFiles: File[] | null;
+  index: number | null;
 }
 
 export const CHAT_COLOR_PALETTE = {
