@@ -6,10 +6,10 @@ import { getUser } from "@/services/UserService";
 import { getSpaces } from "@/services/SpaceService";
 import { getImageCount } from "@/services/StorageService";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   // 1. 認証チェック
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
     // 2. 複数のサービスを並列実行して効率化
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     
     // 3. ユーザー存在チェック
     if (!user) {
-      return NextResponse.json({ error: "ユーザーが見つかりません" }, { status: 404 });
+      return NextResponse.json({ message: MESSAGES.E1010("ユーザー") }, { status: 404 });
     }
 
     // 4. 全データをまとめてレスポンス
@@ -43,16 +43,16 @@ export async function GET(request: NextRequest) {
     // 各サービス内で発生したエラーをキャッチ
     console.error("【マイページデータ取得エラー】", error);
     return NextResponse.json(
-      { error: "データの取得に失敗しました" }, 
+      { message: MESSAGES.E2003("アカウント情報") },
       { status: 500 }
     );
   }
 }
 
-export async function DELETE(request: NextRequest) {
+export async function DELETE() {
   // 1. 認証とユーザーID取得を共通化
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
     // 2. ユーザー削除（論理削除）の実行
@@ -60,12 +60,15 @@ export async function DELETE(request: NextRequest) {
     
     if (!success) {
       // 削除対象が見つからない、または権限がない場合
-      return NextResponse.json({ error: MESSAGES.E2001("ユーザー削除") }, { status: 404 });
+      return NextResponse.json(
+        { message: MESSAGES.E1010("ユーザー") },
+        { status: 404 }
+      );
     }
 
-    return NextResponse.json({ message: "ユーザーを削除しました" });
+    return NextResponse.json({ message: MESSAGES.S1003("ユーザー") });
   } catch (error) {
     console.error("【ユーザー削除エラー】", error);
-    return NextResponse.json({ error: MESSAGES.E2001("ユーザー削除") }, { status: 500 });
+    return NextResponse.json({ message: MESSAGES.E2004("ユーザー") }, { status: 500 });
   }
 }

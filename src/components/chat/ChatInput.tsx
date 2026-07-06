@@ -7,17 +7,7 @@ import { Paperclip, SendHorizontal, Smile, X } from "lucide-react";
 import { CHARACTER_STAMPS } from "@/constants/stamp";
 import { toast } from "react-hot-toast";
 import { MESSAGES } from "@/constants/messages";
-
-interface ChatInputProps {
-  value: string;
-  onChange: (value: string) => void;
-  onSend: () => void;
-  onSendStamp: (stampId: string) => void;
-  onUploadImage: (file: File[]) => void;
-  onRemoveFile: (index: number) => void;
-  selectedFiles: File[];
-  disabled?: boolean;
-}
+import { ChatInputProps } from "@/types/chat";
 
 export default function ChatInput({ 
   value, onChange, onSend, onSendStamp, onUploadImage, onRemoveFile, selectedFiles, disabled 
@@ -87,6 +77,7 @@ export default function ChatInput({
               if (val.length <= 100) {
                 onChange(val);
               } else {
+                toast.dismiss();
                 onChange(val.slice(0, 100));
                 toast.error(MESSAGES.E1002("チャット", 100));
               }
@@ -123,7 +114,7 @@ export default function ChatInput({
               <div className="flex items-center gap-1">
                 <Popover placement="top-end">
                   <PopoverTrigger>
-                    <Button isIconOnly variant="light" radius="full" className="text-gray-400 hover:text-blue-600">
+                    <Button isIconOnly disabled={disabled} variant="light" radius="full" className="text-gray-400 hover:text-blue-600" >
                       <Smile size={20} />
                     </Button>
                   </PopoverTrigger>
@@ -132,6 +123,7 @@ export default function ChatInput({
                       {Object.values(CHARACTER_STAMPS).flat().map((stamp) => (
                         <button 
                           key={stamp.id} 
+                          disabled={disabled}
                           onClick={() => onSendStamp(stamp.id)} 
                           className="hover:bg-gray-100 p-1 rounded-xl transition-transform active:scale-90 flex flex-col items-center"
                         >
@@ -166,6 +158,7 @@ export default function ChatInput({
             className="hidden" 
             accept="image/*" 
             multiple
+            disabled={disabled}
             onChange={(e) => {
               if (e.target.files && e.target.files.length > 0) {
                 const filesArray = Array.from(e.target.files);

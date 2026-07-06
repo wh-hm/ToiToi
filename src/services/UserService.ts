@@ -6,7 +6,21 @@ import { updateLoginManagement, deleteLoginManagement, registerLoginManagement }
 import { deleteSpaces } from './SpaceService';
 
 
+export async function checkUser(user_id: string): Promise<boolean>{
 
+  const user = await prisma.user.findUnique({
+    where: {
+      id: user_id,
+    },
+  });
+
+  // 検索条件：delete_flag = 0 
+  if (!user || user.delete_flag !== 0) {
+    return false;
+  }
+
+  return true;
+}
 /**
  * メソッド名称：getUser
  * 概要：ユーザー情報を取得
@@ -35,7 +49,7 @@ export async function getUser(id: string): Promise<User> {
   }
 }
 
-export async function registerUser(google_id: string, email: string): Promise<User> {
+export async function registerUser(google_id: string, email: string) {
   try {
     const existingUser = await prisma.user.findFirst({
       where: { google_id: google_id },
@@ -43,46 +57,49 @@ export async function registerUser(google_id: string, email: string): Promise<Us
 
     // 既に有効なユーザーが存在する場合
     if (existingUser && existingUser.delete_flag === 0) {
+      await updateLoginManagement(existingUser.id);
+
       if (existingUser.email !== email) {
         return await updateEmail(existingUser.id, google_id, email);
       }
       return existingUser;
     }
 
-    // 新規作成 または 論理削除済みユーザーの復活
+    // 新規作成 または 論理削除済みユーザーの復活（トランザクション内で実行）
     return await prisma.$transaction(async (tx) => {
-      const isNewUser = !existingUser; // ユーザーがDBに存在しない場合は新規
+      const isNewUser = !existingUser;
       const newUuid = crypto.randomUUID();
 
+      // 1. ユーザー作成/更新
       const user = await tx.user.upsert({
         where: { google_id: google_id },
-        update: { delete_flag: 0, email: email, created_at: new Date() },
+        update: { delete_flag: 0, email: email },
         create: {
           id: newUuid,
           google_id: google_id,
           email: email,
           delete_flag: 0,
-          created_at: new Date(),
         },
       });
 
+      // 2. 関連データの処理（tx を渡すことでトランザクション内に含める）
       if (isNewUser) {
-        // ★【新規作成時】登録処理を呼ぶ
-        await registerGoal(user.id, ""); // 初期目標の登録
-        await registerLoginManagement(user.id); // ログイン管理の登録
+        // ★ ここで tx を渡す！
+        await registerGoal(user.id, "", tx);
+        await registerLoginManagement(user.id, tx);
       } else {
-        // ★【復活時】更新（リセット）処理を呼ぶ
-        await updateGoal(user.id, "", 0, 0);
-        await updateLoginManagement(user.id, 1, 0, tx);
+        // ★ ここでも tx を渡す！
+        await updateGoal(user.id, "", 0, 0, tx);
+        await updateLoginManagement(user.id, tx);
       }
 
       return user;
     });
   } catch (error) {
+    console.error("User registration failed:", error);
     throw error;
   }
 }
-
 /**
  * メソッド名称：deleteUser
  * 概要：アカウント削除（関連データ一括論理削除）

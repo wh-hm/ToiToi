@@ -46,7 +46,7 @@ export async function DELETE(
 
     try {
         const { id } = await params;
-        const spaceId = Number(id);
+        const space_id = Number(id);
         
         const { searchParams } = new URL(request.url);
         const spaceType = searchParams.get("space_type");
@@ -59,7 +59,7 @@ export async function DELETE(
             );
         }
 
-        const success = await deleteSpace(spaceId, spaceType, auth.user_id);
+        const success = await deleteSpace(space_id, spaceType, auth.user_id);
         
         if (!success) return NextResponse.json({ error: MESSAGES.E2004("スペース") }, { status: 500 });
         

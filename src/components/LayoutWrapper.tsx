@@ -1,34 +1,54 @@
 'use client';
 
-import { useEffect } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
-import { useSession, signOut } from 'next-auth/react'; // signOut を追加
+import { useEffect, useState } from 'react';
+import { usePathname,  } from 'next/navigation';
+import { useSession, signOut } from 'next-auth/react';
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, useDisclosure } from '@nextui-org/react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 
 export default function LayoutWrapper({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname() ?? '';
-  const router = useRouter();
-  
-  // data.expires にセッションの期限が入っています
   const { data: session, status } = useSession();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const pathname = usePathname() ?? '';
 
+  // 💡 「さっきまでログインしていたか」を記憶するステートを追加
+  const [wasAuthenticated, setWasAuthenticated] = useState(false);
+
+  // 1. セッションが削除・消失した瞬間を監視するuseEffect
+  useEffect(() => {
+    if (status === 'authenticated') {
+      // ログイン中なら履歴フラグをONにする
+      setWasAuthenticated(true);
+    } else if (status === 'unauthenticated' && wasAuthenticated) {
+      // 💡 「さっきまでログインしてたのに、未認証になった」＝ セッションが削除された！
+      onOpen();
+    }
+  }, [status, wasAuthenticated, onOpen]);
+
+
+  useEffect(() => {
+    const handleForceExpire = () => {
+      onOpen();
+    };
+
+    window.addEventListener("session-forced-expired", handleForceExpire);
+    return () => window.removeEventListener("session-forced-expired", handleForceExpire);
+  }, [onOpen]);
+  
+  // 2. セッション有効期限（時間経過）の監視useEffect
   useEffect(() => {
     if (status !== 'authenticated' || !session?.expires) return;
 
-    // セッション期限までの時間を計算
     const expiresAt = new Date(session.expires).getTime();
     const now = Date.now();
     const timeLeft = expiresAt - now;
 
     if (timeLeft <= 0) {
-      onOpen(); // 期限が切れていたら即モーダル
+      onOpen();
       return;
     }
 
-    // 期限切れの瞬間にモーダルを出すタイマー
     const timer = setTimeout(() => {
       onOpen();
     }, timeLeft);
@@ -38,39 +58,35 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
 
   const handleGoToLogin = async () => {
     onClose();
-    await signOut({ redirect: false }); // サーバー側でもセッションを破棄
-    router.replace('/');
-    router.refresh(); // 最新の状態を取得
+    await signOut({ redirect: false });
+    // フラグもリセット
+    setWasAuthenticated(false);
+    window.location.href = '/'; // 強制リロードでセッションを完全にクリア
   };
 
-  // 各種表示フラグ
-  const showHeader = pathname !== '/';
+  const showHeader = pathname !== '/' && pathname !== '/username' && pathname !== '/404';
   const isExcludedPage = ['/chat/', '/question_chat/'].some(path => pathname.includes(path));
   const showFooter = !isExcludedPage;
 
   return (
     <div className="flex flex-col min-h-screen">
       {showHeader && <Header />}
-      
       <main className="flex-grow">{children}</main>
-      
       {showFooter && <Footer />}
 
-      {/* ★ セッション切れ専用のNextUIモーダル */}
       <Modal 
         isOpen={isOpen} 
-        onClose={handleGoToLogin} // 外側をクリックして閉じようとした時もトップへ飛ばす
-        isDismissable={false}     // 勝手に閉じられないように固定
-        hideCloseButton={true}    // 右上の「×」ボタンを非表示にして逃げ道をなくす
-        backdrop="blur"           // 背景をオシャレにぼかす
+        onClose={handleGoToLogin}
+        isDismissable={false}
+        hideCloseButton={true}
+        backdrop="blur"
       >
         <ModalContent>
           <ModalHeader className="flex flex-col gap-1">ログイン有効期限切れ</ModalHeader>
           <ModalBody>
-            <p>ログインの有効期限が切れました。お手数ですが、再度ログインをお願いいたします。</p>
+            <p>ログインの有効期限が切れました。再度ログインをお願いいたします。</p>
           </ModalBody>
           <ModalFooter>
-            {/* 完全にログインが切れているので、ボタンを押させてトップへ戻す */}
             <Button color="primary" onPress={handleGoToLogin} className="w-full font-bold">
               ログイン画面へ戻る
             </Button>

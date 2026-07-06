@@ -40,28 +40,30 @@ export async function getGoal(user_id: string): Promise<Goal | null> {
  * メソッド名称：registerGoal
  * 概要：ユーザーの目標内容を新規に登録する
  */
-export async function registerGoal(user_id: string, content: string): Promise<Goal> {
+export async function registerGoal(
+  user_id: string, 
+  content: string, 
+  tx: any // トランザクションオブジェクト
+): Promise<Goal> {
   try {
-    // 登録データマッピング
-    const newGoal = await prisma.goal.create({
+    // prisma.goal ではなく tx.goal を使用する
+    const newGoal = await tx.goal.create({
       data: {
-        id: user_id,       // user_id を主キー（PK）として直接マッピング
-        content: content,   // 引数の content
-        status: 0,         // デフォルト値：未達成状態を明示的に設定
-        delete_flag: 0,    // デフォルト値：フラグなし（有効）を明示的に設定
-        created_at: new Date(), // 自動設定された作成日時（created_at）
-        deleted_at: getNextMondayOf(new Date()), // 初回登録時も次の月曜日に設定する仕様の場合
+        id: user_id,
+        content: content,
+        status: 0,
+        delete_flag: 0,
+        created_at: new Date(),
+        deleted_at: getNextMondayOf(new Date()),
       },
     });
 
-    // 登録完了後、自動設定された作成日時等が反映されたレコード1件分の全データを返却する。
-    return newGoal as Goal;
+    return newGoal;
   } catch (error) {
-    // 例外処理：同一の user_id で既にレコードが存在している（一意性制約エラー）場合や、DBエラーが発生した場合は、呼び出し元にエラーをそのまま返す。
+    console.error("Goal registration failed:", error);
     throw error;
   }
 }
-
 /**
  * メソッド名称：deleteGoal
  * 概要：設定されている目標を削除する（論理削除）
@@ -79,6 +81,8 @@ export async function deleteGoal(user_id: string, tx?: any): Promise<Goal> {
       },
       data: {
         delete_flag: 1, // 削除フラグを1:削除済みに更新する
+        content: "",
+        status: 0
       },
     });
 
@@ -92,38 +96,65 @@ export async function deleteGoal(user_id: string, tx?: any): Promise<Goal> {
 
 /**
  * メソッド名称：updateGoal
- * 概要：設定済みの目標内容、または目標達成状況（ステータス）を更新する
+ * 概要：設定済みの目標内容を更新する
  */
 export async function updateGoal(
   user_id: string,
-  content: string | null,
-  status?: number | null,
-  delete_flag?: number | null
+  content: string,
+  status?: number,
+  delete_flag?: number,
+  tx?: any
 ): Promise<Goal> {
-  // 1. 現行レコード取得（省略）...
 
-  // 2. リセット日時・更新処理の割り振り（ここを修正！）
-  let nextDeletedAt: Date | undefined = undefined;
-  let targetContent: string | null = content;
+  const prismaClient = tx ?? prisma;
 
-  // 空文字または null の場合は null に正規化し、リセット日を設定
-  if (content === "" || content === null) {
-    targetContent = null; 
-    nextDeletedAt = getNextMondayOf(new Date());
-  }
+  const deletedAt = new Date();
+  deletedAt.setDate(deletedAt.getDate() + 7);
 
-  const updatedGoal = await prisma.goal.update({
-    where: { id: user_id },
-    data: {
-      content: targetContent, // ★直接値を渡す
-      status: status ?? undefined, // nullなら無視、値があれば代入
-      delete_flag: delete_flag ?? undefined,
-      ...(nextDeletedAt ? { deleted_at: nextDeletedAt } : {}),
+  return await prismaClient.goal.upsert({
+    where: {
+      id: user_id,
+    },
+    update: {
+      content,
+      status: status !== undefined ? status : undefined,
+      delete_flag: delete_flag !== undefined ? delete_flag : undefined,
+      deleted_at: deletedAt,
+    },
+    create: {
+      id: user_id,
+      content,
+      status: 0,
+      delete_flag: 0,
+      created_at: new Date(),
+      deleted_at: deletedAt,
     },
   });
-
-  return updatedGoal;
 }
+
+/**
+ * メソッド名称：updateGoalStatus
+ * 概要：目標達成状況を更新する
+ */
+export async function updateGoalStatus(
+  user_id: string,
+  status: number,
+  tx?: any
+): Promise<Goal> {
+
+  const prismaClient = tx ?? prisma;
+
+  return await prismaClient.goal.update({
+    where: {
+      id: user_id,
+    },
+    data: {
+      status,
+    },
+  });
+}
+
+
 /**
  * 💡 補助関数：指定された日時の「次の月曜日の0:00」を計算して返す
  */

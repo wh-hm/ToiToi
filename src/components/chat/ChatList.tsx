@@ -6,26 +6,12 @@ import { ScrollShadow } from "@nextui-org/react";
 import { ImageZoomModal } from "./ImageZoomModal";
 import { ArrowDown, MessageSquare } from "lucide-react";
 import { Loading } from "@/components/LoadingSpinner";
-interface ChatListProps {
-  messages: ChatMessage[];
-  spaceId: number;
-  isSubmitting: boolean;
-  onToggleFavorite?: (id: number, flag: number) => void;
-  onEdit: (id: number) => void;
-  onDelete: (id: number, spaceId: number) => void;
-  onBackgroundChange?: (id: number, color: number) => void;
-  setEditValue: (val: string) => void;
-  onNiceFlag?: (id: number, flag: number) => void;
-  onDownload: (url: string) => void;
-  isLoading: boolean;
-  type: string;
-  onScrollBottom: (force?: boolean) => void;
-}
+import { ChatListProps } from "@/types/chat";
 
 // forwardRef を使用して外部から ref を受け取れるようにします
 const ChatList = forwardRef<HTMLDivElement, ChatListProps>(({ 
-  messages, 
-  spaceId, 
+  chats, 
+  space_id, 
   isSubmitting, 
   onToggleFavorite, 
   onEdit, 
@@ -61,7 +47,7 @@ return (
       >
         {isLoading ? (
           <Loading text="チャットを取得中"/>
-        ) : messages.length === 0 ? (
+        ) : chats.length === 0 ? (
           // メッセージが空の時の表示
           <div className="flex flex-col items-center justify-center h-full text-center p-8 text-gray-400">
             <div className="bg-gray-100 p-4 rounded-full mb-4">
@@ -81,21 +67,21 @@ return (
           </div>
         ) : (
           // メッセージがある時の表示
-          messages.map((message) => (
+          chats.map((chat) => (
             <ChatMessageItem
-              key={`msg-${message.id}`}
-              message={message}
-              spaceId={spaceId}
+              key={`msg-${chat.id}`}
+              message={chat}
+              space_id={space_id}
               isSubmitting={isSubmitting}
-              isOpen={openItemId === message.id}
-              onOpenChange={(open) => setOpenItemId(open ? message.id : null)}
+              isOpen={openItemId === chat.id}
+              onOpenChange={(open) => setOpenItemId(open ? chat.id : null)}
               onToggleFavorite={onToggleFavorite}
               onEdit={onEdit}
               onDelete={onDelete}
               onBackgroundChange={onBackgroundChange}
               setEditValue={setEditValue}
               onNiceFlag={onNiceFlag}
-              onImageClick={(url) => setZoomData({ url, caption: message.message || "",  msg: message})}
+              onImageClick={(url) => setZoomData({ url, caption: chat.message || "",  msg: chat})}
               onDownload={onDownload}
               onScrollBottom={(force) => onScrollBottom(force)}
               type={type}
@@ -117,16 +103,25 @@ return (
         </button>
       )}
 
-      {currentZoomData && (
-        <ImageZoomModal 
-          isOpen={!!currentZoomData} 
-          onClose={() => setZoomData(null)} 
-          imageUrl={currentZoomData.url} 
-          caption={currentZoomData.caption}
-          onDownload={onDownload}
-          msg={currentZoomData.msg}
-        />
-      )}
+      {currentZoomData && (() => {
+        // 💡 IDが途中で変わっても大丈夫なように、画像の URL で最新のメッセージを探し出す
+        const currentChat = chats.find((c) => 
+          c.id === currentZoomData.msg.id || 
+          (c.signedImageUrl && c.signedImageUrl === currentZoomData.url)
+        ) || currentZoomData.msg;
+
+        return (
+          <ImageZoomModal 
+            isOpen={!!currentZoomData} 
+            onClose={() => setZoomData(null)} 
+            imageUrl={currentZoomData.url} 
+            caption={currentZoomData.caption}
+            onDownload={onDownload}
+            msg={currentChat} 
+            isPending={currentChat.isPending} // 👈 確実に最新の Pending 状態が渡る
+          />
+        );
+})()}
     </div>
   );
 });

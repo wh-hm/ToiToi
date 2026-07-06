@@ -4,8 +4,8 @@ import SpaceModal from "@/components/SpaceModal";
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import SpaceList from "@/components/SpaceList";
+import { fetchWithTimeout } from "@/lib/api"; 
 
-// 🛠️ Loadingコンポーネント
 function Loading() {
   return <div style={{ textAlign: "center", color: "#64748b", fontWeight: "bold" }}>読み込み中...</div>;
 }
@@ -133,11 +133,15 @@ export default function Dashboard() {
   };
 
   const handleToggleGoalStatus = async () => {
-    try {
-      const res = await fetch("/api/dashboard", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ toggleStatus: true })
+  try {
+      const res = await fetchWithTimeout("/api/goal/status", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          status: goal?.status === 1 ? 0 : 1,
+        }),
       });
       if (res.ok) await fetchSpaces();
     } catch (error) {
@@ -223,8 +227,8 @@ export default function Dashboard() {
     } catch (error) {
       console.error("取得失敗:", error);
       
-      // 🛠️ 異常系2: 一覧取得失敗時、トーストをトリガーし、一覧データを消す
-      setToastMessage("⚠️ データの取得に失敗しました。");
+      // 異常系2: 一覧取得失敗時、トーストをトリガーし、一覧データを消す
+      setToastMessage(" データの取得に失敗しました。");
       setLoginError(true); 
       setSpaces({ type1: [], type2: [], type3: [] });
       setGoal(null);

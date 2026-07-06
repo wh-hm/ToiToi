@@ -31,6 +31,31 @@ type PrismaClientOrTransaction =
   }));
 }
 
+
+export const getChatCheck = async (user_id: string, space_id: number, chat_id: number): Promise<boolean> => {
+  try {
+    const  result = await prisma.chat.findFirst({
+      where: { 
+        id: chat_id,
+        user_id: user_id, 
+        delete_flag: 0, 
+        space_id: space_id, 
+      }
+    });
+
+    if(!result){
+      return false;
+    }
+    return true;
+
+  } catch (error) {
+    throw error;
+  }
+};
+
+
+
+
 export const getChats = async (user_id: string, space_id: number): Promise<Chat[]> => {
   try {
     return await prisma.chat.findMany({
@@ -70,14 +95,14 @@ export const registerChat = async (
 };
 export const updateChat = async (
   chatId: number,
-  spaceId: number,
+  space_id: number,
   userId: string,
   newMessage: string,
   tx?: PrismaClientOrTransaction // ここも tx を渡せるようにしておく
 ) => {
   const client = tx || prisma;
   return await client.chat.update({
-    where: { id: chatId, space_id: spaceId, user_id: userId },
+    where: { id: chatId, space_id: space_id, user_id: userId },
     data: { 
       message: newMessage,
       updated_at: new Date()
@@ -87,7 +112,7 @@ export const updateChat = async (
 
 
 // 以下、削除やフラグ変更系はそのまま
-export const deleteChat = async (chatId: number, userId: string, spaceId: number, tx?: any) => {
+export const deleteChat = async (chatId: number, userId: string, space_id: number, tx?: any) => {
   try {
     const chat = await prisma.chat.findUnique({ where: { id: chatId } });
     if (!chat) throw new Error("チャットが見つかりません");
@@ -98,7 +123,7 @@ export const deleteChat = async (chatId: number, userId: string, spaceId: number
     const db = tx || prisma;
 
     return await db.chat.update({
-      where: { id: chatId, space_id: spaceId, user_id: userId },
+      where: { id: chatId, space_id: space_id, user_id: userId },
       data: { delete_flag: 1 },
     });
   } catch (error) {
@@ -106,10 +131,10 @@ export const deleteChat = async (chatId: number, userId: string, spaceId: number
   }
 };
 
-export const toggleFavorite = async (chatId: number, spaceId: number, userId: string, newFlag: number) => {
+export const toggleFavorite = async (chatId: number, space_id: number, userId: string, newFlag: number) => {
   try {
     return await prisma.chat.update({
-      where: { id: chatId, space_id: spaceId, user_id: userId },
+      where: { id: chatId, space_id: space_id, user_id: userId },
       data: { favorite_flag: newFlag },
     });
   } catch (error) {
@@ -117,10 +142,10 @@ export const toggleFavorite = async (chatId: number, spaceId: number, userId: st
   }
 };
 
-export const changeBackground = async (chatId: number, spaceId: number, userId: string, background: number) => {
+export const changeBackground = async (chatId: number, space_id: number, userId: string, background: number) => {
   try {
     return await prisma.chat.update({
-      where: { id: chatId, space_id: spaceId, user_id: userId },
+      where: { id: chatId, space_id: space_id, user_id: userId },
       data: { background: background },
     });
   } catch (error) {
