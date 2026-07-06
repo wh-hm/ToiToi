@@ -35,8 +35,8 @@ export const authOptions: NextAuthOptions = {
   // ★★★ これが無いとセッションが作られない ★★★
   session: {
     strategy: "jwt",
-    // maxAge: 30,
-    maxAge: 1 * 24 * 60 * 60,
+    maxAge: 600,
+    //maxAge: 1 * 24 * 60 * 60,
 
   },
 

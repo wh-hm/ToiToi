@@ -33,7 +33,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   useEffect(() => {
     if (status === "unauthenticated") {
       toast.error(MESSAGES.USER001);
-      router.push("/login");
+      router.push("/");
     }
   }, [status, router]);
 
