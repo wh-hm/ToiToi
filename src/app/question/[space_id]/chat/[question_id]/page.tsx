@@ -98,124 +98,124 @@ const [isModalOpen, setIsModalOpen] = useState(false);
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-const handleSend = async (stampId?: string) => {
-  if (isSubmitting) return;
-  // 未入力時の空送信防止ガード句
-  if (!stampId && !inputText.trim() && selectedFiles.length === 0) return;
+  const handleSend = async (stampId?: string) => {
+    if (isSubmitting) return;
+    // 未入力時の空送信防止ガード句
+    if (!stampId && !inputText.trim() && selectedFiles.length === 0) return;
 
-  // ★送信失敗時の復元用にバックアップ
-  const backupInputText = inputText;
-  const backupFiles = [...selectedFiles];
+    // ★送信失敗時の復元用にバックアップ
+    const backupInputText = inputText;
+    const backupFiles = [...selectedFiles];
 
-  // 1. 仮メッセージ（pending）を作成
-  const now = new Date().toISOString();
-  const pendingMessages: ChatMessage[] = [];
+    // 1. 仮メッセージ（pending）を作成
+    const now = new Date().toISOString();
+    const pendingMessages: ChatMessage[] = [];
 
-  
-
-  if (stampId) {
-    pendingMessages.push({ id: Date.now(), stamp: stampId, isPending: true, created_at: now } as ChatMessage);
-  } else {
-    if (selectedFiles.length > 0) {
-      selectedFiles.forEach((file, i) => {
-        pendingMessages.push({
-          id: Date.now() + i,
-          signedImageUrl: URL.createObjectURL(file), // 表示用ローカルURL
-          isPending: true,
-          created_at: now,
-          message: inputText, // 画像と一緒に送るメッセージ
-        } as ChatMessage);
-      });
-    } else {
-      pendingMessages.push({ id: Date.now(), message: inputText, isPending: true, created_at: now } as ChatMessage);
-    }
-  }
-
-  // 2. 楽観的更新 (UIに即座に反映)
-  setMessages((prev) => [...prev, ...pendingMessages]);
-  scrollToBottom(false);
-
-  // 入力リセット
-  if (!stampId) {
-    setInputText("");
-    setSelectedFiles([]);
-  }
-  setIsSubmitting(true);
-
-  // 3. FormDataの構築
-  const formData = new FormData();
-  formData.append("question_id", String(question_id)); // API側のバリデーション用に確実に含める
-  
-  if (stampId) {
-    formData.append("stamp", stampId);
-  } else {
-    if (inputText.trim()) formData.append("message", inputText);
-    selectedFiles.forEach((file) => formData.append("images", file));
-  }
-
-  try {
-    const res = await fetch(`/api/questions/${space_id}/messages`, { method: "POST", body: formData });
-    const data = await res.json();
-
-    // 404エラー時はリダイレクト
-    if (res.status === 404) {
-      router.push("/404");
-      return;
-    }
-
-    // 404以外のエラーハンドリング
-    if (!res.ok) {
-      throw new Error(data.message || "送信に失敗しました");
-    }
     
-    // 4. サーバーからのレスポンス(先ほど作成したAPIは { messages: newChats } を返す)で置き換え
-    // 4. サーバーからのレスポンスで置き換え (修正後)
-  // 4. サーバーからのレスポンスで置き換え
-if (data.messages && data.messages.length > 0) {
-  const serverItems = [...data.messages];
-  
-  setMessages((prev) => prev.map((msg) => {
-    if (msg.isPending) {
-      const match = serverItems.shift();
+
+    if (stampId) {
+      pendingMessages.push({ id: Date.now(), stamp: stampId, isPending: true, created_at: now } as ChatMessage);
+    } else {
+      if (selectedFiles.length > 0) {
+        selectedFiles.forEach((file, i) => {
+          pendingMessages.push({
+            id: Date.now() + i,
+            signedImageUrl: URL.createObjectURL(file), // 表示用ローカルURL
+            isPending: false,
+            created_at: now,
+            message: inputText, // 画像と一緒に送るメッセージ
+          } as ChatMessage);
+        });
+      } else {
+        pendingMessages.push({ id: Date.now(), message: inputText, isPending: true, created_at: now } as ChatMessage);
+      }
+    }
+
+    // 2. 楽観的更新 (UIに即座に反映)
+    setMessages((prev) => [...prev, ...pendingMessages]);
+    scrollToBottom(false);
+
+    // 入力リセット
+    if (!stampId) {
+      setInputText("");
+      setSelectedFiles([]);
+    }
+    setIsSubmitting(true);
+
+    // 3. FormDataの構築
+    const formData = new FormData();
+    formData.append("question_id", String(question_id)); // API側のバリデーション用に確実に含める
+    
+    if (stampId) {
+      formData.append("stamp", stampId);
+    } else {
+      if (inputText.trim()) formData.append("message", inputText);
+      selectedFiles.forEach((file) => formData.append("images", file));
+    }
+
+    try {
+      const res = await fetch(`/api/questions/${space_id}/messages`, { method: "POST", body: formData });
+      const data = await res.json();
+
+      // 404エラー時はリダイレクト
+      if (res.status === 404) {
+        router.push("/404");
+        return;
+      }
+
+      // 404以外のエラーハンドリング
+      if (!res.ok) {
+        throw new Error(data.message || "送信に失敗しました");
+      }
       
-      if (match) {
-        return { 
-          ...msg,         // 1. まず仮データをベースにする（これで signedImageUrl: "blob:..." が残る！）
-          ...match,       // 2. サーバーの本物データ（IDなど）で上書き
-          
-          // 💡 ここが超重要！
-          // 画面表示用の url は、送信時に作ったローカルの "blob:..." を意地でもキープする！
-          signedImageUrl: msg.signedImageUrl, 
-          
-          // 💡 ダウンロードや拡大用に、サーバーから届いた本物のキーを別名で保存しておく
-          storageKey: match.signedImageUrl || match.image_url, 
-          
-          isPending: false 
-        };
+      // 4. サーバーからのレスポンス(先ほど作成したAPIは { messages: newChats } を返す)で置き換え
+      // 4. サーバーからのレスポンスで置き換え (修正後)
+    // 4. サーバーからのレスポンスで置き換え
+  if (data.messages && data.messages.length > 0) {
+    const serverItems = [...data.messages];
+    
+    setMessages((prev) => prev.map((msg) => {
+      if (msg.isPending) {
+        const match = serverItems.shift();
+        
+        if (match) {
+          return { 
+            ...msg,         // 1. まず仮データをベースにする（これで signedImageUrl: "blob:..." が残る！）
+            ...match,       // 2. サーバーの本物データ（IDなど）で上書き
+            
+            // 💡 ここが超重要！
+            // 画面表示用の url は、送信時に作ったローカルの "blob:..." を意地でもキープする！
+            signedImageUrl: msg.signedImageUrl, 
+            
+            // 💡 ダウンロードや拡大用に、サーバーから届いた本物のキーを別名で保存しておく
+            storageKey: match.signedImageUrl || match.image_url, 
+            
+            isPending: true 
+          };
+        }
+        return msg;
       }
       return msg;
-    }
-    return msg;
-  }));
-}
-
-  } catch (e: any) {
-    console.error(e);
-    toast.error(e.message || "メッセージ送信エラー");
-    
-    // ★エラー時にバックアップから復元
-    if (!stampId) {
-      setInputText(backupInputText);
-      setSelectedFiles(backupFiles);
-    }
-    // 楽観的更新で追加した仮メッセージを削除
-    setMessages((prev) => prev.filter((m) => !m.isPending));
-    scrollToBottom(true); // エラー時は下部へスクロール
-
-  } finally {
-    setIsSubmitting(false);
+    }));
   }
-};
+
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "メッセージ送信エラー");
+      
+      // ★エラー時にバックアップから復元
+      if (!stampId) {
+        setInputText(backupInputText);
+        setSelectedFiles(backupFiles);
+      }
+      // 楽観的更新で追加した仮メッセージを削除
+      setMessages((prev) => prev.filter((m) => !m.isPending));
+      scrollToBottom(true); // エラー時は下部へスクロール
+
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleUpdate = async (chatId: number) => {
     if (isSubmitting || !editValue.trim()) return;
