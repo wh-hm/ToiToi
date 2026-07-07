@@ -4,13 +4,15 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { Trash2, User, Settings, Loader2 } from "lucide-react";
-import toast from "react-hot-toast";
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, useDisclosure } from "@nextui-org/react";
 import { Loading } from "@/components/LoadingSpinner";
+// 💡 自作の可愛いコンポーネントたちを正しくインポート
+import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
+import { ToiToiNotification } from "@/components/Toast";
 
 export default function MyPage() {
   const router = useRouter();
-  const { status } = useSession(); // セッション状態を取得
+  const { status } = useSession();
   const [loading, setLoading] = useState(true);
   const [spaces, setSpaces] = useState({ type1: [], type2: [], type3: [] });
   const [username, setUsername] = useState("");
@@ -21,14 +23,25 @@ export default function MyPage() {
   const [archiveCount, setArchiveCount] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // 1. 認証ガード：セッションがない場合はログインページへリダイレクト
+  // 💡 【ここを修正】複数の処理を1つで受け止めるための共通State
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    onConfirm: () => {},
+  });
+
+  // 1. 認証ガード
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/");
     }
   }, [status, router]);
 
-  // 2. データ取得処理（すべてのフックの後に配置）
+  // 2. データ取得処理
   const fetchData = useCallback(async () => {
     try {
       const res = await fetch("/api/user/account");
@@ -54,7 +67,7 @@ export default function MyPage() {
       setUsername(json.user?.username);
       setImageCount(json.imageCount || 0);
     } catch (e) {
-      toast.error("データ取得に失敗しました");
+      ToiToiNotification.error("データ取得に失敗しました");
     } finally {
       setLoading(false);
     }
@@ -77,29 +90,39 @@ export default function MyPage() {
     );
   }
 
-  // 4. メインレンダリング
-  const handleAction = async (action: string, label: string) => {
-    if (!confirm(`${label}を実行しますか？`)) return;
+  // 💡 【ここを追加】どんな削除処理でもこれ1つでモーダルを開けるようにする魔法の関数
+  const openConfirmModal = (label: string, onConfirmAction: () => void) => {
+    setModalConfig({
+      isOpen: true,
+      title: `本当に${label}する？`,
+      onConfirm: onConfirmAction, // 動かしたい中身をそのままStateに預ける
+    });
+  };
+
+  // 💡 【ここを修正】共通化されたAPI削除の実行処理
+  const executeDelete = async (action: string) => {
     setIsDeleting(true);
     try {
       const res = await fetch(`/api/${action}`, { method: "DELETE" });
       const result = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(result.error || "操作に失敗しました");
-      toast.success(result.message);
+      
+      ToiToiNotification.success(result.message || "削除が完了したよ！");
+      
       if (action === "user/account") {
         await signOut({ callbackUrl: "/" });
         return;
       }
       await fetchData();
     } catch (e: any) {
-      toast.error(e.message || "処理に失敗しました");
+      ToiToiNotification.error(e.message || "処理に失敗しました");
     } finally {
       setIsDeleting(false);
     }
   };
 
   const handleUpdateUsername = async () => {
-    if (!newName.trim()) return toast.error("ユーザー名を入力してください");
+    if (!newName.trim()) return ToiToiNotification.error("ユーザー名を入力してください");
     setIsSaving(true);
     try {
       const res = await fetch("/api/user/username", {
@@ -109,11 +132,12 @@ export default function MyPage() {
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "更新に失敗しました");
-      toast.success("ユーザー名を変更しました");
+      
+      ToiToiNotification.success("ユーザー名を変更しました");
       setUsername(newName);
       onClose();
     } catch (e: any) {
-      toast.error(e.message);
+      ToiToiNotification.error(e.message);
     } finally {
       setIsSaving(false);
     }
@@ -162,7 +186,13 @@ export default function MyPage() {
             { label: "アーカイブ全削除", action: "spaces/archive", count: archiveCount ?? 0 },
             { label: "画像全削除", action: "images", count: imageCount },
           ].map((item) => (
-            <button key={item.action} disabled={item.count === 0} onClick={() => handleAction(item.action, item.label)} className={`w-full flex items-center justify-between p-4 rounded-xl font-medium transition-all ${item.count === 0 ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-white border border-gray-200 hover:border-red-300 hover:bg-red-50 text-gray-700 hover:text-red-600"}`}>
+            <button 
+              key={item.action} 
+              disabled={item.count === 0} 
+              /* 💡 1行で文章とそのあとの関数をセットで渡す！ */
+              onClick={() => openConfirmModal(item.label, () => executeDelete(item.action))} 
+              className={`w-full flex items-center justify-between p-4 rounded-xl font-medium transition-all ${item.count === 0 ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-white border border-gray-200 hover:border-red-300 hover:bg-red-50 text-gray-700 hover:text-red-600"}`}
+            >
               {item.label} <Trash2 className="w-4 h-4" />
             </button>
           ))}
@@ -172,7 +202,8 @@ export default function MyPage() {
       {/* アカウント操作 */}
       <div className="pt-8 border-t border-gray-100 space-y-4">
         <button onClick={() => signOut({ callbackUrl: "/" })} className="w-full bg-gray-100 hover:bg-gray-200 py-3 rounded-xl font-bold transition-all">ログアウト</button>
-        <button onClick={() => handleAction("user/account", "アカウント削除")} className="w-full text-red-500 hover:bg-red-50 font-medium py-3 rounded-xl transition-all">アカウントを削除</button>
+        {/* 💡 ここも共通の関数に文章と削除アクションを渡すだけ */}
+        <button onClick={() => openConfirmModal("アカウント削除", () => executeDelete("user/account"))} className="w-full text-red-500 hover:bg-red-50 font-medium py-3 rounded-xl transition-all">アカウントを削除</button>
       </div>
       
       {isDeleting && (
@@ -182,6 +213,14 @@ export default function MyPage() {
           </div>
         </div>
       )}
+
+      {/* 💡 【ここを修正】Stateがまとまったので、タグの指定もすっきり1つに集約 */}
+      <DeleteConfirmModal 
+        isOpen={modalConfig.isOpen}
+        title={modalConfig.title}
+        onClose={() => setModalConfig((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={modalConfig.onConfirm}
+      />
     </section>
   );
 }
