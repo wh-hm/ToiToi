@@ -176,6 +176,7 @@ export default function SpaceModal({ isOpen, onClose, spaceType, editingSpace, o
             {isSubmitting ? "保存中..." : "保存する"}
           </button>
 
+          {/* キャンセル */}
           <button
             type="button"
             onClick={onClose}

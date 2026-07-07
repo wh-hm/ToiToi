@@ -1,51 +1,15 @@
 "use client";
+
 import { useRouter } from "next/navigation";
 import SpaceModal from "@/components/SpaceModal";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useSession } from "next-auth/react";
 import SpaceList from "@/components/SpaceList";
-import { MESSAGES } from "@/constants/messages";
+import { fetchWithTimeout } from "@/lib/api";
+import { Loading } from "@/components/LoadingSpinner";
 
-// ローディングコンポーネント
-function Loading() {
-  return (
-    <div style={{
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      minHeight: "200px",
-      padding: "40px 20px",
-      gap: "20px",
-      flexGrow: 1
-    }}>
-      <div style={{
-        width: "50px",
-        height: "50px",
-        border: "6px solid #e2e8f0",
-        borderTop: "6px solid #10b981",
-        borderRadius: "50%",
-        animation: "spin 1s linear infinite",
-      }} />
-
-      <div style={{
-        fontSize: "20px",
-        color: "#94a3b8",
-        fontWeight: "500",
-        letterSpacing: "0.05em"
-      }}>
-        データを取得中
-      </div>
-      <style>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
-    </div>
-  );
-}
+// 型定義
 type Space = {
   id: string;
   name: string;
@@ -54,42 +18,40 @@ type Space = {
   is_archived: number;
   count?: number;
 };
+
 type Goal = {
   id: string;
   content: string | null;
   status: number;
 };
+
 type SpacesState = {
   type1: Space[];
   type2: Space[];
   type3: Space[];
 };
 
-
 export default function Dashboard() {
   const { data: session, status } = useSession();
   const router = useRouter();
+
   const [spaces, setSpaces] = useState<SpacesState>({
     type1: [],
     type2: [],
     type3: [],
   });
+
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [selectedType, setSelectedType] = useState<number | null>(null);
   const [editingSpace, setEditingSpace] = useState<Space | null>(null);
-  const [modalFavorite, setModalFavorite] = useState<number>(0);
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
   const [consecutiveLoginDays, setConsecutiveLoginDays] = useState<number>(0);
 
   // 異常系用のステート定義
   const [loginError, setLoginError] = useState<boolean>(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null); // トースト用文字列
 
   const [goal, setGoal] = useState<Goal | null>(null);
-  const [loginInfo, setLoginInfo] = useState<any>(null);
-  const [loginMessage, setLoginMessage] = useState("");
   const [showArchivedType1, setShowArchivedType1] = useState<number>(0);
   const [showArchivedType2, setShowArchivedType2] = useState<number>(0);
   const [showArchivedType3, setShowArchivedType3] = useState<number>(0);
@@ -99,14 +61,7 @@ export default function Dashboard() {
     text: "",
     image: ""
   });
-
-  useEffect(() => {
-    if (toastMessage) {
-      const timer = setTimeout(() => setToastMessage(null), 8000);
-      return () => clearTimeout(timer);
-    }
-  }, [toastMessage]);
-
+  // 連続ログインメッセージの更新
   const updateLoginMessage = (streakDays: number, isStreakAchieved: number) => {
     const now = new Date();
     const hour = now.getHours();
@@ -119,6 +74,7 @@ export default function Dashboard() {
     } else {
       timeZone = "夜";
     }
+
     const messageMaster = {
       "朝": {
         charName: "しきじー",
@@ -139,8 +95,9 @@ export default function Dashboard() {
         success: `ホー！（おめでとうございます。 連続ログイン日数${streakDays}日が達成されました。）`
       }
     };
+
     const selectedZone = messageMaster[timeZone];
-    let finalMessageText = isStreakAchieved ? selectedZone.success : selectedZone.normal[Math.floor(Math.random() * 3)];
+    const finalMessageText = isStreakAchieved ? selectedZone.success : selectedZone.normal[Math.floor(Math.random() * 3)];
 
     setCurrentLoginMessage({
       name: selectedZone.charName,
@@ -148,174 +105,49 @@ export default function Dashboard() {
       image: selectedZone.image
     });
   };
-
-  const handleModalFavoriteToggle = () => setModalFavorite(prev => (prev === 1 ? 0 : 1));
-
-  useEffect(() => {
-    window.addEventListener("toggle-modal-favorite", handleModalFavoriteToggle);
-    return () => window.removeEventListener("toggle-modal-favorite", handleModalFavoriteToggle);
-  }, []);
-
-  const openModal = (type: number) => {
-    setModalFavorite(0);
-    setSelectedType(type);
-    setIsModalOpen(true);
-  };
-
-  const handleEdit = (space: Space) => {
-    setModalFavorite(space.favorite);
-    setEditingSpace(space);
-    setSelectedType(space.space_type);
-    setIsModalOpen(true);
-  };
-
-  // API変更：目標達成状況の変更は「/api/goal/status」へPATCHを投げる
-  const handleToggleGoalStatus = async () => {
-    if (!goal) return;
-    const newStatus = goal.status === 1 ? 0 : 1;
-    try {
-      const res = await fetch("/api/goal/status", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus })
-      });
-      if (!res.ok) {
-        throw new Error("目標ステータスの更新に失敗しました。");
-      }
-      await fetchSpaces();
-
-      if (newStatus === 1) {
-        toast.success("目標達成！！");
-      } else {
-        toast.success("未達成に戻しました。");
-      }
-    } catch (error: any) {
-      console.error("ステータス更新失敗", error);
-      toast.error(error.message || "通信エラーが発生しました。")
-    }
-  };
-
-  const handleDelete = async (id: string, spaceType: string) => {
-    toast((t) => (
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        flexDirection: "column",
-        gap: "16px",
-        padding: "4px 10px",
-        minWidth: "220px"
-      }}>
-        {/* テキスト部分 */}
-        <span style={{
-          fontSize: "16px",
-          color: "#363636",
-          fontWeight: 500,
-          fontFamily: "inherit"
-        }}>
-          本当に削除しますか？
-        </span>
-
-        {/* ボタンエリア */}
-        <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
-          {/* OKボタン */}
-          <button
-            onClick={async () => {
-              toast.dismiss(t.id);
-              setIsDeleting(true);
-              try {
-                const res = await fetch(`/api/spaces/${id}?space_type=${spaceType}`, { method: "DELETE" });
-                const result = await res.json().catch(() => ({}));
-                if (!res.ok) throw new Error(result.error || "操作に失敗しました");
-
-                toast.success(result.message || "スペースを削除しました。");
-                await fetchSpaces();
-              } catch (e: any) {
-                toast.error(e.message || "削除に失敗しました");
-              } finally {
-                setIsDeleting(false);
-              }
-            }}
-            style={{
-              padding: "4px 10px",
-              fontSize: "12px",
-              background: "#ef4444",
-              color: "white",
-              border: "none",
-              borderRadius: "6px",
-              cursor: "pointer",
-              fontWeight: "bold",
-              boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-              transition: "all 0.1s"
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.background = "#dc2626"}
-            onMouseLeave={(e) => e.currentTarget.style.background = "#ef4444"}
-          >
-            OK
-          </button>
-          {/* キャンセルボタン */}
-          <button
-            onClick={() => toast.dismiss(t.id)}
-            style={{
-              padding: "6px 12px",
-              fontSize: "12px",
-              background: "#f1f5f9",
-              color: "#64748b",
-              border: "1px solid #cbd5e1",
-              borderRadius: "6px",
-              cursor: "pointer",
-              fontWeight: "500",
-              transition: "all 0.1s"
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.background = "#e2e8f0"}
-            onMouseLeave={(e) => e.currentTarget.style.background = "#f1f5f9"}
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    ), {
-      duration: Infinity,
-      position: "top-center",
-      style: {
-        background: "#fff",
-        color: "#363636",
-        boxShadow: "0 3px 10px rgba(0,0,0,0.1), 0 3px 3px rgba(0,0,0,0.05)",
-        borderRadius: "8px",
-        padding: "12px 16px",
-        maxWidth: "350px",
-      }
-    });
-  };
-
-  //  異常系1: セッション無効、または未認証時に即リダイレクト
-  useEffect(() => {
-    if (status === "unauthenticated") router.push("/");
-  }, [status, router]);
-
+  // データのAPI取得処理
   const fetchSpaces = async () => {
     if (!session?.user?.id) return null;
     setIsLoading(true);
-    try {
-      const spacesRes = await fetch("/api/dashboard");
-      if (!spacesRes.ok) throw new Error("ダッシュボードデータの取得に失敗しました。");
-      const data = await spacesRes.json();
 
+    try {
+      // ログイン状況の更新
+      await fetchWithTimeout("/api/user/login-update", { method: "PATCH" });
+
+      // ダッシュボードデータの取得
+      const res = await fetchWithTimeout("/api/dashboard/");
+      if (!res.ok) {
+        const errorResult = await res.json().catch(() => ({}));
+        toast.error(errorResult.error || "データベースからのデータ取得に失敗しました。");
+        return null;
+      }
+      const data = await res.json();
+      // 1. 目標データのパース
       if (data.goal) {
         setGoal(Array.isArray(data.goal) ? (data.goal[0] || null) : data.goal);
       } else {
         setGoal(null);
       }
-      if (data.login_management) {
-        setLoginInfo(data.login_management);
-        const current_streak = data.login_management.current_streak ?? 0;
-        setConsecutiveLoginDays(current_streak);
-        setLoginError(false);
-        const isStreakAchieved = data.login_management.is_streak_achieved ?? false;
-        updateLoginMessage(current_streak, isStreakAchieved);
+
+      let streakDays = 0;
+      let isStreakAchieved = false;
+
+      if (data.current_streak !== undefined) {
+        streakDays = Number(data.current_streak);
+        isStreakAchieved = data.is_streak_achieved ?? (streakDays > 0);
+      } else if (data.login_management) {
+        const mgmt = Array.isArray(data.login_management) ? data.login_management[0] : data.login_management;
+        if (mgmt) {
+          streakDays = Number(mgmt.current_streak ?? mgmt.streak_days ?? mgmt.continuous_days ?? 0);
+          isStreakAchieved = mgmt.is_streak_achieved ?? (streakDays > 0);
+        }
       } else {
-        throw new Error("ログイン情報の取得に失敗しました。");
+        streakDays = Number(data.streak_days ?? data.continuous_days ?? 0);
+        isStreakAchieved = data.is_streak_achieved ?? (streakDays > 0);
       }
-      if (data.loginMessage) setLoginMessage(data.loginMessage);
+      setConsecutiveLoginDays(streakDays);
+      setLoginError(false);
+      updateLoginMessage(streakDays, isStreakAchieved ? 1 : 0);
 
       const targetData = data.spaces || data;
 
@@ -327,25 +159,7 @@ export default function Dashboard() {
           space_type: Number(s.space_type),
           favorite: Number(s.favorite_flag),
           is_archived: Number(s.is_archived),
-          count: Number(s.task_count ?? 0),
         }));
-      };
-      const sortSpaces = (list: Space[]): Space[] => {
-        return [...list].sort((a, b) => {
-          if (a.is_archived !== b.is_archived) {
-            return a.is_archived - b.is_archived;
-          }
-          if (a.favorite !== b.favorite) {
-            return b.favorite - a.favorite;
-          }
-          return 0;
-        });
-      };
-      const filterByArchiveSetting = (list: Space[], isShowArchived: number): Space[] => {
-        if (isShowArchived === 1) {
-          return sortSpaces(list);
-        }
-        return sortSpaces(list.filter(s => s.is_archived === 0));
       };
 
       setSpaces({
@@ -353,23 +167,97 @@ export default function Dashboard() {
         type2: convertAndFilter(targetData.type2),
         type3: convertAndFilter(targetData.type3),
       });
-      return data;
-    } catch (error: any) {
+
+      return targetData;
+    } catch (error) {
       console.error("取得失敗:", error);
-      toast.error(error.message || "通信エラーが発生しました。");
+      toast.error("サーバーとの通信に失敗しました。DBが不安定な可能性があります。");
       return null;
     } finally {
       setIsLoading(false);
     }
   };
+  //  モーダル開閉制御
+  const openModal = (type: number) => {
+    setSelectedType(type);
+    setIsModalOpen(true);
+  };
 
+  const handleEdit = (space: Space) => {
+    setEditingSpace(space);
+    setSelectedType(space.space_type);
+    setIsModalOpen(true);
+  };
+
+  // 目標ステータスの更新
+  const handleToggleGoalStatus = async () => {
+    if (!goal) return;
+    const newStatus = goal.status === 1 ? 0 : 1;
+    try {
+      const res = await fetch("/api/goal/status", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (!res.ok) throw new Error();
+
+      // クライアント側のステートも即座に更新して fetchSpaces の無駄な通信を削減
+      setGoal(prev => prev ? { ...prev, status: newStatus } : null);
+      toast.success("目標ステータスを更新しました。");
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "目標ステータスの更新に失敗しました。");
+    }
+  };
+  // 削除処理（トースト確認付き）
+  const handleDelete = async (id: string, spaceType: string) => {
+    toast((t) => (
+      <div style={{ display: "flex", alignItems: "center", flexDirection: "column", gap: "16px", padding: "4px 10px", minWidth: "220px" }}>
+        <span style={{ fontSize: "16px", color: "#363636", fontWeight: 500, fontFamily: "inherit" }}>
+          本当に削除しますか？
+        </span>
+        <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
+          <button
+            onClick={async () => {
+              toast.dismiss(t.id);
+              try {
+                const res = await fetch(`/api/spaces/${id}?space_type=${spaceType}`, { method: "DELETE" });
+                const result = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(result.error || "操作に失敗しました");
+
+                toast.success(result.message || "スペースを削除しました。");
+                await fetchSpaces();
+              } catch (e: any) {
+                toast.error(e.message || "削除に失敗しました");
+              }
+            }}
+            style={{ padding: "4px 10px", fontSize: "12px", background: "#ef4444", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" }}
+          >OK</button>
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            style={{ padding: "6px 12px", fontSize: "12px", background: "#f1f5f9", color: "#64748b", border: "1px solid #cbd5e1", borderRadius: "6px", cursor: "pointer", fontWeight: "500" }}
+          >Cancel</button>
+        </div>
+      </div>
+    ), {
+      duration: Infinity,
+      position: "top-center",
+      style: { background: "#fff", color: "#363636", boxShadow: "0 3px 10px rgba(0,0,0,0.1)", borderRadius: "8px", padding: "12px 16px", maxWidth: "350px" }
+    });
+  };
+  // 異常系1: 未認証時に即リダイレクト
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/");
+    }
+  }, [status, router]);
+  // 初期ロード時のみAPIを実行（アーカイブ切替時はクライアント側でソートするためここには含めない）
   useEffect(() => {
     if (status === "authenticated") {
       fetchSpaces();
     }
-  }, [status, showArchivedType1, showArchivedType2, showArchivedType3]);
+  }, [status]);
 
-  // セッション読み込み中、または未認証時はブロック
   if (status === "loading" || status === "unauthenticated") {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#f8fafc" }}>
@@ -378,21 +266,17 @@ export default function Dashboard() {
     );
   }
   const showActiveGoal = !!(goal && goal.content && goal.content.trim() !== "");
+  // お気に入り優先・リアルタイムソート＆フィルタリング関数
   const getDisplaySpaces = (list: Space[], isShowArchived: number) => {
     const sorted = [...list].sort((a, b) => {
-      if (a.is_archived !== b.is_archived) {
-        return a.is_archived - b.is_archived; 
-      }
-      if (a.favorite !== b.favorite) {
-        return b.favorite - a.favorite;
-      }
+      if (a.is_archived !== b.is_archived) return a.is_archived - b.is_archived;
+      if (a.favorite !== b.favorite) return b.favorite - a.favorite;
       return 0;
     });
-    if (isShowArchived === 1) {
-      return sorted;
-    }
+    if (isShowArchived === 1) return sorted;
     return sorted.filter(s => s.is_archived === 0);
   };
+
   const displayType1 = getDisplaySpaces(spaces.type1, showArchivedType1);
   const displayType2 = getDisplaySpaces(spaces.type2, showArchivedType2);
   const displayType3 = getDisplaySpaces(spaces.type3, showArchivedType3);
@@ -406,23 +290,10 @@ export default function Dashboard() {
           <div style={{ display: "flex", justifyContent: "center", padding: "40px" }}>
             <Loading />
           </div>
-        ) : loginError ? (
-          <div style={{ textAlign: "center", padding: "60px 20px", color: "#94a3b8", fontSize: "15px", background: "#f8fafc", borderRadius: "8px", border: "1px dashed #cbd5e1" }}>
-            データを読み込めませんでした。通信環境を確認するか、時間をおいて再度お試しください。
-          </div>
         ) : (
           <>
             {currentLoginMessage.name && (
-              <div style={{
-                marginBottom: "25px",
-                display: "flex",
-                alignItems: "center",
-                gap: "16px",
-                background: "#f8fafc",
-                border: "1px solid #e2e8f0",
-                borderRadius: "12px",
-                padding: "16px 20px",
-              }}>
+              <div style={{ marginBottom: "25px", display: "flex", alignItems: "center", gap: "16px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "16px 20px" }}>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", flexShrink: 0, width: "70px" }}>
                   <img src={currentLoginMessage.image} alt={currentLoginMessage.name} style={{ width: "55px", height: "55px", borderRadius: "50%", objectFit: "cover", border: "2px solid #cbd5e1" }} />
                   <span style={{ fontSize: "12px", fontWeight: "bold", color: "#475569", textAlign: "center" }}>{currentLoginMessage.name}</span>
@@ -437,8 +308,7 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
-
-            {/* 目標管理エリア */}
+            {/* 目構管理エリア */}
             <div style={{ marginBottom: "25px" }}>
               {showActiveGoal ? (
                 <div style={{ padding: "20px", background: "#fef9c3", border: "1px solid #fef08a", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px" }}>
@@ -467,63 +337,21 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
-
             {/* 各スペース一覧 */}
-            <SpaceList title="チャット"
-              items={displayType1}
-              showArchived={showArchivedType1}
-              onToggleArchive={(checked) => setShowArchivedType1(checked ? 1 : 0)}
-              onEdit={handleEdit}
-              onDelete={(id) => handleDelete(id, "1")}
-              onCheckError={(msg) => toast.error(msg)} />
-            <SpaceList title="タスク"
-              items={displayType2}
-              showArchived={showArchivedType2}
-              onToggleArchive={(checked) => setShowArchivedType2(checked ? 1 : 0)}
-              onEdit={handleEdit}
-              onDelete={(id) => handleDelete(id, "2")}
-              onCheckError={(msg) => toast.error(msg)} />
-            <SpaceList title="質問"
-              items={displayType3}
-              showArchived={showArchivedType3}
-              onToggleArchive={(checked) => setShowArchivedType3(checked ? 1 : 0)}
-              onEdit={handleEdit}
-              onDelete={(id) => handleDelete(id, "3")}
-              onCheckError={(msg) => toast.error(msg)} />
+            <SpaceList title="チャット" items={displayType1} showArchived={showArchivedType1} onToggleArchive={(checked) => setShowArchivedType1(checked ? 1 : 0)} onEdit={handleEdit} onDelete={(id) => handleDelete(id, "1")} onCheckError={(msg) => toast.error(msg)} />
+            <SpaceList title="タスク" items={displayType2} showArchived={showArchivedType2} onToggleArchive={(checked) => setShowArchivedType2(checked ? 1 : 0)} onEdit={handleEdit} onDelete={(id) => handleDelete(id, "2")} onCheckError={(msg) => toast.error(msg)} />
+            <SpaceList title="質問" items={displayType3} showArchived={showArchivedType3} onToggleArchive={(checked) => setShowArchivedType3(checked ? 1 : 0)} onEdit={handleEdit} onDelete={(id) => handleDelete(id, "3")} onCheckError={(msg) => toast.error(msg)} />
 
+            {/* 新規作成ボタンメニュー */}
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "30px", position: "relative" }}>
               {isCreateMenuOpen && (
-                <div style={{
-                  position: "absolute",
-                  bottom: "50px",
-                  right: "0",
-                  background: "white",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "8px",
-                  boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
-                  padding: "8px 0",
-                  display: "flex",
-                  flexDirection: "column",
-                  minWidth: "180px",
-                  zIndex: 50
-                }}>
-                  <button type="button" onClick={() => { setEditingSpace(null); openModal(1); setIsCreateMenuOpen(false); }} style={{ padding: "10px 16px", textAlign: "left", background: "none", border: "none", cursor: "pointer", fontSize: "14px", color: "#334155", fontWeight: "500", transition: "background 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.background = "#f1f5f9"} onMouseLeave={(e) => e.currentTarget.style.background = "none"}>
-                    チャットスペース
-                  </button>
-                  <button type="button" onClick={() => { setEditingSpace(null); openModal(2); setIsCreateMenuOpen(false); }} style={{ padding: "10px 16px", textAlign: "left", background: "none", border: "none", cursor: "pointer", fontSize: "14px", color: "#334155", fontWeight: "500", transition: "background 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.background = "#f1f5f9"} onMouseLeave={(e) => e.currentTarget.style.background = "none"}>
-                    タスクスペース
-                  </button>
-                  <button type="button" onClick={() => { setEditingSpace(null); openModal(3); setIsCreateMenuOpen(false); }} style={{ padding: "10px 16px", textAlign: "left", background: "none", border: "none", cursor: "pointer", fontSize: "14px", color: "#334155", fontWeight: "500", transition: "background 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.background = "#f1f5f9"} onMouseLeave={(e) => e.currentTarget.style.background = "none"}>
-                    質問スペース
-                  </button>
+                <div style={{ position: "absolute", bottom: "50px", right: "0", background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)", padding: "8px 0", display: "flex", flexDirection: "column", minWidth: "180px", zIndex: 50 }}>
+                  <button type="button" onClick={() => { setEditingSpace(null); openModal(1); setIsCreateMenuOpen(false); }} style={{ padding: "10px 16px", textAlign: "left", background: "none", border: "none", cursor: "pointer", fontSize: "14px", color: "#334155", fontWeight: "500" }} onMouseEnter={(e) => e.currentTarget.style.background = "#f1f5f9"} onMouseLeave={(e) => e.currentTarget.style.background = "none"}>チャットスペース</button>
+                  <button type="button" onClick={() => { setEditingSpace(null); openModal(2); setIsCreateMenuOpen(false); }} style={{ padding: "10px 16px", textAlign: "left", background: "none", border: "none", cursor: "pointer", fontSize: "14px", color: "#334155", fontWeight: "500" }} onMouseEnter={(e) => e.currentTarget.style.background = "#f1f5f9"} onMouseLeave={(e) => e.currentTarget.style.background = "none"}>タスクスペース</button>
+                  <button type="button" onClick={() => { setEditingSpace(null); openModal(3); setIsCreateMenuOpen(false); }} style={{ padding: "10px 16px", textAlign: "left", background: "none", border: "none", cursor: "pointer", fontSize: "14px", color: "#334155", fontWeight: "500" }} onMouseEnter={(e) => e.currentTarget.style.background = "#f1f5f9"} onMouseLeave={(e) => e.currentTarget.style.background = "none"}>質問スペース</button>
                 </div>
               )}
-
-              <button
-                type="button"
-                onClick={() => setIsCreateMenuOpen(prev => !prev)}
-                style={{ padding: "12px 24px", background: "#2563eb", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "14px", display: "flex", alignItems: "center", gap: "6px" }}
-              >
+              <button type="button" onClick={() => setIsCreateMenuOpen(prev => !prev)} style={{ padding: "12px 24px", background: "#2563eb", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
                 <span>{isCreateMenuOpen ? "×" : "＋"}</span> 新規作成
               </button>
             </div>
@@ -531,6 +359,7 @@ export default function Dashboard() {
         )}
       </section>
 
+      {/* モーダル管理 */}
       <SpaceModal
         isOpen={isModalOpen}
         onClose={() => {
@@ -547,24 +376,9 @@ export default function Dashboard() {
             toast.error("不適切な文字列（スクリプトや無効な記号）が含まれているため、登録できません。");
             return;
           }
-          const MAX_LENGHT = 20;
-          // 1. バリデーションチェックのトースト
-          if (selectedType !== 99 && !name.trim()) {
-            toast.error("スペース名を入力してください。");
-            return;
-          }
-          if (selectedType !== 99 && name.trim().length > MAX_LENGHT) {
-            toast.error(`スペース名は${MAX_LENGHT}文字以内で入力してください。`);
-            return;
-          }
-
           const isGoal = selectedType === 99;
-          if (!isGoal && !name.trim()) {
-            toast.error("スペース名を入力してください。");
-            return;
-          }
-          if (isGoal && !name.trim()) {
-            toast.error("目標を入力してください。");
+          if (!name.trim()) {
+            toast.error(isGoal ? "目標を入力してください。" : "スペース名を入力してください。");
             return;
           }
           if (isGoal) {
@@ -580,17 +394,10 @@ export default function Dashboard() {
               return;
             }
           }
-
           const isEditingExistingSpace = editingSpace && editingSpace.id !== "new_goal" && editingSpace.id !== "edit_goal";
-
-          let url = "";
-          if (isGoal) {
-            url = "/api/goal";
-          } else if (isEditingExistingSpace) {
-            url = `/api/spaces/${editingSpace.id}`;
-          } else {
-            url = "/api/spaces";
-          }
+          const url = isGoal
+            ? "/api/goal"
+            : (isEditingExistingSpace ? `/api/spaces/${editingSpace.id}` : "/api/spaces");
 
           const bodyData = isGoal
             ? { content: name }
@@ -598,25 +405,28 @@ export default function Dashboard() {
 
           const method = isEditingExistingSpace ? "PATCH" : "POST";
 
-          const res = await fetch(url, {
-            method: method,
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(bodyData),
-          });
+          try {
+            const res = await fetch(url, {
+              method: method,
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(bodyData),
+            });
 
-          if (!res.ok) {
-            throw new Error(isGoal ? "目標の保存に失敗しました。" : "スペースの保存に失敗しました。");
+            if (!res.ok) {
+              const errorResult = await res.json().catch(() => ({}));
+              throw new Error(errorResult.error || (isGoal ? "目標の保存に失敗しました。" : "スペースの保存に失敗しました。"));
+            }
+            toast.success(isGoal ? "目標を保存しました！" : "スペースを保存しました！");
+            setIsModalOpen(false);
+            setEditingSpace(null);
+            await fetchSpaces();
+            window.dispatchEvent(new Event("refresh-header"));
+          } catch (error: any) {
+            console.error(error);
+            toast.error(error.message || "通信エラーが発生しました。");
           }
-
-          toast.success(isGoal ? "目標を保存しました！" : "スペースを保存しました！");
-
-          setIsModalOpen(false);
-          setEditingSpace(null);
-          await fetchSpaces();
-          window.dispatchEvent(new Event("refresh-header"));
         }}
       />
-
     </>
   );
 }
