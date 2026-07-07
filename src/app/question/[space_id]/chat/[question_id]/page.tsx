@@ -11,6 +11,7 @@ import { ChevronDown, CheckCircle2 } from "lucide-react";
 import { MESSAGES } from "@/constants/messages";
 import { Switch } from "@nextui-org/react";
 import { fetchWithTimeout } from "@/lib/api";
+import { notFound } from "next/navigation";
 
 export default function ChatPage({ params }: { params: Promise<{ question_id: string, space_id: string }> }) {
   const [inputText, setInputText] = useState("");
@@ -27,8 +28,6 @@ export default function ChatPage({ params }: { params: Promise<{ question_id: st
   const { status } = useSession();
   const router = useRouter();
   const isInitialLoad = useRef(true);
-const [selectedMessageId, setSelectedMessageId] = useState<number | string | null>(null);
-const [isModalOpen, setIsModalOpen] = useState(false);
   // 質問の解決状態を管理する（0:未解決, 1:解決済み）
   const [isResolved, setIsResolved] = useState(0);
 
@@ -159,8 +158,7 @@ const [isModalOpen, setIsModalOpen] = useState(false);
 
       // 404エラー時はリダイレクト
       if (res.status === 404) {
-        router.push("/404");
-        return;
+        notFound();
       }
 
       // 404以外のエラーハンドリング

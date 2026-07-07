@@ -8,6 +8,7 @@ import { MESSAGES } from "@/constants/messages";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { fetchWithTimeout } from "@/lib/api";
+import { notFound } from "next/navigation";
 
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const [chats, setChats] = useState<ChatMessage[]>([]);
@@ -75,8 +76,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       const res = await fetchWithTimeout(`/api/chats?space_id=${id}`);
       if (res.status === 404) {
       // 例: トップ画面か404専用ページに飛ばす。トースト等を出してもOK
-        router.push('/404'); 
-        return; // 処理をここで終了させる
+        notFound();
       }
       const data = await res.json();
     
@@ -200,8 +200,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       const data = await res.json();
 
       if (res.status === 404) {
-        router.push("/404"); // ※プロジェクトの404ページのパスに合わせて変更してください
-        return;
+        notFound();
       }
 
       if (!res.ok){
@@ -265,8 +264,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       });
       const data = await res.json();
       if (res.status === 404) {
-        router.push("/404"); // ※プロジェクトの404ページのパスに合わせて変更してください
-        return;
+        notFound();
       }
       
       if (!res.ok) {
@@ -296,8 +294,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         method: "DELETE" 
       });
       if (res.status === 404) {
-        router.push("/404"); // ※プロジェクトの404ページのパスに合わせて変更してください
-        return;
+        notFound();
       }
       const data = await res.json();
       if (!res.ok) {
@@ -336,8 +333,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       });
 
       if (res.status === 404) {
-        router.push("/404"); // ※プロジェクトの404ページのパスに合わせて変更してください
-        return;
+        notFound();
       }
 
       const data = await res.json();
@@ -371,8 +367,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         body: JSON.stringify({ background: bg }),
       });
       if (res.status === 404) {
-        router.push("/404"); // ※プロジェクトの404ページのパスに合わせて変更してください
-        return;
+        notFound();
       }
 
       const data = await res.json();
@@ -400,8 +395,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     });
 
     if (res.status === 404) {
-        router.push("/404"); // ※プロジェクトの404ページのパスに合わせて変更してください
-        return;
+        notFound();
       }
     const data = await res.json();
     if (!res.ok) {
