@@ -27,7 +27,8 @@ export default function ChatPage({ params }: { params: Promise<{ question_id: st
   const { status } = useSession();
   const router = useRouter();
   const isInitialLoad = useRef(true);
-
+const [selectedMessageId, setSelectedMessageId] = useState<number | string | null>(null);
+const [isModalOpen, setIsModalOpen] = useState(false);
   // 質問の解決状態を管理する（0:未解決, 1:解決済み）
   const [isResolved, setIsResolved] = useState(0);
 

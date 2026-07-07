@@ -16,12 +16,12 @@ export async function PATCH(
     const body = await request.json();
     const { is_resolved, space_id } = body;
 
-    const questionId = Number(id);
+    const question_id = Number(id);
     const spaceId = Number(space_id);
     const isResolved = Number(is_resolved);
 
     // バリデーションチェック
-    if (isNaN(questionId) || isNaN(spaceId) || isNaN(isResolved)) {
+    if (isNaN(question_id) || isNaN(spaceId) || isNaN(isResolved)) {
       return NextResponse.json(
         { message: MESSAGES.E1001("必須パラメータ") }, 
         { status: 400 }
@@ -29,7 +29,7 @@ export async function PATCH(
     }
 
     // 更新処理
-    const success = await updateQuestionStatus(questionId, spaceId, auth.user_id, isResolved);
+    const success = await updateQuestionStatus(question_id, spaceId, auth.user_id, isResolved);
 
     if (!success) {
       return NextResponse.json({ message: MESSAGES.E2002("質問ステータス") }, { status: 500 });

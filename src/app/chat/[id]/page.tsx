@@ -326,10 +326,13 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     );
 
     try {
-      const res = await fetchWithTimeout(`/api/chats/${chatId}/favorite`, {
+      const res = await fetchWithTimeout(`/api/chats/${space_id}/favorite`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ favorite_flag: current }),
+        body: JSON.stringify({ 
+          favorite_flag: current,
+          chat_id: chatId
+        }),
       });
 
       if (res.status === 404) {
