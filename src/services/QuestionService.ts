@@ -9,6 +9,35 @@ const sanitizeOptions = {
   allowedAttributes: {},
 };
 
+export async function checkQuestion(
+  user_id: string,
+  space_id: number,
+  question_id: number,
+  tx?: any
+) {
+  const db = tx || prisma;
+
+  // Promise.all で2つのクエリを同時に実行
+  const [questionExists, spaceExists] = await Promise.all([
+    db.question.findFirst({
+      where: { id: question_id, delete_flag: 0, user_id: user_id },
+    }),
+    db.space.findFirst({
+      where: { id: space_id, delete_flag: 0, user_id: user_id },
+    }),
+  ]);
+
+  // 🔍 ターミナルでどっちが null になっているか確認する
+  console.log("=== checkQuestion デバッグ ===");
+  console.log("検索条件:", { user_id, space_id, question_id });
+  console.log("質問の検索結果:", questionExists ? "存在します" : "❌ null (存在しない)");
+  console.log("スペースの検索結果:", spaceExists ? "存在します" : "❌ null (存在しない)");
+  if (!questionExists || !spaceExists) {
+    return false;
+  }
+  return true;
+}
+
 /**
  * 質問の新規登録（サニタイズ実施版）
  */

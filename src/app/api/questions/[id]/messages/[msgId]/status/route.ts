@@ -3,11 +3,13 @@ import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth-guard";
 import { toggleLike } from "@/services/QuestionChatService";
 import { MESSAGES } from "@/constants/messages";
+import { NextRequest } from "next/server";
 
 export async function PATCH(
+  request: NextRequest,
   { params }: { params: Promise<{ id: string; msgId: string }> }
 ) {
-  const { id, msgId } = await params;
+  const { msgId, id,  } = await params;
   
   // 1. 認証チェック
   const auth = await getAuthContext();

@@ -10,8 +10,9 @@ import { Question } from "@/types/question";
 import { ChevronDown, CheckCircle2 } from "lucide-react";
 import { MESSAGES } from "@/constants/messages";
 import { Switch } from "@nextui-org/react";
+import { fetchWithTimeout } from "@/lib/api";
 
-export default function ChatPage({ params }: { params: Promise<{ questionId: string, space_id: string }> }) {
+export default function ChatPage({ params }: { params: Promise<{ question_id: string, space_id: string }> }) {
   const [inputText, setInputText] = useState("");
   const [editValue, setEditValue] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -21,7 +22,7 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { questionId, space_id } = use(params);
+  const { question_id, space_id } = use(params);
   const numericspace_id = Number(space_id);
   const { status } = useSession();
   const router = useRouter();
@@ -64,13 +65,15 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
   }, [messages]); // messages が更新された（＝描画された）瞬間に実行される
 
   useEffect(() => {
-    if (questionId) fetchMessages();
-  }, [questionId]);
+    if (question_id) fetchMessages();
+  }, [question_id]);
 
   const fetchMessages = async () => {
     setIsLoading(true); // 開始
     try {
-      const res = await fetch(`/api/questions/${questionId}/messages`);
+      const { question_id, space_id } = await params;
+      const res = await fetchWithTimeout(`/api/questions/${space_id}/messages?question_id=${question_id}`);
+
       const data = await res.json();
       setMessages(data.messages || []);
       setQuestion(data.question);
@@ -94,91 +97,124 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
- const handleSend = async (stampId?: string) => {
-    if (isSubmitting) return;
-    if (!stampId && !inputText.trim() && selectedFiles.length === 0) return;
+const handleSend = async (stampId?: string) => {
+  if (isSubmitting) return;
+  // 未入力時の空送信防止ガード句
+  if (!stampId && !inputText.trim() && selectedFiles.length === 0) return;
 
-    // ★送信失敗時の復元用にバックアップ
-    const backupInputText = inputText;
-    const backupFiles = [...selectedFiles];
+  // ★送信失敗時の復元用にバックアップ
+  const backupInputText = inputText;
+  const backupFiles = [...selectedFiles];
 
-    // 1. 仮メッセージ（pending）を作成
-    const now = new Date().toISOString();
-    const pendingMessages: ChatMessage[] = [];
+  // 1. 仮メッセージ（pending）を作成
+  const now = new Date().toISOString();
+  const pendingMessages: ChatMessage[] = [];
 
-    if (stampId) {
-      pendingMessages.push({ id: Date.now(), stamp: stampId, isPending: true, created_at: now } as ChatMessage);
+  
+
+  if (stampId) {
+    pendingMessages.push({ id: Date.now(), stamp: stampId, isPending: true, created_at: now } as ChatMessage);
+  } else {
+    if (selectedFiles.length > 0) {
+      selectedFiles.forEach((file, i) => {
+        pendingMessages.push({
+          id: Date.now() + i,
+          signedImageUrl: URL.createObjectURL(file), // 表示用ローカルURL
+          isPending: true,
+          created_at: now,
+          message: inputText, // 画像と一緒に送るメッセージ
+        } as ChatMessage);
+      });
     } else {
-      if (selectedFiles.length > 0) {
-        selectedFiles.forEach((file, i) => {
-          pendingMessages.push({
-            id: Date.now() + i,
-            signedImageUrl: URL.createObjectURL(file), // 表示用URL
-            isPending: true,
-            created_at: now,
-            message: inputText, // 画像と一緒に送るメッセージ
-          } as ChatMessage);
-        });
-      } else {
-        pendingMessages.push({ id: Date.now(), message: inputText, isPending: true, created_at: now } as ChatMessage);
-      }
+      pendingMessages.push({ id: Date.now(), message: inputText, isPending: true, created_at: now } as ChatMessage);
+    }
+  }
+
+  // 2. 楽観的更新 (UIに即座に反映)
+  setMessages((prev) => [...prev, ...pendingMessages]);
+  scrollToBottom(false);
+
+  // 入力リセット
+  if (!stampId) {
+    setInputText("");
+    setSelectedFiles([]);
+  }
+  setIsSubmitting(true);
+
+  // 3. FormDataの構築
+  const formData = new FormData();
+  formData.append("question_id", String(question_id)); // API側のバリデーション用に確実に含める
+  
+  if (stampId) {
+    formData.append("stamp", stampId);
+  } else {
+    if (inputText.trim()) formData.append("message", inputText);
+    selectedFiles.forEach((file) => formData.append("images", file));
+  }
+
+  try {
+    const res = await fetch(`/api/questions/${space_id}/messages`, { method: "POST", body: formData });
+    const data = await res.json();
+
+    // 404エラー時はリダイレクト
+    if (res.status === 404) {
+      router.push("/404");
+      return;
     }
 
-    // 2. 楽観的更新
-    setMessages((prev) => [...prev, ...pendingMessages]);
-    scrollToBottom(false); // 賢いスクロール
+    // 404以外のエラーハンドリング
+    if (!res.ok) {
+      throw new Error(data.message || "送信に失敗しました");
+    }
+    
+    // 4. サーバーからのレスポンス(先ほど作成したAPIは { messages: newChats } を返す)で置き換え
+    // 4. サーバーからのレスポンスで置き換え (修正後)
+  // 4. サーバーからのレスポンスで置き換え
+if (data.messages && data.messages.length > 0) {
+  const serverItems = [...data.messages];
+  
+  setMessages((prev) => prev.map((msg) => {
+    if (msg.isPending) {
+      const match = serverItems.shift();
+      
+      if (match) {
+        return { 
+          ...msg,         // 1. まず仮データをベースにする（これで signedImageUrl: "blob:..." が残る！）
+          ...match,       // 2. サーバーの本物データ（IDなど）で上書き
+          
+          // 💡 ここが超重要！
+          // 画面表示用の url は、送信時に作ったローカルの "blob:..." を意地でもキープする！
+          signedImageUrl: msg.signedImageUrl, 
+          
+          // 💡 ダウンロードや拡大用に、サーバーから届いた本物のキーを別名で保存しておく
+          storageKey: match.signedImageUrl || match.image_url, 
+          
+          isPending: false 
+        };
+      }
+      return msg;
+    }
+    return msg;
+  }));
+}
 
-    // 入力リセット
+  } catch (e: any) {
+    console.error(e);
+    toast.error(e.message || "メッセージ送信エラー");
+    
+    // ★エラー時にバックアップから復元
     if (!stampId) {
-      setInputText("");
-      setSelectedFiles([]);
+      setInputText(backupInputText);
+      setSelectedFiles(backupFiles);
     }
-    setIsSubmitting(true);
+    // 楽観的更新で追加した仮メッセージを削除
+    setMessages((prev) => prev.filter((m) => !m.isPending));
+    scrollToBottom(true); // エラー時は下部へスクロール
 
-    // 3. FormDataの構築
-    const formData = new FormData();
-    formData.append("questionId", questionId);
-    formData.append("space_id", space_id);
-    if (stampId) {
-      formData.append("stamp", stampId);
-    } else {
-      if (inputText.trim()) formData.append("message", inputText);
-      selectedFiles.forEach((file) => formData.append("images", file));
-    }
-
-    try {
-      const res = await fetch(`/api/questions/${questionId}/messages`, { method: "POST", body: formData });
-      const data = await res.json();
-
-      if (!res.ok) throw new Error(data.error || "送信失敗");
-      
-      // 4. サーバーからのレスポンスで置き換え
-      // ※ APIが新規メッセージの配列(data.newMessagesなど)を返す前提です
-      const serverItems = Array.isArray(data.newMessages) ? [...data.newMessages] : [data.message];
-      
-      setMessages((prev) => prev.map((msg) => {
-        if (msg.isPending) {
-          const match = serverItems.shift();
-          return match ? { ...msg, ...match, isPending: false } : msg;
-        }
-        return msg;
-      }));
-
-    } catch (e: any) {
-      toast.error(e.message);
-      
-      // ★エラー時にバックアップから復元
-      if (!stampId) {
-        setInputText(backupInputText);
-        setSelectedFiles(backupFiles);
-      }
-      setMessages((prev) => prev.filter((m) => !m.isPending));
-      scrollToBottom(true); // エラー時は強制スクロール
-
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   const handleUpdate = async (chatId: number) => {
     if (isSubmitting || !editValue.trim()) return;
@@ -198,10 +234,10 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
 
     setIsSubmitting(true);
     try {
-      const res = await fetch(`/api/questions/${questionId}/messages/${chatId}`, {
+      const res = await fetch(`/api/questions/${question_id}/messages/${chatId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ questionId, message: editValue }),
+        body: JSON.stringify({ question_id, message: editValue }),
       });
 
       if (!res.ok) throw new Error("更新失敗");
@@ -226,7 +262,7 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
     const previousMessages = [...messages];
 
     // 2. 楽観的更新：即座に「ナイス！」状態を反転させる
-    // ※現在の状態と逆の状態（!current）にする前提です
+    // ※現在の状態と逆の状態（!cuWrrent）にする前提です
     setMessages((prev) => 
       prev.map((msg) => 
         msg.id === chatId 
@@ -236,7 +272,7 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
     );
 
     try {
-      const res = await fetch(`/api/questions/${questionId}/messages/${chatId}/status`, { 
+      const res = await fetch(`/api/questions/${question_id}/messages/${chatId}/status`, { 
         method: "PATCH" 
       });
       
@@ -259,10 +295,10 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
     setMessages((prev) => prev.filter((msg) => msg.id !== chatId));
 
     try {
-      const res = await fetch(`/api/questions/${questionId}/messages/${chatId}`, {
+      const res = await fetch(`/api/questions/${question_id}/messages/${chatId}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question_id: questionId }),
+        body: JSON.stringify({ question_id: question_id }),
       });
 
       if (!res.ok) throw new Error("削除失敗");
@@ -312,7 +348,7 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
     setIsResolved(newStatus);
 
     try {
-      const res = await fetch(`/api/questions/${questionId}/status`, {
+      const res = await fetch(`/api/questions/${question_id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 

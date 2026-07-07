@@ -5,6 +5,9 @@ import { Prisma } from "@prisma/client";
 
 // Prismaのトランザクション型（dbがどちらでもいいように）
 type Tx = Omit<Prisma.TransactionClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
+
+
+
 /**
  * 1. 全メッセージ取得（署名付きURL変換対応版）
  */

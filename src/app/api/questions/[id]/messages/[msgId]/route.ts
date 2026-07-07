@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth-guard";
 import { updateQuestionChat, deleteQuestionChat } from "@/services/QuestionChatService";
 import { MESSAGES } from "@/constants/messages";
+import { NextRequest } from "next/server";
 
 export async function PATCH(
   request: Request,
@@ -24,6 +25,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
+  request: NextRequest,
   { params }: { params: Promise<{ id: string; msgId: string }> } // [id] と [msgId] の両方が必要
 ) {
   const { id, msgId } = await params;
