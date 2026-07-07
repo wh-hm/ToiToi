@@ -8,7 +8,6 @@ import { MESSAGES } from "@/constants/messages";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { fetchWithTimeout } from "@/lib/api";
-import { notFound } from "next/navigation";
 
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const [chats, setChats] = useState<ChatMessage[]>([]);
@@ -76,7 +75,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       const res = await fetchWithTimeout(`/api/chats?space_id=${id}`);
       if (res.status === 404) {
       // 例: トップ画面か404専用ページに飛ばす。トースト等を出してもOK
-        notFound();
+        router.push('/404')
       }
       const data = await res.json();
     
@@ -200,7 +199,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       const data = await res.json();
 
       if (res.status === 404) {
-        notFound();
+        router.push('/404')
       }
 
       if (!res.ok){
@@ -264,7 +263,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       });
       const data = await res.json();
       if (res.status === 404) {
-        notFound();
+        router.push('/404')
       }
       
       if (!res.ok) {
@@ -294,7 +293,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         method: "DELETE" 
       });
       if (res.status === 404) {
-        notFound();
+        router.push('/404')
       }
       const data = await res.json();
       if (!res.ok) {
@@ -333,7 +332,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       });
 
       if (res.status === 404) {
-        notFound();
+        router.push('/404')
       }
 
       const data = await res.json();
@@ -349,25 +348,25 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     }
   };
 
-  const changeBackground = async (chatId: number, bg: number) => {
+  const changeBackground = async (chat_id: number, bg: number) => {
     // 1. 更新前の状態を保存
     const previousMessages = [...chats];
 
     // 2. 楽観的更新：即座に背景色を変更
     setChats((prev) => 
       prev.map((msg) => 
-        msg.id === chatId ? { ...msg, background: bg } : msg
+        msg.id === chat_id ? { ...msg, background: bg } : msg
       )
     );
 
     try {
-      const res = await fetchWithTimeout(`/api/chats/${chatId}/background`, {
+      const res = await fetchWithTimeout(`/api/chats/${space_id}/background`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ background: bg }),
+        body: JSON.stringify({ background: bg, chat_id: chat_id }),
       });
       if (res.status === 404) {
-        notFound();
+        router.push('/404')
       }
 
       const data = await res.json();
@@ -395,7 +394,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     });
 
     if (res.status === 404) {
-        notFound();
+        router.push('/404')
       }
     const data = await res.json();
     if (!res.ok) {

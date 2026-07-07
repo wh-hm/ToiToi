@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { notFound, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
 import toast from "react-hot-toast";
@@ -73,7 +73,7 @@ export default function Username() {
       const data = await res.json();
 
       if (res.status === 404) {
-        notFound();
+        router.push('/404')
       }
 
 
@@ -103,7 +103,7 @@ export default function Username() {
         const res = await fetchWithTimeout(`/api/user/username/check`);
 
         if (res.status === 404) {
-          notFound();
+          router.push('/404')
         }
 
         if (!res.ok) throw new Error();

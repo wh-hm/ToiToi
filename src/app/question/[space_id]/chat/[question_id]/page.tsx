@@ -11,7 +11,6 @@ import { ChevronDown, CheckCircle2 } from "lucide-react";
 import { MESSAGES } from "@/constants/messages";
 import { Switch } from "@nextui-org/react";
 import { fetchWithTimeout } from "@/lib/api";
-import { notFound } from "next/navigation";
 
 export default function ChatPage({ params }: { params: Promise<{ question_id: string, space_id: string }> }) {
   const [inputText, setInputText] = useState("");
@@ -158,7 +157,7 @@ export default function ChatPage({ params }: { params: Promise<{ question_id: st
 
       // 404エラー時はリダイレクト
       if (res.status === 404) {
-        notFound();
+        router.push('/404')
       }
 
       // 404以外のエラーハンドリング
