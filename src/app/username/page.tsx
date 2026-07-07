@@ -8,6 +8,7 @@ import toast from "react-hot-toast";
 import { MESSAGES } from "@/constants/messages";
 import { Loading } from "@/components/LoadingSpinner";
 import { fetchWithTimeout } from "@/lib/api";
+import { ToiToiNotification } from "@/components/Toast";
 
 type FallingCharacter = {
   id: number;
@@ -46,7 +47,8 @@ export default function Username() {
 
     // 2. フロント側バリデーションの3連コンボ
     if (!username) {
-      toast.error(MESSAGES.E1001("ユーザ名"));
+      // toast.error(MESSAGES.E1001("ユーザ名"));
+      ToiToiNotification.info(MESSAGES.E1001("ユーザ名"))
       return;
     }
 
