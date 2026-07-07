@@ -6,7 +6,6 @@ type SpaceModalProps = {
   isOpen: boolean;
   onClose: () => void;
   spaceType: number;
-  onSuccess: () => Promise<void>;
   editingSpace: {
     id: string;
     name: string;
@@ -14,21 +13,19 @@ type SpaceModalProps = {
     favorite: number;
     is_archived: number;
   } | null;
+  onSave: (name: string, selectedType: number, favorite_flag: number, is_archived: number) => Promise<void>;
 };
 
-export default function SpaceModal({ isOpen, onClose, spaceType, onSuccess, editingSpace }: SpaceModalProps) {
+export default function SpaceModal({ isOpen, onClose, spaceType, editingSpace, onSave }: SpaceModalProps) {
   const [name, setName] = useState("");
-  // 🌟 追加: セレクトボックスで切り替えた種類を正しく保持するState
-  const [selectedType, setSelectedType] = useState(spaceType); 
+  const [selectedType, setSelectedType] = useState(spaceType);
   const [favorite_flag, setFavoriteFlag] = useState(0);
   const [is_archived, setIsArchived] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // モーダルが開いたとき、または編集対象が変わったときに初期値をセット
   useEffect(() => {
     if (isOpen) {
       setName(editingSpace ? editingSpace.name : "");
-      // 🌟 新規作成時・編集時どちらも親からの初期値を正しく同期します
       setSelectedType(editingSpace ? editingSpace.space_type : spaceType);
       setFavoriteFlag(editingSpace ? editingSpace.favorite : 0);
       setIsArchived(editingSpace ? editingSpace.is_archived ?? 0 : 0);
@@ -38,56 +35,11 @@ export default function SpaceModal({ isOpen, onClose, spaceType, onSuccess, edit
   if (!isOpen) return null;
 
   const handleSave = async () => {
-    // 目標(99)以外のときは名前の入力チェックを行う
-    if (spaceType !== 99 && !name.trim()) {
-      alert("名前を入力してください。");
-      return;
-    }
-
     setIsSubmitting(true);
     try {
-      const isGoal = spaceType === 99;
-      const isEditingExistingSpace = editingSpace && editingSpace.id !== "new_goal" && editingSpace.id !== "edit_goal";
-
-      let url = "";
-      if (isGoal) {
-        url = "/api/goal";
-      } else if (isEditingExistingSpace) {
-        url = `/api/spaces/${editingSpace.id}`;
-      } else {
-        url = "/api/spaces";
-      }
-
-      // 🌟 修正: space_type に、現在選択されている正しい種類（selectedType）を割り当てます
-      const bodyData = isGoal
-        ? { content: name }
-        : { name: name.trim(), space_type: Number(selectedType), favorite_flag, is_archived };
-
-      let method = "POST";
-      if (isEditingExistingSpace) {
-        method = "PATCH";
-      } else {
-        method = "POST";
-      }
-
-      console.log(`通信を開始します: ${method} ${url}`, bodyData);
-
-      const res = await fetch(url, {
-        method: method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(bodyData),
-      });
-
-      if (res.ok) {
-        await onSuccess();
-      } else {
-        const errText = await res.text();
-        console.error("サーバーからのエラーレスポンス:", errText);
-        alert(`保存に失敗しました。Status: ${res.status}`);
-      }
+      await onSave(name, selectedType, favorite_flag, is_archived);
     } catch (error) {
-      console.error("保存エラー:", error);
-      alert("通信エラーが発生しました。");
+      console.error("保存失敗:", error);
     } finally {
       setIsSubmitting(false);
     }
@@ -114,49 +66,21 @@ export default function SpaceModal({ isOpen, onClose, spaceType, onSuccess, edit
         {/* 【1. ヘッダー】 */}
         <div style={{ marginBottom: "20px" }}>
           <h3 style={{ margin: 0, fontSize: "19px", fontWeight: "700", color: "#0f172a", letterSpacing: "-0.025em" }}>
-            {spaceType === 99 ? "目標の管理" : editingSpace?.id ? "スペースの編集" : "新規スペース作成"}
+            {spaceType === 99
+              ? "目標の管理"
+              : editingSpace?.id
+                ? "スペースの編集"
+                : spaceType === 1
+                  ? "チャットスペース作成"
+                  : spaceType === 2
+                    ? "タスクスペース作成"
+                    : spaceType === 3
+                      ? "質問スペース作成"
+                      : "新規スペース作成"}
           </h3>
         </div>
 
-        {!editingSpace && spaceType !== 99 && (
-          <div style={{ marginBottom: "16px" }}>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#475569", marginBottom: "6px" }}>
-              スペースの種類
-            </label>
-            <select
-              // 🌟 修正: value を selectedType に変更
-              value={selectedType}
-              // 🌟 修正: 変更された値を正しく数値化してStateを更新します
-              onChange={(e) => setSelectedType(Number(e.target.value))}
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                padding: "12px 14px",
-                borderRadius: "8px",
-                border: "1px solid #cbd5e1",
-                fontSize: "15px",
-                color: "#334155",
-                background: "#f8fafc",
-                outline: "none",
-                cursor: "pointer",
-                WebkitAppearance: "none",
-                MozAppearance: "none",
-                appearance: "none",
-                backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`, 
-                backgroundRepeat: "no-repeat",
-                backgroundPosition: "right 14px center",
-                backgroundSize: "16px",
-              }}
-            >
-              <option value={1}>チャット</option>
-              <option value={2}>ToDoリスト</option>
-              <option value={3}>質問</option>
-            </select>
-          </div>
-        )}
-
-        <div style={{ marginBottom: "24px", position: "relative", display: "flex", alignItems: "center" }}></div>
-
+        {/* 【2. 入力欄】 */}
         <div style={{ marginBottom: "24px", position: "relative", display: "flex", alignItems: "center" }}>
           <input
             type="text"
@@ -177,7 +101,6 @@ export default function SpaceModal({ isOpen, onClose, spaceType, onSuccess, edit
             }}
           />
 
-          {/* 入力欄の右端に浮かぶ星マーク */}
           {spaceType !== 99 && (
             <button
               type="button"
@@ -193,19 +116,16 @@ export default function SpaceModal({ isOpen, onClose, spaceType, onSuccess, edit
                 padding: "4px",
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "center",
-                transition: "transform 0.1s ease"
+                justifyContent: "center"
               }}
               title="お気に入り"
-              onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.85)"}
-              onMouseUp={(e) => e.currentTarget.style.transform = "scale(1)"}
             >
               {favorite_flag === 1 ? "★" : "☆"}
             </button>
           )}
         </div>
 
-        {/* 【3. ボトムアクションエリア】 */}
+        {/* 【3. アクションエリア】 */}
         <div style={{
           display: "flex",
           justifyContent: "flex-end",
@@ -268,11 +188,8 @@ export default function SpaceModal({ isOpen, onClose, spaceType, onSuccess, edit
               borderRadius: "6px",
               cursor: "pointer",
               fontWeight: "600",
-              fontSize: "14px",
-              transition: "background 0.2s"
+              fontSize: "14px"
             }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f8fafc"}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "#ffffff"}
           >
             キャンセル
           </button>

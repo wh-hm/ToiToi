@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 type Space = {
   id: string;
   name: string;
   space_type: number;
   favorite: number;
-  is_archived: number; 
+  is_archived: number;
 };
 
 type SpaceListProps = {
@@ -17,16 +18,18 @@ type SpaceListProps = {
   onToggleArchive: (checked: boolean) => void;
   onEdit: (space: Space) => void;
   onDelete: (id: string, spaceType: number) => void;
+  onCheckError: (message: string) => void;
 };
 
 export default function SpaceList(props: SpaceListProps) {
-  const { items, title, showArchived, onToggleArchive, onEdit, onDelete } = props;
+  const { items, title, showArchived, onToggleArchive, onEdit, onDelete, onCheckError } = props;
   const [open, setOpen] = useState(true);
   const [localItems, setLocalItems] = useState<Space[]>(items);
+  const router = useRouter();
 
   useEffect(() => {
     setLocalItems(items);
-  }, [items, items.map(i => `${i.id}-${i.is_archived}`).join(',')]);
+  }, [items]);
 
   const getLinkPath = (type: number, id: string) => {
     switch (type) {
@@ -36,11 +39,26 @@ export default function SpaceList(props: SpaceListProps) {
       default: return `/chat/${id}`;
     }
   };
+  const handleSpaceClick = async (e: React.MouseEvent, type: number, id: string) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`/api/spaces/${id}?space_type=${type}`, { method: "GET" });
 
+      if (res.status === 404 || !res.ok) {
+        onCheckError("このスペースは既に削除されています。");
+        router.push("/404");
+      } else {
+        router.push(getLinkPath(type, id));
+      }
+    } catch (error) {
+      console.error("生存チェック失敗:", error);
+      onCheckError("通信エラーが発生しました。");
+    }
+  };
   return (
     <div style={{ marginBottom: "20px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f3f3f3", padding: "10px", borderRadius: "4px", border: "1px solid #ddd" }}>
-        
+
         {/* タイトル開閉エリア */}
         <h2
           onClick={() => setOpen(!open)}
@@ -51,7 +69,7 @@ export default function SpaceList(props: SpaceListProps) {
             fontWeight: "bold",
             display: "flex",
             alignItems: "center",
-            gap: "10px", 
+            gap: "10px",
             userSelect: "none",
             flexGrow: 1
           }}
@@ -62,10 +80,10 @@ export default function SpaceList(props: SpaceListProps) {
             height: 0,
             borderLeft: "5px solid transparent",
             borderRight: "5px solid transparent",
-            borderTop: "6px solid #1e293b", 
-            transform: open ? "rotate(0deg)" : "rotate(-90deg)", 
+            borderTop: "6px solid #1e293b",
+            transform: open ? "rotate(0deg)" : "rotate(-90deg)",
             transition: "transform 0.2s ease",
-            transformOrigin: "center 3px" 
+            transformOrigin: "center 3px"
           }}></span>
 
           {title}
@@ -121,10 +139,10 @@ export default function SpaceList(props: SpaceListProps) {
 
                 {/* リンクとテキストエリア */}
                 <div style={{ flexGrow: 1, display: "flex", alignItems: "center", gap: "8px" }}>
-                  <a 
-                    href={getLinkPath(s.space_type, s.id)} 
-                    style={{ 
-                      textDecoration: "none", 
+                  <a
+                    href={getLinkPath(s.space_type, s.id)}
+                    style={{
+                      textDecoration: "none",
                       color: "#333",
                       fontWeight: "500"
                     }}
@@ -133,12 +151,12 @@ export default function SpaceList(props: SpaceListProps) {
                   </a>
 
                   {s.is_archived === 1 && (
-                    <span 
-                      style={{ 
-                        padding: "2px 6px", 
-                        background: "#cbd5e1", 
-                        color: "#475569",     
-                        borderRadius: "4px", 
+                    <span
+                      style={{
+                        padding: "2px 6px",
+                        background: "#cbd5e1",
+                        color: "#475569",
+                        borderRadius: "4px",
                         fontSize: "11px",
                         fontWeight: "bold",
                         userSelect: "none"
@@ -161,4 +179,5 @@ export default function SpaceList(props: SpaceListProps) {
       )}
     </div>
   );
+
 }
