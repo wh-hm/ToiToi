@@ -5,9 +5,10 @@ import { PreviewModal } from "@/components/chat/PreviewModal";
 import { Input, Button, Popover, PopoverTrigger, PopoverContent } from "@nextui-org/react";
 import { Paperclip, SendHorizontal, Smile, X } from "lucide-react";
 import { CHARACTER_STAMPS } from "@/constants/stamp";
-import { toast } from "react-hot-toast";
+import { ToiToiNotification } from "@/components/Toast";
 import { MESSAGES } from "@/constants/messages";
 import { ChatInputProps } from "@/types/chat";
+import { toast } from "react-hot-toast";
 
 export default function ChatInput({ 
   value, onChange, onSend, onSendStamp, onUploadImage, onRemoveFile, selectedFiles, disabled 
@@ -73,15 +74,17 @@ export default function ChatInput({
             ref={inputRef} // ★フォーカス対象に設定
             value={value}
             onValueChange={(val) => {
-              // 100文字を超えたら、先頭から1000文字まででカットして更新
               if (val.length <= 100) {
                 onChange(val);
-              } else {
-                toast.dismiss();
-                onChange(val.slice(0, 100));
-                toast.error(MESSAGES.E1002("チャット", 100));
+                return;
               }
+              if (value.length >= 100) {
+                return;
+              }
+              ToiToiNotification.error(MESSAGES.E1002("チャット", 100), "chat-limit-toast");
+              onChange(val.slice(0, 100));
             }}
+            
             placeholder="メッセージを入力..."
             radius="full"
             size="lg"

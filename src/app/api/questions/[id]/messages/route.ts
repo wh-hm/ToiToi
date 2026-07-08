@@ -58,11 +58,19 @@ export async function POST(
   const space_id = parseInt(id);
 
   try {
+    
     const formData = await request.formData();
     const message = formData.get("message") as string;
     const files = formData.getAll("images") as File[]; // 複数画像取得
     const stamp = formData.get("stamp") as string | null;
     const question_id = Number(formData.get("question_id"));
+
+    if (isNaN(space_id) || space_id <= 0) {
+      return NextResponse.json({ message: MESSAGES.E1001("Space ID") }, { status: 400 });
+    }
+    if (isNaN(question_id) || question_id <= 0) {
+      return NextResponse.json({ message: MESSAGES.E1001("Question ID") }, { status: 400 });
+    }
 
     // 1. バリデーション
     if (!message && files.length === 0 && !stamp) {

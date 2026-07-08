@@ -6,6 +6,14 @@ import { Prisma } from "@prisma/client";
 // Prismaのトランザクション型（dbがどちらでもいいように）
 type Tx = Omit<Prisma.TransactionClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
+export async function checkQuestionChat(id: number, question_id: number, user_id: string, tx?: Tx): Promise<boolean> {
+  const db = tx || prisma;
+  const chat = await db.questionChats.findFirst({ where: { id, question_id, user_id, delete_flag: 0 } });
+
+  if (!chat) return false;
+
+  return true;
+}
 
 
 /**

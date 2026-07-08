@@ -4,7 +4,8 @@ import { getAuthContext } from "@/lib/auth-guard";
 import { toggleLike } from "@/services/QuestionChatService";
 import { MESSAGES } from "@/constants/messages";
 import { NextRequest } from "next/server";
-
+import { getSpaceCheck } from "@/services/SpaceService";
+import { checkQuestionChat } from "@/services/QuestionChatService";
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; msgId: string }> }
@@ -16,10 +17,25 @@ export async function PATCH(
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
+    const space_id = parseInt(id);
+    const question_id = parseInt(msgId);
 
+    const { searchParams } = new URL(request.url);
+    const chat_id = Number(searchParams.get("chat_id"));
+
+
+     const isSpaceAlive = await getSpaceCheck(auth.user_id, space_id);
+    if (!isSpaceAlive) {
+        return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+    }
+    const isChatAlive = await checkQuestionChat(chat_id, question_id, auth.user_id, );
+
+    if (!isChatAlive) {
+        return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
+    }
     // 2. いいね状態の更新
     // status は boolean (true:いいね, false:解除) や 1/0 などで受け取る想定
-    const updatedStatus = await toggleLike(parseInt(msgId), parseInt(id), auth.user_id);
+    const updatedStatus = await toggleLike(chat_id, question_id, auth.user_id);
 
     if (!updatedStatus) {
       return NextResponse.json({ message: MESSAGES.E1010("更新対象") }, { status: 404 });

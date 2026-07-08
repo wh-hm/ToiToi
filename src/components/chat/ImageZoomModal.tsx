@@ -9,7 +9,8 @@ export const ImageZoomModal = ({
   caption, 
   onDownload, 
   msg,
-  isPending 
+  isPending,
+  chat_id
 }: ImageZoomModalProps) => {
   if (!isOpen || !imageUrl) return null;
 
@@ -32,7 +33,7 @@ export const ImageZoomModal = ({
                 onClick={() => {
                   const targetUrl = msg.image_url || imageUrl;
                   if (targetUrl && !isPending) {
-                    onDownload(targetUrl);
+                    onDownload(targetUrl, chat_id);
                   }
                 }}
                 // 💡 disabled の時は pointer-events-none をつけてボタン単体のイベントを切りつつ、

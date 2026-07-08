@@ -4,11 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
-import toast from "react-hot-toast";
 import { MESSAGES } from "@/constants/messages";
 import { Loading } from "@/components/LoadingSpinner";
 import { fetchWithTimeout } from "@/lib/api";
 import { ToiToiNotification } from "@/components/Toast";
+import toast from "react-hot-toast";
 
 type FallingCharacter = {
   id: number;
@@ -47,18 +47,18 @@ export default function Username() {
 
     // 2. フロント側バリデーションの3連コンボ
     if (!username) {
-      // toast.error(MESSAGES.E1001("ユーザ名"));
+      // ToiToiNotification.error(MESSAGES.E1001("ユーザ名"));
       ToiToiNotification.info(MESSAGES.E1001("ユーザ名"))
       return;
     }
 
     if (username.length > 10) {
-      toast.error(MESSAGES.E1002("ユーザ名", 10));
+      ToiToiNotification.error(MESSAGES.E1002("ユーザ名", 10));
       return;
     }
 
     if (invalidCharRegex.test(username)) {
-      toast.error(MESSAGES.E1003("ユーザ名", "記号"));
+      ToiToiNotification.error(MESSAGES.E1003("ユーザ名", "記号"));
       return;
     }
     
@@ -79,13 +79,13 @@ export default function Username() {
 
       if (!res.ok) {
         // 3. API側で弾かれたエラー（重複チェックなど）はここで拾って表示する
-        toast.error(data.message); 
+        ToiToiNotification.error(data.message); 
         return;
       }
-      toast.success(data.message);
+      ToiToiNotification.success(data.message);
       router.push("/dashboard");
     } catch (error: any) {
-      toast.error(MESSAGES.E3003);
+      ToiToiNotification.error(MESSAGES.E3003);
     } finally {
       setIsSubmitting(false);
     }
@@ -113,7 +113,7 @@ export default function Username() {
           return;
         }
       } catch (error:any) {
-        toast.error(MESSAGES.E3003);
+        ToiToiNotification.error(MESSAGES.E3003);
       } finally {
         setLoading(false);
       }
