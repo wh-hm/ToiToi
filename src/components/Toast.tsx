@@ -57,27 +57,32 @@ export const ToiToiToast = ({ t }: ToiToiToastProps) => {
 // ==========================================
 export const ToiToiNotification = {
   success: (message: string, id?: string) => {
-    // 💡 オプションではなく、t のオブジェクトを直接書き換えてコンポーネントに渡す
+    toast.dismiss();
     toast.custom((t) => {
       t.type = "success";
       t.message = message;
       return <ToiToiToast t={t} />;
-    }, { id });
+    }, { id: id }); // 👈 オプションオブジェクトとして安全に渡す（省略形でもOK）
   },
   
   error: (message: string, id?: string) => {
+    // 💡 理由：toast.dismiss() は全消去になってしまい長押し時にラグを生む原因になるため、
+    // ID指定がある場合は、あえて事前にdismissしないほうが上書きが滑らかになります！
+    if (!id) toast.dismiss(); 
+    
     toast.custom((t) => {
       t.type = "error";
       t.message = message;
       return <ToiToiToast t={t} />;
-    }, { id });
+    }, { id: id }); // 👈 ⭕ここ！react-hot-toastへしっかりIDを流し込みます
   },
   
   info: (message: string, id?: string) => {
+    if (!id) toast.dismiss();
     toast.custom((t) => {
-      t.type = "blank"; // コンポーネント側で "info" に変換されます
+      t.type = "blank";
       t.message = message;
       return <ToiToiToast t={t} />;
-    }, { id });
+    }, { id: id }); // 👈 オプションオブジェクトとして渡す
   }
 };

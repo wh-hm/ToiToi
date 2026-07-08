@@ -4,13 +4,14 @@ import { toggleFavorite } from "@/services/ChatService";
 import { MESSAGES } from "@/constants/messages";
 import { getSpaceCheck } from "@/services/SpaceService";
 import { getChatCheck } from "@/services/ChatService";
+import { NextRequest } from "next/server";
 
 export async function PATCH(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const chatId = parseInt(id);
+  const space_id = parseInt(id);
 
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
@@ -18,14 +19,15 @@ export async function PATCH(
   try {
     const body = await request.json();
     // body に favorite_flag が含まれていることを前提にします
-    const { space_id, favorite_flag } = body;
+    const { chat_id, favorite_flag } = body;
 
+    console.log(space_id);
     const isSpaceAlive = await getSpaceCheck(auth.user_id, space_id);
     if (!isSpaceAlive) {
         return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
 
-    const isChatAlive = await getChatCheck(auth.user_id, space_id, chatId);
+    const isChatAlive = await getChatCheck(auth.user_id, space_id, chat_id);
 
     if (!isChatAlive) {
         return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
@@ -34,7 +36,7 @@ export async function PATCH(
 
     // ★修正：ここで実際に toggleFavorite を呼び出す
     const updatedChat = await toggleFavorite(
-      chatId, 
+      chat_id, 
       space_id, 
       auth.user_id, 
       favorite_flag

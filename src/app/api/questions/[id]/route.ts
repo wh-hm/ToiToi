@@ -13,7 +13,7 @@ export async function PATCH(
 
   try {
     const { id } = await params;
-    const questionId = Number(id);
+    const question_id = Number(id);
     const body = await request.json();
 
     const { title, question, tag } = body;
@@ -26,7 +26,7 @@ export async function PATCH(
 
     if (!title && !question && is_resolved !== undefined) {
       const updatedStatus = await updateQuestionStatus(
-        questionId,
+        question_id,
         space_id,
         auth.user_id, // ⚠️ サービス側の仕様に合わせ作成者IDを渡します
         is_resolved
@@ -44,7 +44,7 @@ export async function PATCH(
     if (question.length > 100) return NextResponse.json({ message: MESSAGES.E1002("質問詳細", 100) }, { status: 400 });
 
     const updated = await updateQuestion(
-      questionId,
+      question_id,
       space_id,
       auth.user_id,
       title,
