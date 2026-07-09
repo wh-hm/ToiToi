@@ -16,6 +16,7 @@ export const ImageZoomModal = ({
 
   const isDisabled = !imageUrl || isPending;
 
+  
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
       <div className="bg-white p-6 rounded-2xl w-full max-w-5xl max-h-[95vh] flex flex-col relative shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -70,15 +71,7 @@ export const ImageZoomModal = ({
         {/* 画像表示部分 */}
         <div className="flex-1 overflow-hidden flex items-center justify-center">
           <img 
-            src={
-              imageUrl.startsWith("blob:")
-                ? imageUrl
-                : imageUrl.startsWith("/api/images/view")
-                  ? imageUrl
-                  : `/api/images/view?key=${encodeURIComponent(imageUrl)}&spaceId=${
-                      imageUrl.split("_")[1] || "26" 
-                    }`
-            } 
+            src={imageUrl} 
             alt="zoomed" 
             className="max-w-full max-h-[70vh] object-contain" 
           />

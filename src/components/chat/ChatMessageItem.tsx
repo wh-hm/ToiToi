@@ -170,21 +170,11 @@ export default function ChatMessageItem({
             return !imageErrors ? (
               <img
                 key={`img-item-${index}`}
-                
-                // 💡 url はずっと「blob:...」のまま固定されているので、サーバー経由のAPIに変えずにそのまま突っ込む！
-                src={
-                  url.startsWith("blob:") 
-                    ? url 
-                    : `/api/images/view?key=${encodeURIComponent(url)}&spaceId=${space_id}`
-                } 
-                
+                src={url} 
                 alt="chat image"
                 className="max-w-[200px] h-auto rounded-lg border border-gray-200"
                 onLoad={() => onScrollBottom?.(true)}
-                
-                // 💡 クリック（拡大モーダル）やダウンロードの時は、本物のS3キーを渡してあげる
                 onClick={() => onImageClick?.(realStorageKey)}
-                
                 onError={() => {
                   if (!url.startsWith("blob:")) {
                     setImageErrors(true);

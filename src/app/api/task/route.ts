@@ -58,6 +58,9 @@ export async function POST(request: Request) {
 
         // 4. 日付形式チェック & 過去日チェック (E1004)
         const inputDate = new Date(due_date);
+        console.log(due_date)
+
+        console.log(inputDate)
         if (inputDate.toString() === "Invalid Date") {
             return NextResponse.json({ message: MESSAGES.E1004 }, { status: 400 });
         }
@@ -76,6 +79,7 @@ export async function POST(request: Request) {
         );
 
         return NextResponse.json(newTask, { status: 201 });
+
     } catch (error) {
         return NextResponse.json({ message: MESSAGES.E2001("タスク") }, { status: 500 });
     }
