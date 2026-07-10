@@ -10,24 +10,23 @@ export async function POST() {
         const session = await getServerSession(authOptions);
 
         if (!session?.user?.id) {
-            return NextResponse.json({ message: MESSAGES.AUTH001 }, { status: 401 });
+            return NextResponse.json({ message: MESSAGES.E4001 }, { status: 401 });
         }
 
         const google_id = session.user.id;
         const email = session.user.email;
 
         if (!email) {
-            return NextResponse.json({ message: MESSAGES.AUTH001 }, { status: 400 });
+            return NextResponse.json({ message: MESSAGES.E4001 }, { status: 400 });
         }
 
-        const user = await registerUser(google_id, email);
-        
+        await registerUser(google_id, email);
+
         return NextResponse.json({ 
             message: MESSAGES.USER001, 
-            user: user 
         }, { status: 200 });
         
     } catch (error) {
-        return NextResponse.json({ message: MESSAGES.AUTH003}, { status: 500 });
+        return NextResponse.json({ message: MESSAGES.E4003}, { status: 500 });
     }
 }

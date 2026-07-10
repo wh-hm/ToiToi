@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { updateQuestion, deleteQuestion, updateQuestionStatus} from "@/services/QuestionService"; 
 import { getAuthContext } from "@/lib/auth-guard";
 import { MESSAGES } from "@/constants/messages";
+import { getSpaceCheck } from "@/services/SpaceService";
+import { checkQuestion } from "@/services/QuestionService";
 
 // 1. PATCH: 質問または解決ステータスの更新
 export async function PATCH(
@@ -13,7 +15,7 @@ export async function PATCH(
 
   try {
     const { id } = await params;
-    const questionId = Number(id);
+    const question_id = Number(id);
     const body = await request.json();
 
     const { title, question, tag } = body;
@@ -23,10 +25,22 @@ export async function PATCH(
     if (!space_id || isNaN(space_id)) {
       return NextResponse.json({ message: MESSAGES.E1001("スペースID") }, { status: 400 });
     }
+    const [isSpaceAlive,  isQuestionAlive] = await Promise.all([
+      getSpaceCheck(auth.user_id, space_id), // ※関数名が推測ですが合わせる
+      checkQuestion(auth.user_id, space_id, question_id),
+    ]);
+        
+    // スペースチェックの判定
+    if (!isSpaceAlive) {
+        return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+    }
+    if (!isQuestionAlive) {
+        return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
+    }
 
     if (!title && !question && is_resolved !== undefined) {
       const updatedStatus = await updateQuestionStatus(
-        questionId,
+        question_id,
         space_id,
         auth.user_id, // ⚠️ サービス側の仕様に合わせ作成者IDを渡します
         is_resolved
@@ -44,7 +58,7 @@ export async function PATCH(
     if (question.length > 100) return NextResponse.json({ message: MESSAGES.E1002("質問詳細", 100) }, { status: 400 });
 
     const updated = await updateQuestion(
-      questionId,
+      question_id,
       space_id,
       auth.user_id,
       title,
@@ -71,6 +85,7 @@ export async function DELETE(
     const { id } = await params;
     const { searchParams } = new URL(request.url);
     const space_id = Number(searchParams.get("space_id"));
+
 
     if (!space_id || isNaN(space_id)) {
       return NextResponse.json({ message: MESSAGES.E1001("スペースID") }, { status: 400 });

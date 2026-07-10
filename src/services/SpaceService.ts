@@ -387,17 +387,17 @@ export async function deleteSpaceQuestion(
     });
 
     if (questions.length === 0) return true;
-    const questionIds = questions.map((q:ChatMessage) => q.id);
+    const question_ids = questions.map((q:ChatMessage) => q.id);
 
     // 2. 質問自体を一括論理削除
     await db.question.updateMany({
-      where: { id: { in: questionIds } },
+      where: { id: { in: question_ids } },
       data: { delete_flag: 1 }
     });
 
     // 3. 紐づくチャットも一括論理削除（deleteQuestionをループするのではなく）
     await db.questionChats.updateMany({
-      where: { question_id: { in: questionIds } },
+      where: { question_id: { in: question_ids } },
       data: { delete_flag: 1 }
     });
 

@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import toast from "react-hot-toast";
+import { ToiToiNotification } from "@/components/Toast";
 import ChatInput from "@/components/chat/ChatInput";
 import ChatList from "@/components/chat/ChatList";
 import { ChatMessage } from "@/types/chat";
@@ -8,6 +8,7 @@ import { MESSAGES } from "@/constants/messages";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { fetchWithTimeout } from "@/lib/api";
+import { handleApiResponse } from "@/lib/api-utils";
 
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const [chats, setChats] = useState<ChatMessage[]>([]);
@@ -19,48 +20,56 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const scrollRef = useRef<HTMLDivElement>(null);
   const { status } = useSession();
   const router = useRouter();
-  // ★配列で管理に変更
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const isInitialLoad = useRef(true);
-  const [isLoading, setIsLoading] = useState(true); // ★追加
+  const [isLoading, setIsLoading] = useState(true); 
   const [spaceName, setSpaceName] = useState("");
   const [isChatsLoadFailed, setIsChatsLoadFailed] = useState(true);
-  
-
+  const [ isError, setIsError] = useState(true);
 
   useEffect(() => {
     if (status === "unauthenticated") {
-      toast.error(MESSAGES.AUTH003);
+      ToiToiNotification.error(MESSAGES.E4003);
       router.push("/");
     }
   }, [status, router]);
 
-
   // 初回ロード完了時に一度だけ実行
+  // useEffect(() => {
+    
+  //   if (chats.length > 0 && scrollRef.current && isInitialLoad.current) {
+  //     scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'instant' });
+  //     isInitialLoad.current = false;
+  //   }
+  // }, [chats]);
+  // 修正後
   useEffect(() => {
-    if (chats.length > 0 && scrollRef.current && isInitialLoad.current) {
-      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'instant' });
+    // Array.isArray(chats) で安全に配列かどうかを確認してから length を見る
+    if (Array.isArray(chats) && chats.length > 0 && scrollRef.current && isInitialLoad.current) {
+      scrollRef.current.scrollTo({ 
+        top: scrollRef.current.scrollHeight, 
+        behavior: 'instant' 
+      });
       isInitialLoad.current = false;
     }
   }, [chats]);
 
-
   const scrollToBottom = (force: boolean = false) => {
-  // 0ミリ秒の setTimeout で、React のレンダリングが終わるのを待つ
-  setTimeout(() => {
-    if (!scrollRef.current || editingId !== null) return;
+    setTimeout(() => {
+      if (!scrollRef.current || editingId !== null) return;
+      
 
-    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
-    const isNearBottom = (scrollHeight - scrollTop - clientHeight < 200);
+      const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+      const isNearBottom = (scrollHeight - scrollTop - clientHeight < 200);
 
-    if (isNearBottom || force) {
-      scrollRef.current.scrollTo({ 
-        top: scrollHeight, 
-        behavior: 'smooth' 
-      });
-    }
-  }, 0);
-};
+      if (isNearBottom || force) {
+        scrollRef.current.scrollTo({ 
+          top: scrollHeight, 
+          behavior: 'smooth' 
+        });
+      }
+    }, 0);
+  };
 
   useEffect(() => {
     params.then((p) => setspace_id(Number(p.id)));
@@ -69,77 +78,74 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   useEffect(() => { fetchMessages(); }, []);
 
   const fetchMessages = async () => {
-    setIsLoading(true); // 開始時にオン
+    setIsLoading(true); 
+    setIsChatsLoadFailed(true); // 読み込み開始時は一旦Failed扱いにしておく
     try {
       const { id } = await params;
       const res = await fetchWithTimeout(`/api/chats?space_id=${id}`);
-      if (res.status === 404) {
-      // 例: トップ画面か404専用ページに飛ばす。トースト等を出してもOK
-        router.push('/404'); 
-        return; // 処理をここで終了させる
-      }
       const data = await res.json();
-    
       if (!res.ok) {
-        toast.error(data.message)
-        return;
+        await handleApiResponse(res); // 内部のthrowを待つ
+        throw new Error(); // 明示的にエラーを投げる
       }
+
+      // 💡 【修正点】まずデータを画面にセットして、Failedフラグを解除
       setChats(data.chats);
       setSpaceName(data.spaceName);
       setIsChatsLoadFailed(false);
+      setIsError(false);
+      
     } catch (e) {
-      console.log(e);
+      console.error("メッセージ取得エラー:", e);
+      console.error("API Error at /api/chats:", e);
+      setIsError(true);
+      ToiToiNotification.error("チャットの取得に失敗しました。");
     } finally {
-      setIsLoading(false); // 完了したらオフ
+      // 💡 【超重要】ここで一律でfalseにするのではなく、
+      // データのマウントが終わったので isLoading を解除。
+      // これにより、ChatList内部の「画像ロード監視（isImagesLoading）」へバトンが綺麗に渡ります！
+      setIsLoading(false); 
     }
   };
 
-  // ★画像追加処理：5枚制限
- const handleFileSelect = (input: File | File[]) => {
-  const newFiles = Array.isArray(input) ? input : [input];
-  const MAX_SIZE_BYTES = 2 * 1024 * 1024; // 2MB
+  // ファイル選択処理
+  const handleFileSelect = (input: File | File[]) => {
+    const newFiles = Array.isArray(input) ? input : [input];
+    const MAX_SIZE_BYTES = 2 * 1024 * 1024; // 2MB
 
-  // 1. まず枚数制限（全体に対して）
-  if (selectedFiles.length + newFiles.length > 5) {
-    toast.error(MESSAGES.E1007);
-  }
+    if (selectedFiles.length + newFiles.length > 5) {
+      ToiToiNotification.error(MESSAGES.E1007);
+    }
 
-  // 2. ファイルごとのバリデーション
-  const validFiles: File[] = [];
-  
-  newFiles.forEach((file, index) => {
-    // 現在の配列の長さ + これから追加する有効なファイル数 + 今回のループのインデックス
-    const currentFileNumber = selectedFiles.length + validFiles.length + 1;
+    const validFiles: File[] = [];
     
-    // 枚数が上限を超えていたら中断
-    if (selectedFiles.length + validFiles.length >= 5) return;
+    newFiles.forEach((file) => {
+      const currentFileNumber = selectedFiles.length + validFiles.length + 1;
+      
+      if (selectedFiles.length + validFiles.length >= 5) return;
 
-    // 形式チェック (仮に image/ かどうか)
-    if (!file.type.startsWith('image/')) {
-      toast.error(MESSAGES.E1005(currentFileNumber));
-      return;
+      if (!file.type.startsWith('image/')) {
+        ToiToiNotification.error(MESSAGES.E1005(currentFileNumber));
+        return;
+      }
+
+      if (file.size === 0) {
+        ToiToiNotification.error(MESSAGES.E1012(currentFileNumber));
+        return;
+      }
+      if (file.size > MAX_SIZE_BYTES) {
+        ToiToiNotification.error(MESSAGES.E1006(currentFileNumber));
+        return;
+      }
+
+      validFiles.push(file);
+    });
+
+    if (validFiles.length > 0) {
+      setSelectedFiles((prev) => [...prev, ...validFiles]);
     }
+  };
 
-    // サイズチェック
-    if (file.size === 0) {
-      toast.error(MESSAGES.E1012(currentFileNumber));
-      return;
-    }
-    if (file.size > MAX_SIZE_BYTES) {
-      toast.error(MESSAGES.E1006(currentFileNumber));
-      return;
-    }
-
-    validFiles.push(file);
-  });
-
-  // 3. 有効なファイルのみ追加
-  if (validFiles.length > 0) {
-    setSelectedFiles((prev) => [...prev, ...validFiles]);
-  }
-};
-
-  // ★削除処理
   const handleRemoveFile = (index: number) => {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
@@ -148,7 +154,6 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     if (isSubmitting) return;
     const { id } = await params;
 
-    // ★送信失敗時の復元用にバックアップ
     const backupInputText = inputText;
     const backupFiles = [...selectedFiles];
 
@@ -185,34 +190,29 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       }
     }
 
-    setChats((prev) => [...prev, ...pendingMessages]);
+    setChats((prev) => {
+      // prev が配列であることを確認し、そうでなければ空配列として扱う
+      const safePrev = Array.isArray(prev) ? prev : [];
+      return [...safePrev, ...pendingMessages];
+    });
+
+    // setChats((prev) => [...prev, ...pendingMessages]);
     scrollToBottom(false);
-    console.log("ok")
+
     if (!stampId) {
       setInputText("");
       setSelectedFiles([]);
     }
     setIsSubmitting(true);
 
-    
     try {
       const res = await fetchWithTimeout(`/api/chats/`, { method: "POST", body: formData });
       const data = await res.json();
-
-      if (res.status === 404) {
-        router.push("/404"); // ※プロジェクトの404ページのパスに合わせて変更してください
-        return;
+      if (!res.ok) {
+        await handleApiResponse(res); // 内部のthrowを待つ
+        throw new Error(); // 明示的にエラーを投げる
       }
 
-      if (!res.ok){
-        toast.error(data.message);
-        if (!stampId) {
-        setInputText(backupInputText);
-        setSelectedFiles(backupFiles);
-      }
-      setChats((prev) => prev.filter((m) => !m.isPending));
-      scrollToBottom(true);
-    }
       if (data.newChat && data.newChat.length > 0){
         const serverItems = [...data.newChat];
         setChats((prev) => prev.map((msg) => {
@@ -225,15 +225,12 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       }
     } catch (e) {
       console.log(e);
-      
-      // ★エラー時にバックアップから復元
       if (!stampId) {
         setInputText(backupInputText);
         setSelectedFiles(backupFiles);
       }
       setChats((prev) => prev.filter((m) => !m.isPending));
       scrollToBottom(true);
-
     } finally {
       setIsSubmitting(false);
     }
@@ -242,21 +239,18 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const handleUpdate = async () => {
     if (isSubmitting || !editingId || space_id === null) return;
     
-    // 1. 保存前の状態を保存（失敗した時に戻すため）
     const previousMessages = [...chats];
 
-    // 2. 楽観的更新：即座に画面上のメッセージを書き換える
     setChats((prev) => 
       prev.map((msg) => 
         msg.id === editingId ? { ...msg, message: editValue } : msg
       )
     );
     
-    // 3. 入力欄を閉じる（ユーザーには即座に反映されたように見える）
     setEditingId(null);
     setEditValue("");
-
     setIsSubmitting(true);
+
     try {
       const res = await fetchWithTimeout(`/api/chats/${editingId}`, {
         method: "PATCH",
@@ -264,20 +258,13 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         body: JSON.stringify({ message: editValue, space_id: space_id }),
       });
       const data = await res.json();
-      if (res.status === 404) {
-        router.push("/404"); // ※プロジェクトの404ページのパスに合わせて変更してください
-        return;
-      }
-      
       if (!res.ok) {
-        toast.error(data.message);
-        setChats(previousMessages);
-        return;
+        await handleApiResponse(res); // 内部のthrowを待つ
+        throw new Error(); // 明示的にエラーを投げる
       }
       
     } catch (e) {
       console.log(e);
-      // 4. 失敗したら元の状態に戻す
       setChats(previousMessages);
     } finally {
       setIsSubmitting(false);
@@ -285,40 +272,27 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   };
 
   const handleDeleteClick = async (chatId: number, sId: number) => {
-    // 1. 削除前の状態をしっかり保存
     const previousMessages = [...chats];
-
-    // 2. 楽観的更新：即座に画面から消す
     setChats((prev) => prev.filter((msg) => msg.id !== chatId));
 
     try {
       const res = await fetchWithTimeout(`/api/chats/${chatId}?space_id=${sId}`, { 
         method: "DELETE" 
       });
-      if (res.status === 404) {
-        router.push("/404"); // ※プロジェクトの404ページのパスに合わせて変更してください
-        return;
-      }
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.message)
-        setChats(previousMessages);
-        return;
-      }
-      
-      // 成功した場合はここで終了（画面はすでに消えているので何もしなくていい）
+        await handleApiResponse(res); // 内部のthrowを待つ
+        throw new Error(); // 明示的にエラーを投げる
+      }(res);
     } catch (e) {
       console.log(e);
-      // ★重要：ここで確実に元のリストをセットし直す
       setChats(previousMessages);
     }
   };
 
   const handleToggleFavorite = async (chatId: number, current: number) => {
-    // 1. 更新前の状態を保存（失敗時用）
     const previousMessages = [...chats];
 
-    // 2. 楽観的更新：即座に星のアイコンや表示を切り替える
     setChats((prev) => 
       prev.map((msg) => 
         msg.id === chatId ? { ...msg, favorite_flag: current } : msg
@@ -326,111 +300,100 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     );
 
     try {
-      const res = await fetchWithTimeout(`/api/chats/${chatId}/favorite`, {
+      const res = await fetchWithTimeout(`/api/chats/${space_id}/favorite`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ favorite_flag: current }),
+        body: JSON.stringify({ 
+          favorite_flag: current,
+          chat_id: chatId
+        }),
       });
-
-      if (res.status === 404) {
-        router.push("/404"); // ※プロジェクトの404ページのパスに合わせて変更してください
-        return;
-      }
-
       const data = await res.json();
+
+
       if (!res.ok) {
-        toast.error(data.message)
-        setChats(previousMessages);
-        return;
+        await handleApiResponse(res); // 内部のthrowを待つ
+        throw new Error(); // 明示的にエラーを投げる
       }
-      
     } catch (e) {
       console.log(e);
       setChats(previousMessages);
     }
   };
 
-  const changeBackground = async (chatId: number, bg: number) => {
-    // 1. 更新前の状態を保存
+  const changeBackground = async (chat_id: number, bg: number) => {
     const previousMessages = [...chats];
 
-    // 2. 楽観的更新：即座に背景色を変更
     setChats((prev) => 
       prev.map((msg) => 
-        msg.id === chatId ? { ...msg, background: bg } : msg
+        msg.id === chat_id ? { ...msg, background: bg } : msg
       )
     );
 
     try {
-      const res = await fetchWithTimeout(`/api/chats/${chatId}/background`, {
+      const res = await fetchWithTimeout(`/api/chats/${space_id}/background`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ background: bg }),
+        body: JSON.stringify({ background: bg, chat_id: chat_id }),
       });
-      if (res.status === 404) {
-        router.push("/404"); // ※プロジェクトの404ページのパスに合わせて変更してください
-        return;
-      }
-
       const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.message);
-        setChats(previousMessages);
 
-        return;
-      }
-      
+      if (!res.ok) {
+        await handleApiResponse(res); // 内部のthrowを待つ
+        throw new Error(); // 明示的にエラーを投げる
+      };
     } catch (e) {
       console.log(e);
-
-      // 3. 失敗したら元に戻す
       setChats(previousMessages);
     }
   };
 
-  const handleDownload = async (imageUrl: string) => {
-    // ダウンロード処理を開始
-    const res = await fetchWithTimeout("/api/images", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ targetUrl: imageUrl })
-    });
+  const handleDownload = async (imageUrl: string, chat_id: string) => {
+    try {
+      const res = await fetchWithTimeout("/api/images", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          targetUrl: imageUrl,
+          space_id: space_id,
+          type: "chat",
+          chat_id: chat_id 
+        })
+      });
 
-    if (res.status === 404) {
-        router.push("/404"); // ※プロジェクトの404ページのパスに合わせて変更してください
-        return;
-      }
-    const data = await res.json();
-    if (!res.ok) {
-      toast.error(data.message)
-      return;
+
+      if (!res.ok) {
+        await handleApiResponse(res); // 内部のthrowを待つ
+        throw new Error(); // 明示的にエラーを投げる
+      };
+
+      // 💡 成功ならそのまま安全にBlob変換
+      const blob = await res.blob();
+      
+      const url = window.URL.createObjectURL(blob);
+      
+      const disposition = res.headers.get('Content-Disposition');
+      const fileName = disposition?.split('filename=')[1]?.replace(/['"]/g, '') || 'download.png';
+      
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = decodeURIComponent(fileName); 
+      
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(error);
+      ToiToiNotification.error("ダウンロード中にエラーが発生しました。");
     }
-
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-    
-    // <a>タグをプログラム的に作成
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "download.png"; // ファイル名
-    
-    // bodyに追加してクリック
-    document.body.appendChild(a);
-    a.click();
-    
-    // 後片付け
-    a.remove();
-    window.URL.revokeObjectURL(url);
   };
-
-
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] w-full overflow-hidden bg-gray-50">
       {chats && (
         <div className="flex-shrink-0 bg-white border-b border-gray-200 shadow-[0_1px_2px_rgba(0,0,0,0.03)] z-20 w-full ">
           <div className="flex items-center h-14 px-4 pl-8 md:p-0 max-w-2xl xl:max-w-5xl md:m-auto">
-            
             <div className="flex items-center gap-2 min-w-0">
               <svg 
                 className="w-4 h-4 text-gray-400 flex-shrink-0" 
@@ -440,17 +403,14 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
-
               <h2 className="text-base font-semibold text-gray-800 truncate tracking-wide flex items-center gap-1">
                 <span className="text-gray-400 text-sm font-normal">スペース名:</span>
-                <span>{isLoading? "読み込み中...:":spaceName}</span>
+                <span>{isLoading ? "読み込み中..." : spaceName}</span>
               </h2>
             </div>
-
           </div>
         </div>
       )}
-
 
       <div className="flex-1 overflow-y-auto relative w-full">
         <ChatList 
@@ -467,6 +427,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           onScrollBottom={scrollToBottom}
           isLoading={isLoading}
           type="chat"
+          isError={isError}
         />
       </div>
 
@@ -476,9 +437,6 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         </div>
       )}
 
-      {/* ※プレビューの表示部分は ChatInput 内部へ完全に移動させたので、
-        ここでは ChatInput コンポーネントに配列を渡すだけでOKです。
-      */}
       <div className="flex-shrink-0 w-full">
         <ChatInput 
           value={editingId ? editValue : inputText}
@@ -486,15 +444,11 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           onSend={editingId ? handleUpdate : () => handleSend()}
           onSendStamp={(s) => handleSend(s)} 
           onUploadImage={handleFileSelect}
-          onRemoveFile={handleRemoveFile} // 削除関数を追加
-          selectedFiles={selectedFiles}   // 配列を渡す
-          disabled={isSubmitting || isChatsLoadFailed}
+          onRemoveFile={handleRemoveFile} 
+          selectedFiles={selectedFiles}   
+          disabled={isSubmitting || isChatsLoadFailed || isError}
         />
       </div>
-      
     </div>
-
-
-    
   );
 }

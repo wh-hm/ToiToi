@@ -1,5 +1,5 @@
 "use client";
-import { useState, forwardRef } from "react";
+import { useState, forwardRef, useEffect } from "react";
 import { ChatMessage } from "@/types/chat";
 import ChatMessageItem from "@/components/chat/ChatMessageItem";
 import { ScrollShadow } from "@nextui-org/react";
@@ -8,7 +8,6 @@ import { ArrowDown, MessageSquare } from "lucide-react";
 import { Loading } from "@/components/LoadingSpinner";
 import { ChatListProps } from "@/types/chat";
 
-// forwardRef を使用して外部から ref を受け取れるようにします
 const ChatList = forwardRef<HTMLDivElement, ChatListProps>(({ 
   chats, 
   space_id, 
@@ -17,18 +16,18 @@ const ChatList = forwardRef<HTMLDivElement, ChatListProps>(({
   onEdit, 
   onDelete, 
   onBackgroundChange, 
-  setEditValue ,
+  setEditValue,
   onNiceFlag,
   onDownload,
   onScrollBottom,
   isLoading,
   type,
+  isError
 }, ref) => {
   
   const [openItemId, setOpenItemId] = useState<number | null>(null);
-  const [zoomData, setZoomData] = useState<{ url: string; caption: string; msg:ChatMessage } | null>(null);
+  const [zoomData, setZoomData] = useState<{ url: string; caption: string; msg: ChatMessage } | null>(null);
   const currentZoomData = zoomData;
-  // 1. スクロール位置を監視するステート
   const [showScrollButton, setShowScrollButton] = useState(false);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -36,7 +35,15 @@ const ChatList = forwardRef<HTMLDivElement, ChatListProps>(({
     setShowScrollButton(scrollHeight - scrollTop - clientHeight > 200);
   };
 
-return (
+  useEffect(() => {
+  console.log("【状態変化】isErrorが変化しました:", isError);
+}, [isError]);
+
+useEffect(() => {
+  console.log("【状態変化】isSubmittingが変化しました:", isSubmitting);
+}, [isSubmitting]);
+
+  return (
     <div className="relative w-full h-full">
       <ScrollShadow 
         ref={ref}
@@ -47,8 +54,7 @@ return (
       >
         {isLoading ? (
           <Loading text="チャットを取得中"/>
-        ) : chats.length === 0 ? (
-          // メッセージが空の時の表示
+          ) : !chats || chats.length === 0 || isError ? (
           <div className="flex flex-col items-center justify-center h-full text-center p-8 text-gray-400">
             <div className="bg-gray-100 p-4 rounded-full mb-4">
               <MessageSquare size={32} className="text-gray-400" />
@@ -66,29 +72,30 @@ return (
             </p>
           </div>
         ) : (
-          // メッセージがある時の表示
-          chats.map((chat) => (
-            <ChatMessageItem
-              key={`msg-${chat.id}`}
-              message={chat}
-              space_id={space_id}
-              isSubmitting={isSubmitting}
-              isOpen={openItemId === chat.id}
-              onOpenChange={(open) => setOpenItemId(open ? chat.id : null)}
-              onToggleFavorite={onToggleFavorite}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              onBackgroundChange={onBackgroundChange}
-              setEditValue={setEditValue}
-              onNiceFlag={onNiceFlag}
-              onImageClick={(url) => setZoomData({ url, caption: chat.message || "",  msg: chat})}
-              onDownload={onDownload}
-              onScrollBottom={(force) => onScrollBottom(force)}
-              type={type}
-            />
+          
+          (chats.map((chat) => (
+          // chats.map((chat) => (
+            <div key={`msg-${chat.id}`}>
+              <ChatMessageItem
+                message={chat}
+                space_id={space_id}
+                isSubmitting={isSubmitting}
+                isOpen={openItemId === chat.id}
+                onOpenChange={(open) => setOpenItemId(open ? chat.id : null)}
+                onToggleFavorite={onToggleFavorite}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onBackgroundChange={onBackgroundChange}
+                setEditValue={setEditValue}
+                onNiceFlag={onNiceFlag}
+                onImageClick={(url) => setZoomData({ url, caption: chat.message || "",  msg: chat})}
+                onDownload={(url) => onDownload(url, String(chat.id))}
+                onScrollBottom={(force) => onScrollBottom(force)}
+                type={type}
+              />
+            </div>
           ))
-        )}
-        {/* 下部の余白用div */}
+        ))}
         <div className="h-20 flex-shrink-0" />
       </ScrollShadow>
 
@@ -104,7 +111,6 @@ return (
       )}
 
       {currentZoomData && (() => {
-        // 💡 IDが途中で変わっても大丈夫なように、画像の URL で最新のメッセージを探し出す
         const currentChat = chats.find((c) => 
           c.id === currentZoomData.msg.id || 
           (c.signedImageUrl && c.signedImageUrl === currentZoomData.url)
@@ -112,16 +118,18 @@ return (
 
         return (
           <ImageZoomModal 
+          
             isOpen={!!currentZoomData} 
             onClose={() => setZoomData(null)} 
             imageUrl={currentZoomData.url} 
             caption={currentZoomData.caption}
             onDownload={onDownload}
             msg={currentChat} 
-            isPending={currentChat.isPending} // 👈 確実に最新の Pending 状態が渡る
+            isPending={currentChat.isPending} 
+            chat_id={String(currentChat.id)}
           />
         );
-})()}
+      })()}
     </div>
   );
 });

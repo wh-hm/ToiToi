@@ -17,6 +17,12 @@ export async function GET(request: Request) {
         return NextResponse.json({ message: MESSAGES.E1001("スペースID") }, { status: 400 });
     }
 
+    const isSpaceAlive = await getSpaceCheck(auth.user_id, space_id);
+        
+    if (!isSpaceAlive) {
+        return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+    }
+
     try {
 
         const isSpaceAlive = await getSpaceCheck(auth.user_id, space_id);
@@ -41,6 +47,9 @@ export async function POST(request: Request) {
     try {
         const { title, description, due_date, space_id, tag, is_allday, priority } = await request.json();
 
+        
+
+
         // --- 単体チェック ---
         // 1. 必須チェック (E1001)
         if (!title) return NextResponse.json({ message: MESSAGES.E1001("タスク名") }, { status: 400 });
@@ -58,6 +67,9 @@ export async function POST(request: Request) {
 
         // 4. 日付形式チェック & 過去日チェック (E1004)
         const inputDate = new Date(due_date);
+        console.log(due_date)
+
+        console.log(inputDate)
         if (inputDate.toString() === "Invalid Date") {
             return NextResponse.json({ message: MESSAGES.E1004 }, { status: 400 });
         }
@@ -70,12 +82,19 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: MESSAGES.E1011 }, { status: 400 });
         }
 
+        const isSpaceAlive = await getSpaceCheck(auth.user_id, space_id);
+        
+        if (!isSpaceAlive) {
+            return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+        }
+
         // データベース保存
         const newTask = await registerTask(
             auth.user_id, title, description, due_date, space_id, tag || 0, is_allday, priority
         );
 
         return NextResponse.json(newTask, { status: 201 });
+
     } catch (error) {
         return NextResponse.json({ message: MESSAGES.E2001("タスク") }, { status: 500 });
     }

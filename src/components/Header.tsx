@@ -13,14 +13,11 @@ import {ChevronDownIcon} from "lucide-react"
 
 
 export default function Header() {
-  const [data, setData] = useState<any>({ type1: [], type2: [], type3: [] });
+  const [data, setData] = useState<any>({ chat: [], task: [], question: [] });
   const [isLoading, setIsLoading] = useState(true);
   const [openStates, setOpenStates] = useState({ chats: false, tasks: false, questions: false });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
-
-  
-
 
   // スクロール監視：メニューを開いている時に外側がスクロールされたら閉じる
   useEffect(() => {
@@ -53,15 +50,15 @@ export default function Header() {
   useEffect(() => { refreshData(); }, [refreshData]);
 
   const menuConfig = [
-    { key: 'chats', title: 'チャット', items: data.type1, path: 'chat' },
-    { key: 'tasks', title: 'タスク', items: data.type2, path: 'task' },
-    { key: 'questions', title: '質問', items: data.type3, path: 'question' },
+    { key: 'chats', title: 'チャット', items: data.chat, path: 'chat' },
+    { key: 'tasks', title: 'タスク', items: data.task, path: 'task' },
+    { key: 'questions', title: '質問', items: data.question, path: 'question' },
   ] as const;
 
   return (
     <>
       <Navbar className="w-full h-16 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-sm" maxWidth="full">
-        <NavbarBrand>
+        <NavbarBrand className="max-w-[150px]">
           <Link href="/dashboard" className="transition-transform hover:scale-105">
             <Image 
               src="/logo.png" 
@@ -76,6 +73,7 @@ export default function Header() {
 
         {/* PC用ナビ */}
         <NavbarContent className="hidden lg:flex" justify="end">
+          <Link href="/dashboard" className="mr-4 font-medium text-gray-600">ダッシュボード</Link>
           {menuConfig.map((cat) => (
             <div key={cat.key} className="relative" onMouseEnter={() => setOpenStates(p => ({...p, [cat.key]: true}))} onMouseLeave={() => setOpenStates(p => ({...p, [cat.key]: false}))}>
               <Dropdown isOpen={openStates[cat.key]}>
@@ -126,10 +124,16 @@ export default function Header() {
             className="absolute top-0 right-0 h-full w-[280px] bg-white shadow-2xl p-4 overflow-y-auto cursor-default"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center mb-6 pt-2 px-2">
+            
+            <div className="flex justify-between items-center mb-10 pt-2 px-2">
               <span className="font-bold text-gray-800">メニュー</span>
               <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-gray-500">✕</button>
             </div>
+
+            <div className="flex flex-col gap-1 pb-2">
+              <Link className="font-bold text-gray-700 ml-2" href="/dashboard" onClick={() => setIsMobileMenuOpen(false)}>ダッシュボード</Link>
+            </div>
+
             
             <Accordion selectionMode="multiple" className="p-2">
               {menuConfig.map((cat) => (

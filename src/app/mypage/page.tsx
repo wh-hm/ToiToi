@@ -9,12 +9,14 @@ import { Loading } from "@/components/LoadingSpinner";
 // 💡 自作の可愛いコンポーネントたちを正しくインポート
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import { ToiToiNotification } from "@/components/Toast";
+import { fetchWithTimeout } from "@/lib/api";
+import { handleApiResponse } from "@/lib/api-utils";
 
 export default function MyPage() {
   const router = useRouter();
   const { status } = useSession();
   const [loading, setLoading] = useState(true);
-  const [spaces, setSpaces] = useState({ type1: [], type2: [], type3: [] });
+  const [spaces, setSpaces] = useState({ chat: [], task: [], question: [] });
   const [username, setUsername] = useState("");
   const [imageCount, setImageCount] = useState(0);
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -44,24 +46,27 @@ export default function MyPage() {
   // 2. データ取得処理
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch("/api/user/account");
-      if (!res.ok) throw new Error("取得失敗");
+      const res = await fetchWithTimeout("/api/user/account");
+      if (!res.ok) {
+          await handleApiResponse(res); // 内部のthrowを待つ
+          throw new Error(); // 明示的にエラーを投げる
+      }
       const json = await res.json();
       
-      const rawSpaces = json.spaces || { type1: [], type2: [], type3: [] };
+      const rawSpaces = json.spaces || { chat: [], task: [], question: [] };
       const allItems = [
-        ...(rawSpaces.type1 || []),
-        ...(rawSpaces.type2 || []),
-        ...(rawSpaces.type3 || [])
+        ...(rawSpaces.chat || []),
+        ...(rawSpaces.task || []),
+        ...(rawSpaces.question || [])
       ];
       
       const archivedItems = allItems.filter(item => item.is_archived === 1);
       setArchiveCount(archivedItems.length);
       
       setSpaces({
-        type1: rawSpaces.type1 || [],
-        type2: rawSpaces.type2 || [],
-        type3: rawSpaces.type3 || [],
+        chat: rawSpaces.chat || [],
+        task: rawSpaces.task || [],
+        question: rawSpaces.question || [],
       });
 
       setUsername(json.user?.username);
@@ -103,11 +108,11 @@ export default function MyPage() {
   const executeDelete = async (action: string) => {
     setIsDeleting(true);
     try {
-      const res = await fetch(`/api/${action}`, { method: "DELETE" });
-      const result = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(result.error || "操作に失敗しました");
-      
-      ToiToiNotification.success(result.message || "削除が完了したよ！");
+      const res = await fetchWithTimeout(`/api/${action}`, { method: "DELETE" });
+      if (!res.ok) {
+        await handleApiResponse(res); // 内部のthrowを待つ
+        throw new Error(); // 明示的にエラーを投げる
+      }
       
       if (action === "user/account") {
         await signOut({ callbackUrl: "/" });
@@ -125,13 +130,16 @@ export default function MyPage() {
     if (!newName.trim()) return ToiToiNotification.error("ユーザー名を入力してください");
     setIsSaving(true);
     try {
-      const res = await fetch("/api/user/username", {
+      const res = await fetchWithTimeout("/api/user/username", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: newName }),
       });
+      if (!res.ok) {
+        await handleApiResponse(res); // 内部のthrowを待つ
+        throw new Error(); // 明示的にエラーを投げる
+      }
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "更新に失敗しました");
       
       ToiToiNotification.success("ユーザー名を変更しました");
       setUsername(newName);
@@ -179,10 +187,10 @@ export default function MyPage() {
         </h2>
         <div className="grid gap-3">
           {[
-            { label: "チャット全削除", action: "spaces/chats", count: spaces?.type1?.length ?? 0 },
-            { label: "タスク全削除", action: "spaces/tasks", count: spaces?.type2?.length ?? 0 },
-            { label: "質問全削除", action: "spaces/questions", count: spaces?.type3?.length ?? 0 },
-            { label: "スペース全削除", action: "spaces", count: (spaces?.type1?.length ?? 0) + (spaces?.type2?.length ?? 0) + (spaces?.type3?.length ?? 0) },
+            { label: "チャット全削除", action: "spaces/chats", count: spaces?.chat?.length ?? 0 },
+            { label: "タスク全削除", action: "spaces/tasks", count: spaces?.task?.length ?? 0 },
+            { label: "質問全削除", action: "spaces/questions", count: spaces?.question?.length ?? 0 },
+            { label: "スペース全削除", action: "spaces", count: (spaces?.chat?.length ?? 0) + (spaces?.task?.length ?? 0) + (spaces?.question?.length ?? 0) },
             { label: "アーカイブ全削除", action: "spaces/archive", count: archiveCount ?? 0 },
             { label: "画像全削除", action: "images", count: imageCount },
           ].map((item) => (

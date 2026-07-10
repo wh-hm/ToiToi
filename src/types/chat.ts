@@ -23,7 +23,7 @@ export interface ChatInputProps {
   onUploadImage: (file: File[]) => void;
   onRemoveFile: (index: number) => void;
   selectedFiles: File[];
-  disabled?: boolean;
+  disabled: boolean;
 }
 
 export interface ChatListProps {
@@ -36,10 +36,11 @@ export interface ChatListProps {
   onBackgroundChange?: (id: number, color: number) => void;
   setEditValue: (val: string) => void;
   onNiceFlag?: (id: number, flag: number) => void;
-  onDownload: (url: string) => void;
+  onDownload: (url: string, chat_id: string) => void;
   isLoading: boolean;
   type: string;
   onScrollBottom: (force?: boolean) => void;
+  isError: boolean;
 }
 
 export interface ChatMessageItemProps {
@@ -65,9 +66,10 @@ export interface ImageZoomModalProps {
   onClose: () => void;
   imageUrl: string | null;
   caption?: string;
-  onDownload: (url: string) => void;
+  onDownload: (url: string, chat_id: string) => void;
   msg: ChatMessage;
   isPending?: boolean; // 👈 途切れていたプロパティを正しく定義
+  chat_id: string
 }
 
 export interface PreviewModalProps {

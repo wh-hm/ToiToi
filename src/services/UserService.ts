@@ -201,19 +201,19 @@ export async function updateEmail(id: string, google_id: string, email: string):
  * メソッド名称：getUserId
  * 概要：ユーザIDの取得
  */
-export async function getUserId(google_id: string): Promise<string | null> {
+export async function getUserId(google_id: string): Promise<User | null> {
   try {
     const user = await prisma.user.findFirst({
       where: {
         google_id: google_id,
-        delete_flag: 0,
+        // delete_flag: 0,
       },
     });
 
     // 条件に一致するレコードが存在する場合：特定されたユーザーの「id」のみを返却する
-    // 条件に一致するレコードが存在しない場合：nullを返却する
-    return user ? user.id : null;
+    return user || null;
   } catch (error) {
     throw error;
   }
 }
+

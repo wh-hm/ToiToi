@@ -5,6 +5,7 @@ import { getTasksCount } from "@/services/TaskService";
 import { MESSAGES } from "@/constants/messages";
 import { getGoal, updateGoal } from "@/services/GoalService";
 import { getLoginManagement } from "@/services/LoginManagementService";
+import { getQuestionsCount } from "@/services/QuestionService";
 
 // ==========================================
 // 1. GET: ダッシュボード全体のデータ取得
@@ -15,9 +16,10 @@ export async function GET() {
 
   try {
     // 1. スペース一覧 と スペースごとのタスク数配列 を取得
-    const [allSpaces, tasksWithCounts, goal, login_management] = await Promise.all([
+    const [allSpaces, tasksWithCounts, questionsWithCounts, goal, login_management] = await Promise.all([
       getSpaces(auth.user_id),
       getTasksCount(auth.user_id), // これが { space_id, space_name, task_count } の配列
+      getQuestionsCount(auth.user_id),
       getGoal(auth.user_id),
       getLoginManagement(auth.user_id)
     ]);
@@ -31,20 +33,31 @@ export async function GET() {
       };
     });
 
-    const tasksCount = tasksWithCounts.reduce((sum, t) => sum + (t.task_count || 0), 0);
+    const spacesWithQuestionCount = allSpaces.map(space => {
+      const questionInfo = questionsWithCounts.find(t => t.space_id === space.id);
+      return {
+        ...space,
+        question_count: questionInfo ? questionInfo.question_count : 0 // 見つからなければ0
+      };
+    });
+
 
     // 3. データの整形と統合
     const result = {
       spaces: {
-        type1: spacesWithTaskCount.filter(s => s.space_type === 1),
-        type2: spacesWithTaskCount
+        chat: spacesWithTaskCount.filter(s => s.space_type === 1),
+        task: spacesWithTaskCount
           .filter(s => s.space_type === 2)
           .map(s => ({
             ...s, 
             task_count: s.task_count 
-          })),
-          
-        type3: spacesWithTaskCount.filter(s => s.space_type === 3),
+        })),
+        question: spacesWithQuestionCount
+          .filter(s => s.space_type === 3)
+          .map(s => ({
+            ...s, 
+            question_count: s.question_count 
+        })),
       },
       goal,             // 目標データ
       login_management, // ログイン管理情報
