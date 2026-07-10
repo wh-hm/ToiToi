@@ -91,20 +91,6 @@ export async function DELETE(
       return NextResponse.json({ message: MESSAGES.E1001("スペースID") }, { status: 400 });
     }
 
-    const [isSpaceAlive,  isQuestionAlive] = await Promise.all([
-      getSpaceCheck(auth.user_id, space_id), // ※関数名が推測ですが合わせる
-      checkQuestion(auth.user_id, space_id, Number(id)),
-    ]);
-        
-    // スペースチェックの判定
-    if (!isSpaceAlive) {
-        return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
-    }
-    if (!isQuestionAlive) {
-        return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
-    }
-
-
     const success = await deleteQuestion(Number(id), space_id, auth.user_id);
     if (!success) return NextResponse.json({ message: MESSAGES.E2004("質問") }, { status: 500 });
 

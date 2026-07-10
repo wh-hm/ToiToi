@@ -74,23 +74,7 @@ export async function DELETE(
   }
 
   try {
-    const [isSpaceAlive, usQuestionAlive, isChatAlive] = await Promise.all([
-      getSpaceCheck(auth.user_id, space_id), // ※関数名が推測ですが合わせる
-      checkQuestion(auth.user_id, space_id, question_id),
-      checkQuestionChat(chat_id, question_id, auth.user_id, )
-    ]);
-        
-    // スペースチェックの判定
-    if (!isSpaceAlive) {
-        return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
-    }
-    if (!isChatAlive) {
-        return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
-    }
-
-    if (!usQuestionAlive) {
-        return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
-    }
+    
     
     // 3. 削除実行
     const result = await deleteQuestionChat(chat_id, question_id, auth.user_id);

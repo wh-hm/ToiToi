@@ -70,21 +70,6 @@ export async function DELETE(
     const { searchParams } = new URL(request.url);
     const space_id = Number(searchParams.get("space_id"));
 
-    if (!space_id || isNaN(space_id)) return NextResponse.json({ message: MESSAGES.E1001("スペースID") }, { status: 400 });
-
-    const [isSpaceAlive, isTaslAlive] = await Promise.all([
-        getSpaceCheck(auth.user_id, space_id), // ※関数名が推測ですが合わせる
-        getTaskCheck(auth.user_id, space_id, Number(id))
-    ]);
-
-    // スペースチェックの判定
-    if (!isSpaceAlive) {
-        return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
-    }
-
-    if (!isTaslAlive) {
-        return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
-    }
 
     const success = await deleteTask(Number(id), auth.user_id, space_id);
     if (!success) return NextResponse.json({ message: MESSAGES.E2004("タスク") }, { status: 500 });

@@ -2,7 +2,6 @@
 import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth-guard";
 import { updateLoginManagement} from "@/services/LoginManagementService";
-import { MESSAGES } from "@/constants/messages";
 
 export async function PATCH() {
   const auth = await getAuthContext();

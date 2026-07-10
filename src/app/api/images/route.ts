@@ -7,19 +7,21 @@ import { MESSAGES } from "@/constants/messages";
 import { getSpaceCheck } from "@/services/SpaceService";
 import { checkQuestionChat } from "@/services/QuestionChatService";
 import { getChatCheck } from "@/services/ChatService";
-// export async function DELETE() {
-//   // 1. 認証チェック
-//   const auth = await getAuthContext();
-//   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
-//   try {
-//     await deleteImages(auth.user_id);
 
-//     return NextResponse.json({ message: MESSAGES.S1004("画像")});
-//   } catch (error) {
-//     return NextResponse.json({ message: MESSAGES.E2004("画像") }, { status: 500 });
-//   }
-// }
+export async function DELETE() {
+  // 1. 認証チェック
+  const auth = await getAuthContext();
+  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
+
+  try {
+    await deleteImages(auth.user_id);
+
+    return NextResponse.json({ message: MESSAGES.S1004("画像")});
+  } catch (error) {
+    return NextResponse.json({ message: MESSAGES.E2004("画像") }, { status: 500 });
+  }
+}
 
 
 const s3Client = new S3Client({

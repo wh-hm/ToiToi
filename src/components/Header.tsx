@@ -13,14 +13,11 @@ import {ChevronDownIcon} from "lucide-react"
 
 
 export default function Header() {
-  const [data, setData] = useState<any>({ type1: [], type2: [], type3: [] });
+  const [data, setData] = useState<any>({ chat: [], task: [], question: [] });
   const [isLoading, setIsLoading] = useState(true);
   const [openStates, setOpenStates] = useState({ chats: false, tasks: false, questions: false });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
-
-  
-
 
   // スクロール監視：メニューを開いている時に外側がスクロールされたら閉じる
   useEffect(() => {
@@ -53,9 +50,9 @@ export default function Header() {
   useEffect(() => { refreshData(); }, [refreshData]);
 
   const menuConfig = [
-    { key: 'chats', title: 'チャット', items: data.type1, path: 'chat' },
-    { key: 'tasks', title: 'タスク', items: data.type2, path: 'task' },
-    { key: 'questions', title: '質問', items: data.type3, path: 'question' },
+    { key: 'chats', title: 'チャット', items: data.chat, path: 'chat' },
+    { key: 'tasks', title: 'タスク', items: data.task, path: 'task' },
+    { key: 'questions', title: '質問', items: data.question, path: 'question' },
   ] as const;
 
   return (

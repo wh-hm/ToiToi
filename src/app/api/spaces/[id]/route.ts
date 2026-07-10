@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { updateSpace, deleteSpace } from "@/services/SpaceService";
 import { getAuthContext } from "@/lib/auth-guard";
 import { MESSAGES } from "@/constants/messages";
-        
+import { getSpaceCheck } from "@/services/SpaceService";
 const safeRegex = /[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uFF01-\uFF5E]/;
 
 
@@ -24,6 +24,11 @@ export async function PATCH(
         if (name.length > 20) return NextResponse.json({ error: MESSAGES.E1002("スペース名", 20) }, { status: 400 });
         if (safeRegex.test(name)) {
             return NextResponse.json({ error: MESSAGES.E1003("スペース名", "記号") }, { status: 400 });
+        }
+        const isSpaceAlive = await getSpaceCheck(auth.user_id, Number(id));
+        // スペースチェックの判定
+        if (!isSpaceAlive) {
+            return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
         }
         
         const updated = await updateSpace(Number(id), name, auth.user_id, favorite_flag, is_archived);
@@ -58,7 +63,7 @@ export async function DELETE(
                 { status: 400 }
             );
         }
-
+        
         const success = await deleteSpace(space_id, spaceType, auth.user_id);
         
         if (!success) return NextResponse.json({ error: MESSAGES.E2004("スペース") }, { status: 500 });

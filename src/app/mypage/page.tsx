@@ -16,7 +16,7 @@ export default function MyPage() {
   const router = useRouter();
   const { status } = useSession();
   const [loading, setLoading] = useState(true);
-  const [spaces, setSpaces] = useState({ type1: [], type2: [], type3: [] });
+  const [spaces, setSpaces] = useState({ chat: [], task: [], question: [] });
   const [username, setUsername] = useState("");
   const [imageCount, setImageCount] = useState(0);
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -53,20 +53,20 @@ export default function MyPage() {
       }
       const json = await res.json();
       
-      const rawSpaces = json.spaces || { type1: [], type2: [], type3: [] };
+      const rawSpaces = json.spaces || { chat: [], task: [], question: [] };
       const allItems = [
-        ...(rawSpaces.type1 || []),
-        ...(rawSpaces.type2 || []),
-        ...(rawSpaces.type3 || [])
+        ...(rawSpaces.chat || []),
+        ...(rawSpaces.task || []),
+        ...(rawSpaces.question || [])
       ];
       
       const archivedItems = allItems.filter(item => item.is_archived === 1);
       setArchiveCount(archivedItems.length);
       
       setSpaces({
-        type1: rawSpaces.type1 || [],
-        type2: rawSpaces.type2 || [],
-        type3: rawSpaces.type3 || [],
+        chat: rawSpaces.chat || [],
+        task: rawSpaces.task || [],
+        question: rawSpaces.question || [],
       });
 
       setUsername(json.user?.username);
@@ -187,10 +187,10 @@ export default function MyPage() {
         </h2>
         <div className="grid gap-3">
           {[
-            { label: "チャット全削除", action: "spaces/chats", count: spaces?.type1?.length ?? 0 },
-            { label: "タスク全削除", action: "spaces/tasks", count: spaces?.type2?.length ?? 0 },
-            { label: "質問全削除", action: "spaces/questions", count: spaces?.type3?.length ?? 0 },
-            { label: "スペース全削除", action: "spaces", count: (spaces?.type1?.length ?? 0) + (spaces?.type2?.length ?? 0) + (spaces?.type3?.length ?? 0) },
+            { label: "チャット全削除", action: "spaces/chats", count: spaces?.chat?.length ?? 0 },
+            { label: "タスク全削除", action: "spaces/tasks", count: spaces?.task?.length ?? 0 },
+            { label: "質問全削除", action: "spaces/questions", count: spaces?.question?.length ?? 0 },
+            { label: "スペース全削除", action: "spaces", count: (spaces?.chat?.length ?? 0) + (spaces?.task?.length ?? 0) + (spaces?.question?.length ?? 0) },
             { label: "アーカイブ全削除", action: "spaces/archive", count: archiveCount ?? 0 },
             { label: "画像全削除", action: "images", count: imageCount },
           ].map((item) => (
