@@ -18,9 +18,9 @@ export async function GET() {
 
         // 3. 型ごとのフィルタリング
         const result = {
-        type1: spaces.filter(s => s.space_type === 1),
-        type2: spaces.filter(s => s.space_type === 2),
-        type3: spaces.filter(s => s.space_type === 3),
+        chat: spaces.filter(s => s.space_type === 1),
+        task: spaces.filter(s => s.space_type === 2),
+        question: spaces.filter(s => s.space_type === 3),
         };
         
         // データが空でも [] を返すことで、JSONパースエラーを防げます

@@ -11,6 +11,8 @@ import { ChevronDown, CheckCircle2 } from "lucide-react";
 import { MESSAGES } from "@/constants/messages";
 import { Switch } from "@nextui-org/react";
 import { fetchWithTimeout } from "@/lib/api";
+import { handleApiResponse } from "@/lib/api-utils";
+import { SegmentViewStateNode } from "next/dist/next-devtools/userspace/app/segment-explorer-node";
 
 export default function ChatPage({ params }: { params: Promise<{ question_id: string, space_id: string }> }) {
   const [inputText, setInputText] = useState("");
@@ -29,6 +31,7 @@ export default function ChatPage({ params }: { params: Promise<{ question_id: st
   const isInitialLoad = useRef(true);
   // 質問の解決状態を管理する（0:未解決, 1:解決済み）
   const [isResolved, setIsResolved] = useState(0);
+  const [isError, setIsError] = useState(false);
 
   // useEffect で質問データを取得した際に、初期状態をセットする
   useEffect(() => {
@@ -51,17 +54,36 @@ export default function ChatPage({ params }: { params: Promise<{ question_id: st
 
   useEffect(() => {
     if (status === "unauthenticated") {
-      ToiToiNotification.error(MESSAGES.AUTH003);
+      ToiToiNotification.error(MESSAGES.E4003);
       router.push("/");
     }
   }, [status, router]);
 
+  // useEffect(() => {
+  //   if (messages.length > 0 && isInitialLoad.current) {
+  //     scrollToBottom(true);
+  //     isInitialLoad.current = false; // 初回だけ実行するようにフラグを折る
+  //   }
+  // }, [messages]); // messages が更新された（＝描画された）瞬間に実行される
+
   useEffect(() => {
-    if (messages.length > 0 && isInitialLoad.current) {
-      scrollToBottom(true);
-      isInitialLoad.current = false; // 初回だけ実行するようにフラグを折る
+      // Array.isArray(chats) で安全に配列かどうかを確認してから length を見る
+    if (Array.isArray(messages) && messages.length > 0 && scrollRef.current && isInitialLoad.current) {
+      scrollRef.current.scrollTo({ 
+        top: scrollRef.current.scrollHeight, 
+        behavior: 'instant' 
+      });
+      isInitialLoad.current = false;
     }
-  }, [messages]); // messages が更新された（＝描画された）瞬間に実行される
+  }, [messages]);
+
+  useEffect(() => {
+  // 読み込み完了後にスクロールを実行する
+  if (!isLoading && messages.length > 0 && isInitialLoad.current) {
+    scrollToBottom(true);
+    isInitialLoad.current = false;
+  }
+}, [messages, isLoading]);
 
   useEffect(() => {
     if (question_id) fetchMessages();
@@ -72,22 +94,20 @@ export default function ChatPage({ params }: { params: Promise<{ question_id: st
     try {
       const { question_id, space_id } = await params;
       const res = await fetchWithTimeout(`/api/questions/${space_id}/messages?question_id=${question_id}`);
-      if (res.status === 404) {
-      // 例: トップ画面か404専用ページに飛ばす。トースト等を出してもOK
-        router.push('/404')
-      }
       const data = await res.json();
-    
+
       if (!res.ok) {
-        ToiToiNotification.error(data.message)
-        setIsSubmitting(true);
-        return;
+        await handleApiResponse(res); // 内部のthrowを待つ
+        throw new Error(); // 明示的にエラーを投げる
       }
       setMessages(data.messages || []);
       setQuestion(data.question);
       
     } catch (error) {
       console.error("メッセージ取得エラー:", error);
+      setIsError(true);
+      setIsSubmitting(true);
+
     } finally {
       setIsLoading(false); // 終了
     }
@@ -164,27 +184,11 @@ export default function ChatPage({ params }: { params: Promise<{ question_id: st
     try {
       const res = await fetchWithTimeout(`/api/questions/${space_id}/messages`, { method: "POST", body: formData });
       const data = await res.json();
-
-      // 404エラー時はリダイレクト
-      if (res.status === 404) {
-        router.push('/404')
-      }
-
-      // 404以外のエラーハンドリング
       if (!res.ok) {
-        ToiToiNotification.error(data.message);
-      
-      // ★エラー時にバックアップから復元
-        if (!stampId) {
-          setInputText(backupInputText);
-          setSelectedFiles(backupFiles);
-        }
-        // 楽観的更新で追加した仮メッセージを削除
-        setMessages((prev) => prev.filter((m) => !m.isPending));
-        scrollToBottom(true); // エラー時は下部へスクロール
-        return;
+        await handleApiResponse(res); // 内部のthrowを待つ
+        throw new Error(); // 明示的にエラーを投げる
       }
-      
+
       // 4. サーバーからのレスポンス(先ほど作成したAPIは { messages: newChats } を返す)で置き換え
       // 4. サーバーからのレスポンスで置き換え (修正後)
     // 4. サーバーからのレスポンスで置き換え
@@ -218,8 +222,6 @@ export default function ChatPage({ params }: { params: Promise<{ question_id: st
 
     } catch (e: any) {
       console.error(e);
-      ToiToiNotification.error(e.message || "メッセージ送信エラー");
-      
       // ★エラー時にバックアップから復元
       if (!stampId) {
         setInputText(backupInputText);
@@ -257,22 +259,17 @@ export default function ChatPage({ params }: { params: Promise<{ question_id: st
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: editValue }),
       });
-      if (res.status === 404) {
-        router.push('/404')
-      }
       const data = await res.json();
 
-      if (!res.ok){
-        ToiToiNotification.error(data.message);
-        setMessages(previousMessages);
-        return;
+      if (!res.ok) {
+        await handleApiResponse(res); // 内部のthrowを待つ
+        throw new Error(); // 明示的にエラーを投げる
       }
       // 成功したら、サーバーから返された正式なデータでリストを更新するのが理想的です
       // API側が更新後のデータを返しているなら、以下の処理でより正確になります
       setMessages((prev) => prev.map(m => m.id === chatId ? data : m));
 
     } catch (e: any) {
-      ToiToiNotification.error(e.message);
 
       // 4. 失敗したら元の状態へロールバック
       setMessages(previousMessages);
@@ -299,19 +296,13 @@ export default function ChatPage({ params }: { params: Promise<{ question_id: st
       const res = await fetchWithTimeout(`/api/questions/${question_id}/messages/${chatId}/status`, { 
         method: "PATCH" 
       });
-      if (res.status === 404) {
-        router.push('/404')
-      }
       const data = await res.json();
-      
       if (!res.ok) {
-        ToiToiNotification.error(data.message);
-        setMessages(previousMessages);
-        return;
+        await handleApiResponse(res); // 内部のthrowを待つ
+        throw new Error(); // 明示的にエラーを投げる
       }
       
     } catch (e: any) {
-      ToiToiNotification.error(e.message);
       // 3. 失敗したら元の状態に戻す
       setMessages(previousMessages);
     }
@@ -330,14 +321,10 @@ export default function ChatPage({ params }: { params: Promise<{ question_id: st
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
       });
-      if (res.status === 404) {
-        router.push('/404')
-      }
-      const data = await res.json();
 
-      if (!res.ok){
-        ToiToiNotification.error(data.message);
-
+      if (!res.ok) {
+        await handleApiResponse(res); // 内部のthrowを待つ
+        throw new Error(); // 明示的にエラーを投げる
       }
 
     } catch (e: any) {
@@ -364,12 +351,13 @@ export default function ChatPage({ params }: { params: Promise<{ question_id: st
 
   // 1. まずレスポンスをクローンして、JSONかバイナリかを判別する準備をする
   const responseClone = res.clone();
+
+  
   
   // 2. ステータスが OK でない場合は JSON としてメッセージを取り出す
   if (!res.ok) {
-    const errorData = await res.json();
-    ToiToiNotification.error(errorData.message || "エラーが発生しました");
-    return;
+    await handleApiResponse(res); // 内部のthrowを待つ
+    throw new Error(); // 明示的にエラーを投げる
   }
 
   // 3. OKなら、Blobとしてデータを取得
@@ -412,18 +400,15 @@ export default function ChatPage({ params }: { params: Promise<{ question_id: st
           space_id: space_id 
         }),
       });
-      if (res.status === 404) {
-        router.push('/404')
-      }
-        const data = await res.json();
+      const data = await res.json();
+
       if (!res.ok) {
-        ToiToiNotification.error(data.message);
-        setIsResolved(previousStatus); 
+        await handleApiResponse(res); // 内部のthrowを待つ
+        throw new Error(); // 明示的にエラーを投げる
       }
       
       // 成功時は何もしなくてOK（setIsResolvedで既に更新済みのため）
     } catch (e: any) {
-      ToiToiNotification.error(e.message);
       setIsResolved(previousStatus); 
     }
   };
@@ -490,6 +475,7 @@ return (
           onScrollBottom={scrollToBottom}
           isLoading={isLoading}
           type="question"
+          isError={isError}
         />
       </div>
 

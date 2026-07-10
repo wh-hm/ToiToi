@@ -21,14 +21,17 @@ export async function PATCH(
     // body に favorite_flag が含まれていることを前提にします
     const { chat_id, favorite_flag } = body;
 
-    console.log(space_id);
-    const isSpaceAlive = await getSpaceCheck(auth.user_id, space_id);
+    const [isSpaceAlive, isChatAlive] = await Promise.all([
+        getSpaceCheck(auth.user_id, space_id), // ※関数名が推測ですが合わせる
+        getChatCheck(auth.user_id, space_id, chat_id)
+    ]);
+
+    // スペースチェックの判定
     if (!isSpaceAlive) {
         return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
 
-    const isChatAlive = await getChatCheck(auth.user_id, space_id, chat_id);
-
+    // チャットチェックの判定
     if (!isChatAlive) {
         return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
     }

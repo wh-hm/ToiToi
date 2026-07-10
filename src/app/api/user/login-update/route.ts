@@ -2,14 +2,12 @@
 import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth-guard";
 import { updateLoginManagement} from "@/services/LoginManagementService";
-import { MESSAGES } from "@/constants/messages";
 
 export async function PATCH() {
   const auth = await getAuthContext();
   if ('error' in auth) {
     return NextResponse.json({ message: auth.error }, { status: auth.status });
   }
-
   try {
     await updateLoginManagement(auth.user_id);
 

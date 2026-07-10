@@ -1,5 +1,4 @@
 "use client";
-
 import { useState, useRef } from "react";
 import { PreviewModal } from "@/components/chat/PreviewModal";
 import { Input, Button, Popover, PopoverTrigger, PopoverContent } from "@nextui-org/react";
@@ -8,16 +7,16 @@ import { CHARACTER_STAMPS } from "@/constants/stamp";
 import { ToiToiNotification } from "@/components/Toast";
 import { MESSAGES } from "@/constants/messages";
 import { ChatInputProps } from "@/types/chat";
-import { toast } from "react-hot-toast";
 
 export default function ChatInput({ 
-  value, onChange, onSend, onSendStamp, onUploadImage, onRemoveFile, selectedFiles, disabled 
+  value, onChange, onSend, onSendStamp, onUploadImage, onRemoveFile, selectedFiles, disabled
 }: ChatInputProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null); // ★フォーカス制御用
   
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+
 
   const handleOpenModal = (index: number) => {
     setPreviewIndex(index);
@@ -36,6 +35,8 @@ export default function ChatInput({
       inputRef.current?.focus();
     }, 100);
   };
+
+  console.log(disabled);
 
   return (
     <>
@@ -57,10 +58,22 @@ export default function ChatInput({
                   <img 
                     src={URL.createObjectURL(file)} 
                     className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
-                    onClick={() => handleOpenModal(index)}
+                    onClick={() => {
+                      console.log("disabledの状況",disabled)
+                      if (!disabled){
+                        handleOpenModal(index)
+                      }
+                    }}
                   />
                   <button 
-                    onClick={() => onRemoveFile(index)}
+                    onClick={() => {
+                      console.log(disabled)
+                      console.log("disabledの状況",disabled)
+
+                      if (!disabled){
+                        onRemoveFile(index)
+                      }
+                    }}
                     className="absolute top-0 right-0 bg-black/50 text-white rounded-bl-lg p-0.5 hover:bg-black transition-colors"
                   >
                     <X size={12} />
@@ -107,8 +120,15 @@ export default function ChatInput({
                 isIconOnly 
                 variant="light" 
                 radius="full" 
-                onClick={() => fileInputRef.current?.click()}
-                disabled={selectedFiles.length >= 5}
+                onClick={() => {
+                      console.log("disabledの状況",disabled)
+
+                  console.log(disabled)
+                  if (!disabled){
+                    fileInputRef.current?.click()
+                  }
+                }}
+                disabled={selectedFiles.length >= 5 || disabled}
               >
                 <Paperclip size={20} className={selectedFiles.length >= 5 ? "text-gray-300" : "text-gray-500"} />
               </Button>
@@ -127,7 +147,14 @@ export default function ChatInput({
                         <button 
                           key={stamp.id} 
                           disabled={disabled}
-                          onClick={() => onSendStamp(stamp.id)} 
+                          onClick={() => {
+                      console.log("disabledの状況",disabled)
+
+                            console.log(disabled)
+                            if (!disabled){
+                              onSendStamp(stamp.id);
+                            }
+                          }}
                           className="hover:bg-gray-100 p-1 rounded-xl transition-transform active:scale-90 flex flex-col items-center"
                         >
                           <img 
@@ -144,7 +171,13 @@ export default function ChatInput({
                   isIconOnly 
                   variant="light" 
                   radius="full" 
-                  onClick={onSend}
+                  onClick={() => {
+                      console.log("disabledの状況",disabled)
+
+                    if (!disabled){
+                      onSend();
+                    }
+                  }}
                   disabled={disabled || (!value.trim() && selectedFiles.length === 0)}
                 >
                   <SendHorizontal 

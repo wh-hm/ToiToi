@@ -8,6 +8,7 @@ import { MESSAGES } from "@/constants/messages";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { fetchWithTimeout } from "@/lib/api";
+import { handleApiResponse } from "@/lib/api-utils";
 
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const [chats, setChats] = useState<ChatMessage[]>([]);
@@ -24,18 +25,31 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [isLoading, setIsLoading] = useState(true); 
   const [spaceName, setSpaceName] = useState("");
   const [isChatsLoadFailed, setIsChatsLoadFailed] = useState(true);
+  const [ isError, setIsError] = useState(true);
 
   useEffect(() => {
     if (status === "unauthenticated") {
-      ToiToiNotification.error(MESSAGES.AUTH003);
+      ToiToiNotification.error(MESSAGES.E4003);
       router.push("/");
     }
   }, [status, router]);
 
   // 初回ロード完了時に一度だけ実行
+  // useEffect(() => {
+    
+  //   if (chats.length > 0 && scrollRef.current && isInitialLoad.current) {
+  //     scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'instant' });
+  //     isInitialLoad.current = false;
+  //   }
+  // }, [chats]);
+  // 修正後
   useEffect(() => {
-    if (chats.length > 0 && scrollRef.current && isInitialLoad.current) {
-      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'instant' });
+    // Array.isArray(chats) で安全に配列かどうかを確認してから length を見る
+    if (Array.isArray(chats) && chats.length > 0 && scrollRef.current && isInitialLoad.current) {
+      scrollRef.current.scrollTo({ 
+        top: scrollRef.current.scrollHeight, 
+        behavior: 'instant' 
+      });
       isInitialLoad.current = false;
     }
   }, [chats]);
@@ -43,6 +57,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const scrollToBottom = (force: boolean = false) => {
     setTimeout(() => {
       if (!scrollRef.current || editingId !== null) return;
+      
 
       const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
       const isNearBottom = (scrollHeight - scrollTop - clientHeight < 200);
@@ -68,24 +83,22 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     try {
       const { id } = await params;
       const res = await fetchWithTimeout(`/api/chats?space_id=${id}`);
-      if (res.status === 404) {
-        router.push('/404');
-        return;
-      }
       const data = await res.json();
-    
       if (!res.ok) {
-        ToiToiNotification.error(data.message);
-        return;
+        await handleApiResponse(res); // 内部のthrowを待つ
+        throw new Error(); // 明示的にエラーを投げる
       }
 
       // 💡 【修正点】まずデータを画面にセットして、Failedフラグを解除
       setChats(data.chats);
       setSpaceName(data.spaceName);
       setIsChatsLoadFailed(false);
+      setIsError(false);
       
     } catch (e) {
       console.error("メッセージ取得エラー:", e);
+      console.error("API Error at /api/chats:", e);
+      setIsError(true);
       ToiToiNotification.error("チャットの取得に失敗しました。");
     } finally {
       // 💡 【超重要】ここで一律でfalseにするのではなく、
@@ -177,7 +190,13 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       }
     }
 
-    setChats((prev) => [...prev, ...pendingMessages]);
+    setChats((prev) => {
+      // prev が配列であることを確認し、そうでなければ空配列として扱う
+      const safePrev = Array.isArray(prev) ? prev : [];
+      return [...safePrev, ...pendingMessages];
+    });
+
+    // setChats((prev) => [...prev, ...pendingMessages]);
     scrollToBottom(false);
 
     if (!stampId) {
@@ -189,21 +208,9 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     try {
       const res = await fetchWithTimeout(`/api/chats/`, { method: "POST", body: formData });
       const data = await res.json();
-
-      if (res.status === 404) {
-        router.push('/404');
-        return;
-      }
-
-      if (!res.ok){
-        ToiToiNotification.error(data.message);
-        if (!stampId) {
-          setInputText(backupInputText);
-          setSelectedFiles(backupFiles);
-        }
-        setChats((prev) => prev.filter((m) => !m.isPending));
-        scrollToBottom(true);
-        return;
+      if (!res.ok) {
+        await handleApiResponse(res); // 内部のthrowを待つ
+        throw new Error(); // 明示的にエラーを投げる
       }
 
       if (data.newChat && data.newChat.length > 0){
@@ -251,15 +258,9 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         body: JSON.stringify({ message: editValue, space_id: space_id }),
       });
       const data = await res.json();
-      if (res.status === 404) {
-        router.push('/404');
-        return;
-      }
-      
       if (!res.ok) {
-        ToiToiNotification.error(data.message);
-        setChats(previousMessages);
-        return;
+        await handleApiResponse(res); // 内部のthrowを待つ
+        throw new Error(); // 明示的にエラーを投げる
       }
       
     } catch (e) {
@@ -278,16 +279,11 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       const res = await fetchWithTimeout(`/api/chats/${chatId}?space_id=${sId}`, { 
         method: "DELETE" 
       });
-      if (res.status === 404) {
-        router.push('/404');
-        return;
-      }
       const data = await res.json();
       if (!res.ok) {
-        ToiToiNotification.error(data.message);
-        setChats(previousMessages);
-        return;
-      }
+        await handleApiResponse(res); // 内部のthrowを待つ
+        throw new Error(); // 明示的にエラーを投げる
+      }(res);
     } catch (e) {
       console.log(e);
       setChats(previousMessages);
@@ -312,17 +308,12 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           chat_id: chatId
         }),
       });
-
-      if (res.status === 404) {
-        router.push('/404');
-        return;
-      }
-
       const data = await res.json();
+
+
       if (!res.ok) {
-        ToiToiNotification.error(data.message);
-        setChats(previousMessages);
-        return;
+        await handleApiResponse(res); // 内部のthrowを待つ
+        throw new Error(); // 明示的にエラーを投げる
       }
     } catch (e) {
       console.log(e);
@@ -345,17 +336,12 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ background: bg, chat_id: chat_id }),
       });
-      if (res.status === 404) {
-        router.push('/404');
-        return;
-      }
-
       const data = await res.json();
+
       if (!res.ok) {
-        ToiToiNotification.error(data.message);
-        setChats(previousMessages);
-        return;
-      }
+        await handleApiResponse(res); // 内部のthrowを待つ
+        throw new Error(); // 明示的にエラーを投げる
+      };
     } catch (e) {
       console.log(e);
       setChats(previousMessages);
@@ -375,15 +361,15 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         })
       });
 
-      // 💡 【修正点】失敗した時だけJSONを取り出してエラー通知する
+
       if (!res.ok) {
-        const errorData = await res.json();
-        ToiToiNotification.error(errorData.message || "エラーが発生しました");
-        return;
-      }
+        await handleApiResponse(res); // 内部のthrowを待つ
+        throw new Error(); // 明示的にエラーを投げる
+      };
 
       // 💡 成功ならそのまま安全にBlob変換
       const blob = await res.blob();
+      
       const url = window.URL.createObjectURL(blob);
       
       const disposition = res.headers.get('Content-Disposition');
@@ -441,6 +427,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           onScrollBottom={scrollToBottom}
           isLoading={isLoading}
           type="chat"
+          isError={isError}
         />
       </div>
 
@@ -459,7 +446,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           onUploadImage={handleFileSelect}
           onRemoveFile={handleRemoveFile} 
           selectedFiles={selectedFiles}   
-          disabled={isSubmitting || isChatsLoadFailed}
+          disabled={isSubmitting || isChatsLoadFailed || isError}
         />
       </div>
     </div>

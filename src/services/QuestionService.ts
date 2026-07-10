@@ -322,32 +322,40 @@ export async function updateQuestionStatus(
  * メソッド名称：getQuestionsCount
  * 概要：未解決の質問の個数を取得
  */
-export async function getQuestionsCount(
-    space_id: number,
-    user_id: string,
-    tx?: any
 
-): Promise<number> { // 戻り値: int
-  try {
-    const db = tx || prisma;
+export async function getQuestionsCount(user_id: string) {
+  // 1. まずユーザーの全スペースを取得
+  const spaces = await prisma.space.findMany({
+    where: {
+      user_id: user_id,
+      delete_flag: 0,
+    },
+    select: {
+      id: true,
+      name: true, // スペース名も取れるようにしておくのがおすすめ
+    },
+  });
 
-    // 1. 質問マスタ（question）に対して、指定の条件を満たすレコードの集計（count）を要求する。
-    // 検索・カウント条件（where句）
-    const count = await db.question.count({
-      where: {
-        space_id: space_id,     // space_id = 引数の space_id
-        is_resolved: 0,         // is_resolved = 0（解決済みフラグが「未解決」の状態）
-        delete_flag: 0,         // delete_flag = 0（削除されていない有効な質問のみ）
-        // ユーザー自身のスペース内、または閲覧権限のバリデーションとしてuser_idが必要な場合はここに追記します
-      },
-    });
+  // 2. 各スペースについてタスクをカウント（並列処理で高速化）
+  const result = await Promise.all(
+    spaces.map(async (space) => {
+      const count = await prisma.question.count({
+        where: {
+          user_id: user_id,
+          space_id: space.id,
+          is_resolved: 0,
+          delete_flag: 0,
+        },
+      });
+      
+      return {
+        space_id: space.id,
+        space_name: space.name,
+        question_count: count,
+      };
+    })
+  );
 
-    // 2. データベースから返ってきた件数（数値型）を、そのまま呼び出し元へ返却する。
-    return count;
-
-  } catch (error) {
-    // 例外処理：データベース接続エラー等の例外発生時は、呼び出し元（呼出元）にエラーをそのまま返し、画面側でのエラーハンドリングに委ねる。
-    console.error(`space_id: ${space_id} の未解決質問数カウント中にエラーが発生しました:`, error);
-    throw error;
-  }
+  return result; // これが「配列」になります
 }
+

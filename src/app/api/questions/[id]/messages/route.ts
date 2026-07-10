@@ -7,6 +7,7 @@ import { MESSAGES } from "@/constants/messages";
 import { getQuestion, checkQuestion } from "@/services/QuestionService";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { getSpaceCheck } from "@/services/SpaceService";
 
 
 // 1. メッセージ一覧取得 (GET)
@@ -32,15 +33,26 @@ export async function GET(
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
-    const isSpaceAlive = await checkQuestion(auth.user_id, space_id, question_id);
+    
+    const [isSpaceAlive,  isQuestionAlive] = await Promise.all([
+      getSpaceCheck(auth.user_id, space_id), // ※関数名が推測ですが合わせる
+      checkQuestion(auth.user_id, space_id, question_id),
+    ]);
+        
+    // スペースチェックの判定
     if (!isSpaceAlive) {
-      return NextResponse.json({ message: MESSAGES.E2005("質問") }, { status: 404 });
+        return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+    }
+    if (!isQuestionAlive) {
+        return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
     }
 
     const [messages, question] = await Promise.all([
       getQuestionChats(question_id, auth.user_id),
       getQuestion(question_id, auth.user_id)
     ]);
+
+    
 
     return NextResponse.json({ messages: messages || [], question: question || null });
   } catch (error) {
@@ -80,6 +92,20 @@ export async function POST(
     if (message && message.length > 100) {
       return NextResponse.json({ message: MESSAGES.E1002("チャット内容", 100) }, { status: 400 });
     }
+
+    const [isSpaceAlive,  isQuestionAlive] = await Promise.all([
+      getSpaceCheck(auth.user_id, space_id), // ※関数名が推測ですが合わせる
+      checkQuestion(auth.user_id, space_id, question_id),
+    ]);
+        
+    // スペースチェックの判定
+    if (!isSpaceAlive) {
+        return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+    }
+    if (!isQuestionAlive) {
+        return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
+    }
+
 
     // 画像アップロード処理
     let imageUrls: string[] = [];

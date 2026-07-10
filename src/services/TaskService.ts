@@ -2,6 +2,27 @@
 import { prisma } from "@/lib/prisma";
 import { Task } from "@prisma/client";
 
+export const getTaskCheck = async (user_id: string, space_id: number, task_id: number): Promise<boolean> => {
+  try {
+    const  result = await prisma.chat.findFirst({
+      where: { 
+        id: task_id,
+        user_id: user_id, 
+        delete_flag: 0, 
+        space_id: space_id, 
+      }
+    });
+
+    if(!result){
+      return false;
+    }
+    return true;
+
+  } catch (error) {
+    throw error;
+  }
+};
+
 
 //概要：スペースに紐づく有効なタスク一覧を取得する
 export async function getTasks(
