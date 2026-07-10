@@ -9,6 +9,8 @@ import { Loading } from "@/components/LoadingSpinner";
 // 💡 自作の可愛いコンポーネントたちを正しくインポート
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import { ToiToiNotification } from "@/components/Toast";
+import { fetchWithTimeout } from "@/lib/api";
+import { handleApiResponse } from "@/lib/api-utils";
 
 export default function MyPage() {
   const router = useRouter();
@@ -44,8 +46,11 @@ export default function MyPage() {
   // 2. データ取得処理
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch("/api/user/account");
-      if (!res.ok) throw new Error("取得失敗");
+      const res = await fetchWithTimeout("/api/user/account");
+      if (!res.ok) {
+          await handleApiResponse(res); // 内部のthrowを待つ
+          throw new Error(); // 明示的にエラーを投げる
+      }
       const json = await res.json();
       
       const rawSpaces = json.spaces || { type1: [], type2: [], type3: [] };
@@ -103,11 +108,11 @@ export default function MyPage() {
   const executeDelete = async (action: string) => {
     setIsDeleting(true);
     try {
-      const res = await fetch(`/api/${action}`, { method: "DELETE" });
-      const result = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(result.error || "操作に失敗しました");
-      
-      ToiToiNotification.success(result.message || "削除が完了したよ！");
+      const res = await fetchWithTimeout(`/api/${action}`, { method: "DELETE" });
+      if (!res.ok) {
+        await handleApiResponse(res); // 内部のthrowを待つ
+        throw new Error(); // 明示的にエラーを投げる
+      }
       
       if (action === "user/account") {
         await signOut({ callbackUrl: "/" });
@@ -125,13 +130,16 @@ export default function MyPage() {
     if (!newName.trim()) return ToiToiNotification.error("ユーザー名を入力してください");
     setIsSaving(true);
     try {
-      const res = await fetch("/api/user/username", {
+      const res = await fetchWithTimeout("/api/user/username", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: newName }),
       });
+      if (!res.ok) {
+        await handleApiResponse(res); // 内部のthrowを待つ
+        throw new Error(); // 明示的にエラーを投げる
+      }
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "更新に失敗しました");
       
       ToiToiNotification.success("ユーザー名を変更しました");
       setUsername(newName);

@@ -17,6 +17,12 @@ export async function GET(request: Request) {
         return NextResponse.json({ message: MESSAGES.E1001("スペースID") }, { status: 400 });
     }
 
+    const isSpaceAlive = await getSpaceCheck(auth.user_id, space_id);
+        
+    if (!isSpaceAlive) {
+        return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+    }
+
     try {
 
         const isSpaceAlive = await getSpaceCheck(auth.user_id, space_id);
@@ -40,6 +46,9 @@ export async function POST(request: Request) {
 
     try {
         const { title, description, due_date, space_id, tag, is_allday, priority } = await request.json();
+
+        
+
 
         // --- 単体チェック ---
         // 1. 必須チェック (E1001)
@@ -71,6 +80,12 @@ export async function POST(request: Request) {
         if (inputDate < today) {
             // 📝 ここには仕様書で定義されている「過去日のエラーメッセージ」を当てはめてください
             return NextResponse.json({ message: MESSAGES.E1011 }, { status: 400 });
+        }
+
+        const isSpaceAlive = await getSpaceCheck(auth.user_id, space_id);
+        
+        if (!isSpaceAlive) {
+            return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
         }
 
         // データベース保存

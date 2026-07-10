@@ -16,7 +16,6 @@ export const ImageZoomModal = ({
 
   const isDisabled = !imageUrl || isPending;
 
-  
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
       <div className="bg-white p-6 rounded-2xl w-full max-w-5xl max-h-[95vh] flex flex-col relative shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -43,6 +42,7 @@ export const ImageZoomModal = ({
                   isDisabled ? 'opacity-50 pointer-events-none' : ''
                 }`}
                 disabled={isDisabled}
+                
               >
                 {/* 💡 isPending が true なら確実にぐるぐる回す */}
                 {isPending ? (

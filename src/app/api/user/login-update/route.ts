@@ -9,7 +9,6 @@ export async function PATCH() {
   if ('error' in auth) {
     return NextResponse.json({ message: auth.error }, { status: auth.status });
   }
-
   try {
     await updateLoginManagement(auth.user_id);
 

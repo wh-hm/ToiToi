@@ -5,6 +5,7 @@ import { updateQuestionChat, deleteQuestionChat, checkQuestionChat } from "@/ser
 import { MESSAGES } from "@/constants/messages";
 import { NextRequest } from "next/server";
 import { getSpaceCheck } from "@/services/SpaceService";
+import { checkQuestion } from "@/services/QuestionService";
 
 export async function PATCH(
   request: Request,
@@ -22,13 +23,21 @@ export async function PATCH(
     const { searchParams } = new URL(request.url);
     const chat_id = Number(searchParams.get("chat_id"));
 
-    const isSpaceAlive = await getSpaceCheck(auth.user_id, space_id);
+    const [isSpaceAlive, usQuestionAlive, isChatAlive] = await Promise.all([
+      getSpaceCheck(auth.user_id, space_id), // ※関数名が推測ですが合わせる
+      checkQuestion(auth.user_id, space_id, question_id),
+      checkQuestionChat(chat_id, question_id, auth.user_id, )
+    ]);
+        
+    // スペースチェックの判定
     if (!isSpaceAlive) {
         return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
-    const isChatAlive = await checkQuestionChat(chat_id, question_id, auth.user_id, );
-
     if (!isChatAlive) {
+        return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
+    }
+
+    if (!usQuestionAlive) {
         return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
     }
 
@@ -65,16 +74,24 @@ export async function DELETE(
   }
 
   try {
-    const isSpaceAlive = await getSpaceCheck(auth.user_id, space_id);
+    const [isSpaceAlive, usQuestionAlive, isChatAlive] = await Promise.all([
+      getSpaceCheck(auth.user_id, space_id), // ※関数名が推測ですが合わせる
+      checkQuestion(auth.user_id, space_id, question_id),
+      checkQuestionChat(chat_id, question_id, auth.user_id, )
+    ]);
+        
+    // スペースチェックの判定
     if (!isSpaceAlive) {
         return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
-    const isChatAlive = await checkQuestionChat(chat_id, question_id, auth.user_id, );
-
     if (!isChatAlive) {
         return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
     }
 
+    if (!usQuestionAlive) {
+        return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
+    }
+    
     // 3. 削除実行
     const result = await deleteQuestionChat(chat_id, question_id, auth.user_id);
     if(! result){

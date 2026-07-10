@@ -7,19 +7,19 @@ import { MESSAGES } from "@/constants/messages";
 import { getSpaceCheck } from "@/services/SpaceService";
 import { checkQuestionChat } from "@/services/QuestionChatService";
 import { getChatCheck } from "@/services/ChatService";
-export async function DELETE() {
-  // 1. 認証チェック
-  const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
+// export async function DELETE() {
+//   // 1. 認証チェック
+//   const auth = await getAuthContext();
+//   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
-  try {
-    await deleteImages(auth.user_id);
+//   try {
+//     await deleteImages(auth.user_id);
 
-    return NextResponse.json({ message: MESSAGES.S1004("画像")});
-  } catch (error) {
-    return NextResponse.json({ message: MESSAGES.E2004("画像") }, { status: 500 });
-  }
-}
+//     return NextResponse.json({ message: MESSAGES.S1004("画像")});
+//   } catch (error) {
+//     return NextResponse.json({ message: MESSAGES.E2004("画像") }, { status: 500 });
+//   }
+// }
 
 
 const s3Client = new S3Client({
@@ -50,34 +50,36 @@ export async function POST(request: Request) {
   const qId = question_id ? parseInt(question_id) : null;
 
   // ==========================================
-  // 1. 権限・生存チェック
+  // 1. 権限・生存チェック（並列化版）
   // ==========================================
+
+  // チェック用のPromise配列を準備
+  const checkTasks = [];
+
   if (type === "chat") {
-    const isSpaceAlive = await getSpaceCheck(auth.user_id, sId);
-    if (!isSpaceAlive) {
-      return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
-    }
-
-    const isChatAlive = await getChatCheck(auth.user_id, sId, cId);
-    if (!isChatAlive) {
-      return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
-    }
-
+    // スペースとチャットのチェックを同時に飛ばす
+    checkTasks.push(getSpaceCheck(auth.user_id, sId));
+    checkTasks.push(getChatCheck(auth.user_id, sId, cId));
   } else if (type === "question") {
-    const isSpaceAlive = await getSpaceCheck(auth.user_id, sId);
-    if (!isSpaceAlive) {
-      return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
-    }
-
-    // question_id が無いとチェックできないのでバリデーション
+    // question_idのバリデーションは先に行う
     if (!qId) {
       return NextResponse.json({ message: MESSAGES.E1008 }, { status: 400 });
     }
+    // スペースと質問チャットのチェックを同時に飛ばす
+    checkTasks.push(getSpaceCheck(auth.user_id, sId));
+    console.log(cId, qId, auth.user_id);
+    checkTasks.push(checkQuestionChat(cId, qId, auth.user_id));
+  }
 
-    const isChatAlive = await checkQuestionChat(cId, qId, auth.user_id);
-    if (!isChatAlive) {
-      return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
-    }
+  // すべてのチェックを並列実行
+  const [isSpaceAlive, isChatAlive] = await Promise.all(checkTasks);
+
+  // 判定処理
+  if (!isSpaceAlive) {
+    return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+  }
+  if (!isChatAlive) {
+    return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
   }
 
   // ==========================================

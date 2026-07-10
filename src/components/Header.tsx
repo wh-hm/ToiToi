@@ -61,7 +61,7 @@ export default function Header() {
   return (
     <>
       <Navbar className="w-full h-16 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-sm" maxWidth="full">
-        <NavbarBrand>
+        <NavbarBrand className="max-w-[150px]">
           <Link href="/dashboard" className="transition-transform hover:scale-105">
             <Image 
               src="/logo.png" 
@@ -76,6 +76,7 @@ export default function Header() {
 
         {/* PC用ナビ */}
         <NavbarContent className="hidden lg:flex" justify="end">
+          <Link href="/dashboard" className="mr-4 font-medium text-gray-600">ダッシュボード</Link>
           {menuConfig.map((cat) => (
             <div key={cat.key} className="relative" onMouseEnter={() => setOpenStates(p => ({...p, [cat.key]: true}))} onMouseLeave={() => setOpenStates(p => ({...p, [cat.key]: false}))}>
               <Dropdown isOpen={openStates[cat.key]}>
@@ -126,10 +127,16 @@ export default function Header() {
             className="absolute top-0 right-0 h-full w-[280px] bg-white shadow-2xl p-4 overflow-y-auto cursor-default"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center mb-6 pt-2 px-2">
+            
+            <div className="flex justify-between items-center mb-10 pt-2 px-2">
               <span className="font-bold text-gray-800">メニュー</span>
               <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-gray-500">✕</button>
             </div>
+
+            <div className="flex flex-col gap-1 pb-2">
+              <Link className="font-bold text-gray-700 ml-2" href="/dashboard" onClick={() => setIsMobileMenuOpen(false)}>ダッシュボード</Link>
+            </div>
+
             
             <Accordion selectionMode="multiple" className="p-2">
               {menuConfig.map((cat) => (

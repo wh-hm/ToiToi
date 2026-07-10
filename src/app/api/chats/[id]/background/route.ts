@@ -20,18 +20,20 @@ export async function PATCH(
   try {
     const { background, chat_id } = await request.json();
 
-    const isSpaceAlive = await getSpaceCheck(auth.user_id, space_id);
-    
+    const [isSpaceAlive, isChatAlive] = await Promise.all([
+        getSpaceCheck(auth.user_id, space_id), // ※関数名が推測ですが合わせる
+        getChatCheck(auth.user_id, space_id, chat_id)
+    ]);
+
+    // スペースチェックの判定
     if (!isSpaceAlive) {
         return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
 
-    const isChatAlive = await getChatCheck(auth.user_id, space_id, chat_id);
-
+    // チャットチェックの判定
     if (!isChatAlive) {
         return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
     }
-
     // 2. 背景変更を実行
     const updatedChat = await changeBackground(chat_id, space_id, auth.user_id, background);
 

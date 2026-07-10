@@ -34,7 +34,6 @@ export async function PATCH(request: Request) {
         { status: 400 }
       );
     }
-
     // 使用禁止文字
     if (safeRegex.test(content)) {
       return NextResponse.json(
@@ -42,7 +41,6 @@ export async function PATCH(request: Request) {
         { status: 400 }
       );
     }
-
     const deletedAt = new Date();
     deletedAt.setDate(deletedAt.getDate() + 7);
 
@@ -64,7 +62,6 @@ export async function PATCH(request: Request) {
         deleted_at: deletedAt,
       },
     });
-
     return NextResponse.json(goal);
   } catch (error) {
     console.error("目標更新エラー:", error);

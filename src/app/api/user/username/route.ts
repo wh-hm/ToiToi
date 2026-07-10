@@ -12,7 +12,6 @@ export async function PATCH(request: Request) {
     }
 
     try {
-
         const userCheck = await checkUser(auth.user_id);
         if (!userCheck) {
             // 404 Not Found を返す
@@ -39,10 +38,8 @@ export async function PATCH(request: Request) {
             );
         }
 
-
         // 3. ユーザー名を更新
         const isUpdated = await updateUsername(auth.user_id, username);
-        
         
         if (!isUpdated) {
             return NextResponse.json({ message: MESSAGES.E2002("ユーザー名") }, { status: 500 });

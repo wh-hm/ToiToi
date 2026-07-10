@@ -9,7 +9,7 @@ import { Loading } from "@/components/LoadingSpinner";
 import { fetchWithTimeout } from "@/lib/api";
 import { ToiToiNotification } from "@/components/Toast";
 import toast from "react-hot-toast";
-
+import { handleApiResponse } from "@/lib/api-utils";
 type FallingCharacter = {
   id: number;
   src: string;
@@ -72,15 +72,9 @@ export default function Username() {
 
       const data = await res.json();
 
-      if (res.status === 404) {
-        router.push('/404')
-      }
-
-
       if (!res.ok) {
-        // 3. API側で弾かれたエラー（重複チェックなど）はここで拾って表示する
-        ToiToiNotification.error(data.message); 
-        return;
+        await handleApiResponse(res); // 内部のthrowを待つ
+        throw new Error(); // 明示的にエラーを投げる
       }
       ToiToiNotification.success(data.message);
       router.push("/dashboard");
@@ -101,19 +95,19 @@ export default function Username() {
       if (!session?.user?.id) return;
       try {
         const res = await fetchWithTimeout(`/api/user/username/check`);
+        const data = await res.json();
 
-        if (res.status === 404) {
-          router.push('/404')
+        if (!res.ok) {
+          await handleApiResponse(res); // 内部のthrowを待つ
+          throw new Error(); // 明示的にエラーを投げる
         }
 
-        if (!res.ok) throw new Error();
-        const data = await res.json();
         if (data.hasUsername) {
           router.push("/dashboard");
           return;
         }
       } catch (error:any) {
-        ToiToiNotification.error(MESSAGES.E3003);
+        console.log(error);
       } finally {
         setLoading(false);
       }

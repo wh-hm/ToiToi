@@ -5,6 +5,8 @@ import { signIn, SessionProvider, useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import { useRouter } from 'next/navigation';
 import { ToiToiNotification } from "@/components/Toast";
+import { fetchWithTimeout } from "@/lib/api";
+import { handleApiResponse } from "@/lib/api-utils";
 
 function TopPageContent() {
     const router = useRouter();
@@ -51,16 +53,18 @@ function TopPageContent() {
     const initializeUser = async () => {
         setIsProcessing(true);
         try {
-            const res = await fetch("/api/auth/login", { method: "POST" });
+            const res = await fetchWithTimeout("/api/auth/login", { method: "POST" });
             const loginData = await res.json();
             if (!res.ok) {
-                throw new Error(loginData.message || "ログイン処理に失敗しました");
+                await handleApiResponse(res); // 内部のthrowを待つ
+                throw new Error(); // 明示的にエラーを投げる
             }
 
-            const checkRes = await fetch("/api/user/username/check");
+            const checkRes = await fetchWithTimeout("/api/user/username/check");
             const data = await checkRes.json();
             if (!checkRes.ok) {
-                throw new Error(data.message || "ユーザー確認に失敗しました");
+                await handleApiResponse(checkRes); // 内部のthrowを待つ
+                throw new Error(); // 明示的にエラーを投げる
             }
 
             if (data.hasUsername) {

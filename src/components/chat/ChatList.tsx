@@ -22,6 +22,7 @@ const ChatList = forwardRef<HTMLDivElement, ChatListProps>(({
   onScrollBottom,
   isLoading,
   type,
+  isError
 }, ref) => {
   
   const [openItemId, setOpenItemId] = useState<number | null>(null);
@@ -34,6 +35,14 @@ const ChatList = forwardRef<HTMLDivElement, ChatListProps>(({
     setShowScrollButton(scrollHeight - scrollTop - clientHeight > 200);
   };
 
+  useEffect(() => {
+  console.log("【状態変化】isErrorが変化しました:", isError);
+}, [isError]);
+
+useEffect(() => {
+  console.log("【状態変化】isSubmittingが変化しました:", isSubmitting);
+}, [isSubmitting]);
+
   return (
     <div className="relative w-full h-full">
       <ScrollShadow 
@@ -45,7 +54,7 @@ const ChatList = forwardRef<HTMLDivElement, ChatListProps>(({
       >
         {isLoading ? (
           <Loading text="チャットを取得中"/>
-        ) : chats.length === 0 ? (
+          ) : !chats || chats.length === 0 || isError ? (
           <div className="flex flex-col items-center justify-center h-full text-center p-8 text-gray-400">
             <div className="bg-gray-100 p-4 rounded-full mb-4">
               <MessageSquare size={32} className="text-gray-400" />
@@ -63,7 +72,9 @@ const ChatList = forwardRef<HTMLDivElement, ChatListProps>(({
             </p>
           </div>
         ) : (
-          chats.map((chat) => (
+          
+          (chats.map((chat) => (
+          // chats.map((chat) => (
             <div key={`msg-${chat.id}`}>
               <ChatMessageItem
                 message={chat}
@@ -84,7 +95,7 @@ const ChatList = forwardRef<HTMLDivElement, ChatListProps>(({
               />
             </div>
           ))
-        )}
+        ))}
         <div className="h-20 flex-shrink-0" />
       </ScrollShadow>
 
@@ -107,6 +118,7 @@ const ChatList = forwardRef<HTMLDivElement, ChatListProps>(({
 
         return (
           <ImageZoomModal 
+          
             isOpen={!!currentZoomData} 
             onClose={() => setZoomData(null)} 
             imageUrl={currentZoomData.url} 
@@ -114,7 +126,7 @@ const ChatList = forwardRef<HTMLDivElement, ChatListProps>(({
             onDownload={onDownload}
             msg={currentChat} 
             isPending={currentChat.isPending} 
-            chat_id={String(currentZoomData.msg.id)}
+            chat_id={String(currentChat.id)}
           />
         );
       })()}

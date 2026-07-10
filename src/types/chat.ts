@@ -23,7 +23,7 @@ export interface ChatInputProps {
   onUploadImage: (file: File[]) => void;
   onRemoveFile: (index: number) => void;
   selectedFiles: File[];
-  disabled?: boolean;
+  disabled: boolean;
 }
 
 export interface ChatListProps {
@@ -40,6 +40,7 @@ export interface ChatListProps {
   isLoading: boolean;
   type: string;
   onScrollBottom: (force?: boolean) => void;
+  isError: boolean;
 }
 
 export interface ChatMessageItemProps {
