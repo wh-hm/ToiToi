@@ -16,7 +16,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [editValue, setEditValue] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [space_id, setspace_id] = useState<number | null>(null);
+  const [spaceId, setspaceId] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { status } = useSession();
   const router = useRouter();
@@ -72,7 +72,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   };
 
   useEffect(() => {
-    params.then((p) => setspace_id(Number(p.id)));
+    params.then((p) => setspaceId(Number(p.id)));
   }, [params]);
 
   useEffect(() => { fetchMessages(); }, []);
@@ -82,7 +82,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     setIsChatsLoadFailed(true); // 読み込み開始時は一旦Failed扱いにしておく
     try {
       const { id } = await params;
-      const res = await fetchWithTimeout(`/api/chats?space_id=${id}`);
+      const res = await fetchWithTimeout(`/api/chats?spaceId=${id}`);
       const data = await res.json();
       if (!res.ok) {
         await handleApiResponse(res); // 内部のthrowを待つ
@@ -158,7 +158,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     const backupFiles = [...selectedFiles];
 
     const formData = new FormData();
-    formData.append("space_id", id);
+    formData.append("spaceId", id);
 
     if (stampId) {
       formData.append("stamp", stampId);
@@ -173,7 +173,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     const now = new Date().toISOString();
 
     if (stampId) {
-      pendingMessages.push({ id: Date.now(), stamp: stampId, isPending: true, created_at: now } as ChatMessage);
+      pendingMessages.push({ id: Date.now(), stamp: stampId, isPending: true, createdAt: now } as ChatMessage);
     } else {
       if (selectedFiles.length > 0) {
         selectedFiles.forEach((file, i) => {
@@ -181,12 +181,12 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
             id: Date.now() + i,
             signedImageUrl: URL.createObjectURL(file),
             isPending: true,
-            created_at: now,
+            createdAt: now,
             message: inputText,
           } as ChatMessage);
         });
       } else {
-        pendingMessages.push({ id: Date.now(), message: inputText, isPending: true, created_at: now } as ChatMessage);
+        pendingMessages.push({ id: Date.now(), message: inputText, isPending: true, createdAt: now } as ChatMessage);
       }
     }
 
@@ -237,7 +237,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   };
 
   const handleUpdate = async () => {
-    if (isSubmitting || !editingId || space_id === null) return;
+    if (isSubmitting || !editingId || spaceId === null) return;
     
     const previousMessages = [...chats];
 
@@ -255,7 +255,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       const res = await fetchWithTimeout(`/api/chats/${editingId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: editValue, space_id: space_id }),
+        body: JSON.stringify({ message: editValue, spaceId: spaceId }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -276,7 +276,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     setChats((prev) => prev.filter((msg) => msg.id !== chatId));
 
     try {
-      const res = await fetchWithTimeout(`/api/chats/${chatId}?space_id=${sId}`, { 
+      const res = await fetchWithTimeout(`/api/chats/${chatId}?spaceId=${sId}`, { 
         method: "DELETE" 
       });
       const data = await res.json();
@@ -300,12 +300,12 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     );
 
     try {
-      const res = await fetchWithTimeout(`/api/chats/${space_id}/favorite`, {
+      const res = await fetchWithTimeout(`/api/chats/${spaceId}/favorite`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           favorite_flag: current,
-          chat_id: chatId
+          chatId: chatId
         }),
       });
       const data = await res.json();
@@ -321,20 +321,20 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     }
   };
 
-  const changeBackground = async (chat_id: number, bg: number) => {
+  const changeBackground = async (chatId: number, bg: number) => {
     const previousMessages = [...chats];
 
     setChats((prev) => 
       prev.map((msg) => 
-        msg.id === chat_id ? { ...msg, background: bg } : msg
+        msg.id === chatId ? { ...msg, background: bg } : msg
       )
     );
 
     try {
-      const res = await fetchWithTimeout(`/api/chats/${space_id}/background`, {
+      const res = await fetchWithTimeout(`/api/chats/${spaceId}/background`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ background: bg, chat_id: chat_id }),
+        body: JSON.stringify({ background: bg, chatId: chatId }),
       });
       const data = await res.json();
 
@@ -348,16 +348,16 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     }
   };
 
-  const handleDownload = async (imageUrl: string, chat_id: string) => {
+  const handleDownload = async (imageUrl: string, chatId: string) => {
     try {
       const res = await fetchWithTimeout("/api/images", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           targetUrl: imageUrl,
-          space_id: space_id,
+          spaceId: spaceId,
           type: "chat",
-          chat_id: chat_id 
+          chatId: chatId 
         })
       });
 
@@ -415,7 +415,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       <div className="flex-1 overflow-y-auto relative w-full">
         <ChatList 
           chats={chats}
-          space_id={space_id || 0}
+          spaceId={spaceId || 0}
           isSubmitting={isSubmitting}
           ref={scrollRef}
           onToggleFavorite={handleToggleFavorite}

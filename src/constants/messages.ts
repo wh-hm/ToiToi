@@ -36,6 +36,7 @@ export const MESSAGES = {
     S1002: (field: string) => `${field}の保存が完了しました。`,
     S1003: (field: string) => `${field}を削除しました。`,
     S1004: (field: string) => `${field}の一括削除が成功しました。`,
+    S2001: (field: string) => `${field}を取得しました。`,
     USER001: "ログインに成功しました。",
 } as const;
 

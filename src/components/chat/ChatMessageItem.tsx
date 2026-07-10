@@ -7,7 +7,7 @@ import { ChatMessageItemProps } from "@/types/chat";
 
 
 export default function ChatMessageItem({ 
-  message, space_id, isOpen, isSubmitting, 
+  message, spaceId, isOpen, isSubmitting, 
   onOpenChange, onToggleFavorite, onEdit, onDelete, onBackgroundChange, setEditValue, onNiceFlag, onImageClick, onDownload, onScrollBottom, type
 }: ChatMessageItemProps) {
   
@@ -38,7 +38,7 @@ export default function ChatMessageItem({
     onOpenChange(true);
   };
 
-  const hasImage = !!(message.signedImageUrl || (message as any).previewImages || message.image_url);
+  const hasImage = !!(message.signedImageUrl || (message as any).previewImages || message.imageUrl);
 
   return (
     <div className="relative flex flex-col items-end w-full">
@@ -70,22 +70,22 @@ export default function ChatMessageItem({
             )}
             <button 
               disabled={isSubmitting}
-              onClick={() => { onOpenChange(false); onDelete(message.id, space_id); }} 
+              onClick={() => { onOpenChange(false); onDelete(message.id, spaceId); }} 
               className="w-full text-left p-3 text-sm text-red-500 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >削除</button>
             {type === "chat" && (
               <button 
                 disabled={isSubmitting}
-                onClick={() => { onOpenChange(false); onToggleFavorite?.(message.id, message.favorite_flag === 1 ? 0 : 1); }} 
+                onClick={() => { onOpenChange(false); onToggleFavorite?.(message.id, message.favoriteFlag === 1 ? 0 : 1); }} 
                 className="w-full text-left p-3 text-sm text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              >{message.favorite_flag === 1 ? "お気に入り解除" : "お気に入り登録"}</button>
+              >{message.favoriteFlag === 1 ? "お気に入り解除" : "お気に入り登録"}</button>
             )}
             {type === "question" && (
               <button 
                 disabled={isSubmitting}
-                onClick={() => { onOpenChange(false); onNiceFlag?.(message.id, message.nice_flag === 1 ? 0 : 1); }} 
+                onClick={() => { onOpenChange(false); onNiceFlag?.(message.id, message.niceFlag === 1 ? 0 : 1); }} 
                 className="w-full text-left p-3 text-sm text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              >{message.nice_flag === 1 ? "いいね解除" : "いいね登録"}</button>
+              >{message.niceFlag === 1 ? "いいね解除" : "いいね登録"}</button>
             )}
           </div>
           
@@ -116,13 +116,13 @@ export default function ChatMessageItem({
         <div className="w-4 h-4  flex-shrink-0 mr-3">
           {type === "chat" ? (
             <>
-              {message.favorite_flag === 1 && (
+              {message.favoriteFlag === 1 && (
                 <Star className="text-yellow-400 fill-yellow-400"/>
               )}
             </>
           ) : (
             <>
-              {message.nice_flag === 1 && (
+              {message.niceFlag === 1 && (
                 <ThumbsUp className="text-yellow-400 fill-yellow-400"/>
               )}
             </>
@@ -143,7 +143,7 @@ export default function ChatMessageItem({
             ${(isHovered || isOpen) && !isSubmitting ? "brightness-90" : "brightness-100"}
           `}
         >
-          {(!message.signedImageUrl && !(message as any).previewImages && !message.image_url && message.message) && (
+          {(!message.signedImageUrl && !(message as any).previewImages && !message.imageUrl && message.message) && (
             <p className="text-lg text-gray-800 whitespace-pre-wrap select-none">{message.message}</p>
           )}         
           {message.stamp ? (
@@ -194,7 +194,7 @@ export default function ChatMessageItem({
           })}
         </div>
       </div>
-      <span className="text-[10px] text-gray-400 mt-1">{formatDateTime(message.created_at, message.updated_at)}</span>
+      <span className="text-[10px] text-gray-400 mt-1">{formatDateTime(message.createdAt, message.updated_at)}</span>
     </div>
   );
 }

@@ -17,7 +17,10 @@ export async function DELETE() {
   try {
     await deleteImages(auth.user_id);
 
-    return NextResponse.json({ message: MESSAGES.S1004("画像")});
+    return NextResponse.json({ 
+        success: true, 
+        message: MESSAGES.S1004("画像") 
+    }, { status: 200 });
   } catch (error) {
     return NextResponse.json({ message: MESSAGES.E2004("画像") }, { status: 500 });
   }
@@ -39,7 +42,7 @@ export async function POST(request: Request) {
   // 💡 【修正点1】リクエストボディの読み込みは「絶対に最初の一回だけ」！
   // question_id は入っていない可能性もあるので、デフォルト値を考慮するか省略可能にします
   const body = await request.json();
-  const { targetUrl, space_id, type, chat_id, question_id } = body;
+  const { targetUrl, spaceId, type, chatId, questionId } = body;
 
   const auth = await getAuthContext();
   if ('error' in auth) {
@@ -47,9 +50,9 @@ export async function POST(request: Request) {
   }
 
   // 💡 バリデーション用に数値をパース
-  const sId = parseInt(space_id);
-  const cId = parseInt(chat_id);
-  const qId = question_id ? parseInt(question_id) : null;
+  const sId = parseInt(spaceId);
+  const cId = parseInt(chatId);
+  const qId = questionId ? parseInt(questionId) : null;
 
   // ==========================================
   // 1. 権限・生存チェック（並列化版）

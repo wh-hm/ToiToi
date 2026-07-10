@@ -21,12 +21,12 @@ type Goal = {
 };
 
 type SpacesState = {
-  type1: Space[];
-  type2: Space[];
-  type3: Space[];
-  type1Empty: boolean;
-  type2Empty: boolean;
-  type3Empty: boolean;
+  chat: Space[];
+  task: Space[];
+  question: Space[];
+  chatEmpty: boolean;
+  taskEmpty: boolean;
+  questionEmpty: boolean;
   allEmpty: boolean;
 };
 
@@ -35,8 +35,8 @@ export default function Dashboard() {
   const router = useRouter();
 
   const [spaces, setSpaces] = useState<SpacesState>({
-    type1: [], type2: [], type3: [],
-    type1Empty: false, type2Empty: false, type3Empty: false, allEmpty: false,
+    chat: [], task: [], question: [],
+    chatEmpty: false, taskEmpty: false, questionEmpty: false, allEmpty: false,
   });
 
   const [isLoading, setIsLoading] = useState(true);
@@ -202,6 +202,8 @@ export default function Dashboard() {
 
       const data = await res.json();
 
+      console.log(data);
+
       if (data.goal) {
         if (Array.isArray(data.goal)) {
           setGoal(data.goal[0] || null);
@@ -258,16 +260,16 @@ export default function Dashboard() {
         return sortSpaces(list.filter(s => s.is_archived === 0));
       };
 
-      const type1 = filterByArchiveSetting(convertAndFilter(targetData.type1), showArchivedType1);
-      const type2 = filterByArchiveSetting(convertAndFilter(targetData.type2), showArchivedType2);
-      const type3 = filterByArchiveSetting(convertAndFilter(targetData.type3), showArchivedType3);
+      const chat = filterByArchiveSetting(convertAndFilter(targetData.chat), showArchivedType1);
+      const task = filterByArchiveSetting(convertAndFilter(targetData.task), showArchivedType2);
+      const question = filterByArchiveSetting(convertAndFilter(targetData.question), showArchivedType3);
 
       const newState = {
-        type1, type2, type3,
-        type1Empty: type1.length === 0,
-        type2Empty: type2.length === 0,
-        type3Empty: type3.length === 0,
-        allEmpty: type1.length + type2.length + type3.length === 0,
+        chat, task, question,
+        chatEmpty: chat.length === 0,
+        taskEmpty: task.length === 0,
+        questionEmpty: question.length === 0,
+        allEmpty: chat.length + task.length + question.length === 0,
       };
 
       setSpaces(newState);
@@ -487,9 +489,9 @@ export default function Dashboard() {
 
         {/* 各スペース一覧 */}
         <SpaceList
-          key={`type1_${spaces.type1.map(s => `${s.id}-${s.favorite}-${s.is_archived}`).join(',')}`}
+          key={`chat_${spaces.chat.map(s => `${s.id}-${s.favorite}-${s.is_archived}`).join(',')}`}
           title="チャット"
-          items={spaces.type1}
+          items={spaces.chat}
           showArchived={showArchivedType1}
           onToggleArchive={(checked) => setShowArchivedType1(checked ? 1 : 0)}
           onEdit={handleEdit}
@@ -497,9 +499,9 @@ export default function Dashboard() {
         />
 
         <SpaceList
-          key={`type2_${spaces.type2.map(s => `${s.id}-${s.favorite}-${s.is_archived}`).join(',')}`}
+          key={`task_${spaces.task.map(s => `${s.id}-${s.favorite}-${s.is_archived}`).join(',')}`}
           title="ToDoリスト"
-          items={spaces.type2}
+          items={spaces.task}
           showArchived={showArchivedType2}
           onToggleArchive={(checked) => setShowArchivedType2(checked ? 1 : 0)}
           onEdit={handleEdit}
@@ -507,9 +509,9 @@ export default function Dashboard() {
         />
 
         <SpaceList
-          key={`type3_${spaces.type3.map(s => `${s.id}-${s.favorite}-${s.is_archived}`).join(',')}`}
+          key={`question_${spaces.question.map(s => `${s.id}-${s.favorite}-${s.is_archived}`).join(',')}`}
           title="質問"
-          items={spaces.type3}
+          items={spaces.question}
           showArchived={showArchivedType3}
           onToggleArchive={(checked) => setShowArchivedType3(checked ? 1 : 0)}
           onEdit={handleEdit}

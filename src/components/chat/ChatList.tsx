@@ -10,7 +10,7 @@ import { ChatListProps } from "@/types/chat";
 
 const ChatList = forwardRef<HTMLDivElement, ChatListProps>(({ 
   chats, 
-  space_id, 
+  spaceId, 
   isSubmitting, 
   onToggleFavorite, 
   onEdit, 
@@ -78,7 +78,7 @@ useEffect(() => {
             <div key={`msg-${chat.id}`}>
               <ChatMessageItem
                 message={chat}
-                space_id={space_id}
+                spaceId={spaceId}
                 isSubmitting={isSubmitting}
                 isOpen={openItemId === chat.id}
                 onOpenChange={(open) => setOpenItemId(open ? chat.id : null)}
@@ -126,7 +126,7 @@ useEffect(() => {
             onDownload={onDownload}
             msg={currentChat} 
             isPending={currentChat.isPending} 
-            chat_id={String(currentChat.id)}
+            chatId={String(currentChat.id)}
           />
         );
       })()}

@@ -42,7 +42,10 @@ export default function Header() {
     setIsLoading(true);
     try {
       const res = await fetch(`/api/spaces`);
-      if (res.ok) setData(await res.json());
+      const data = await res.json();
+
+      if (res.ok) setData(data.spaces);
+  
     } catch (e) { console.error(e); }
     finally { setIsLoading(false); }
   }, []);
