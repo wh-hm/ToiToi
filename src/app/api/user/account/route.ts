@@ -34,10 +34,11 @@ export async function GET() {
     // 4. 全データをまとめてレスポンス
     // フロント側で「データが空かどうか」を判定できるように全て返します
     return NextResponse.json({ 
-      user, 
+      user: user, 
       spaces: result, 
-      imageCount 
-    });
+      imageCount: imageCount,
+      message: MESSAGES.S2001("アカウント情報")
+    }, { status: 200 });
 
   } catch (error) {
     // 各サービス内で発生したエラーをキャッチ
@@ -65,8 +66,11 @@ export async function DELETE() {
         { status: 404 }
       );
     }
+    return NextResponse.json({ 
+        success: true, 
+        message: MESSAGES.S1003("ユーザー") 
+    }, { status: 200 });
 
-    return NextResponse.json({ message: MESSAGES.S1003("ユーザー") });
   } catch (error) {
     console.error("【ユーザー削除エラー】", error);
     return NextResponse.json({ message: MESSAGES.E2004("ユーザー") }, { status: 500 });

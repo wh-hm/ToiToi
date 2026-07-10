@@ -16,22 +16,19 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { is_resolved, space_id } = body;
-
-    const question_id = Number(id);
-    const spaceId = Number(space_id);
-    const isResolved = Number(is_resolved);
+    const { isResolved, spaceId } = body;
+    const questionId = Number(id);
 
     // バリデーションチェック
-    if (isNaN(question_id) || isNaN(spaceId) || isNaN(isResolved)) {
+    if (isNaN(questionId) || isNaN(spaceId) || isNaN(isResolved)) {
       return NextResponse.json(
         { message: MESSAGES.E1001("必須パラメータ") }, 
         { status: 400 }
       );
     }
     const [isSpaceAlive,  isQuestionAlive] = await Promise.all([
-      getSpaceCheck(auth.user_id, space_id), // ※関数名が推測ですが合わせる
-      checkQuestion(auth.user_id, space_id, question_id),
+      getSpaceCheck(auth.user_id, spaceId), // ※関数名が推測ですが合わせる
+      checkQuestion(auth.user_id, spaceId, questionId),
     ]);
         
     // スペースチェックの判定
@@ -43,13 +40,16 @@ export async function PATCH(
     }
 
     // 更新処理
-    const success = await updateQuestionStatus(question_id, spaceId, auth.user_id, isResolved);
+    const updatedQuestion = await updateQuestionStatus(questionId, spaceId, auth.user_id, isResolved);
 
-    if (!success) {
+    if (!updatedQuestion) {
       return NextResponse.json({ message: MESSAGES.E2002("質問ステータス") }, { status: 500 });
     }
 
-    return NextResponse.json({ message: MESSAGES.S1002("質問ステータス") });
+    return NextResponse.json({ 
+        question: updatedQuestion, 
+        message: MESSAGES.S1002("質問ステータス") 
+    }, { status: 200 });
   } catch (error) {
     return NextResponse.json({ message: MESSAGES.E2002("質問ステータス") }, { status: 500 });
   }

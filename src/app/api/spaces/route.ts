@@ -24,7 +24,10 @@ export async function GET() {
         };
         
         // データが空でも [] を返すことで、JSONパースエラーを防げます
-        return NextResponse.json(result);
+        return NextResponse.json({ 
+            spaces: result, 
+            message: MESSAGES.S2001("スペース一覧") 
+        });
     } catch (error) {
         console.error("GET spaces error:", error);
         return NextResponse.json({ message: MESSAGES.E2001("スペース一覧") }, { status: 500 });
@@ -54,10 +57,13 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: MESSAGES.E1003("スペース名", "記号") }, { status: 400 });
         }
 
-        const success = await registerSpace(auth.user_id, name, space_type, favorite_flag);
-        if (!success) return NextResponse.json({ message: MESSAGES.E2001("スペース") }, { status: 500 });
+        const newSpace = await registerSpace(auth.user_id, name, space_type, favorite_flag);
+        if (!newSpace) return NextResponse.json({ message: MESSAGES.E2001("スペース") }, { status: 500 });
 
-        return NextResponse.json({ message: MESSAGES.S1001("スペース") });
+        return NextResponse.json({ 
+            space: newSpace, 
+            message: MESSAGES.S1001("スペース") 
+        }, { status: 201 });
     } catch (error) {
         return NextResponse.json({ message: MESSAGES.E2001("スペース") }, { status: 500 });
     }
@@ -74,7 +80,10 @@ export async function DELETE() {
         const success = await deleteSpaces(auth.user_id, "ALL", );
         if (!success) return NextResponse.json({ message: MESSAGES.E2004("スペース") }, { status: 500 });
         
-        return NextResponse.json({ message: MESSAGES.S1003("スペース") });
+        return NextResponse.json({ 
+            success: true, 
+            message: MESSAGES.S1003("スペース") 
+        });
     } catch (error) {
         return NextResponse.json({ message: MESSAGES.E2004("スペース") }, { status: 500 });
     }

@@ -15,19 +15,19 @@ export async function PATCH(
 
   try {
     const { id } = await params;
-    const question_id = Number(id);
+    const questionId = Number(id);
     const body = await request.json();
 
     const { title, question, tag } = body;
-    const space_id = Number(body.space_id || body.space_id);
+    const spaceId = Number(body.spaceId || body.spaceId);
     const is_resolved = body.is_resolved !== undefined ? Number(body.is_resolved) : (body.status !== undefined ? Number(body.status) : undefined);
 
-    if (!space_id || isNaN(space_id)) {
+    if (!spaceId || isNaN(spaceId)) {
       return NextResponse.json({ message: MESSAGES.E1001("スペースID") }, { status: 400 });
     }
     const [isSpaceAlive,  isQuestionAlive] = await Promise.all([
-      getSpaceCheck(auth.user_id, space_id), // ※関数名が推測ですが合わせる
-      checkQuestion(auth.user_id, space_id, question_id),
+      getSpaceCheck(auth.user_id, spaceId), // ※関数名が推測ですが合わせる
+      checkQuestion(auth.user_id, spaceId, questionId),
     ]);
         
     // スペースチェックの判定
@@ -40,8 +40,8 @@ export async function PATCH(
 
     if (!title && !question && is_resolved !== undefined) {
       const updatedStatus = await updateQuestionStatus(
-        question_id,
-        space_id,
+        questionId,
+        spaceId,
         auth.user_id, // ⚠️ サービス側の仕様に合わせ作成者IDを渡します
         is_resolved
       );
@@ -58,8 +58,8 @@ export async function PATCH(
     if (question.length > 100) return NextResponse.json({ message: MESSAGES.E1002("質問詳細", 100) }, { status: 400 });
 
     const updated = await updateQuestion(
-      question_id,
-      space_id,
+      questionId,
+      spaceId,
       auth.user_id,
       title,
       question,
@@ -67,7 +67,10 @@ export async function PATCH(
       tag ? Number(tag) : null
     );
 
-    return NextResponse.json(updated);
+    return NextResponse.json({ 
+        question: updated, 
+        message: MESSAGES.S1002("質問") 
+    }, { status: 200 });
   } catch (error: any) {
     return NextResponse.json({ message: MESSAGES.E2002("質問") }, { status: 500 });
   }
@@ -84,17 +87,20 @@ export async function DELETE(
   try {
     const { id } = await params;
     const { searchParams } = new URL(request.url);
-    const space_id = Number(searchParams.get("space_id"));
+    const spaceId = Number(searchParams.get("spaceId"));
 
 
-    if (!space_id || isNaN(space_id)) {
+    if (!spaceId || isNaN(spaceId)) {
       return NextResponse.json({ message: MESSAGES.E1001("スペースID") }, { status: 400 });
     }
 
-    const success = await deleteQuestion(Number(id), space_id, auth.user_id);
+    const success = await deleteQuestion(Number(id), spaceId, auth.user_id);
     if (!success) return NextResponse.json({ message: MESSAGES.E2004("質問") }, { status: 500 });
 
-    return NextResponse.json({ message: MESSAGES.S1003("質問") });
+    return NextResponse.json({ 
+        success: true, 
+        message: MESSAGES.S1003("質問") 
+    }, { status: 200 });
   } catch (error) {
     return NextResponse.json({ message: MESSAGES.E2004("質問") }, { status: 500 });
   }

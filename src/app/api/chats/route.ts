@@ -15,29 +15,33 @@ export async function GET(request: NextRequest) {
     if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
     const { searchParams } = new URL(request.url);
-    const space_id = Number(searchParams.get("space_id"));
+    const spaceId = Number(searchParams.get("spaceId"));
 
-    if (!space_id || isNaN(space_id)) {
+    if (!spaceId || isNaN(spaceId)) {
         return NextResponse.json({ message: MESSAGES.E1001("スペースID") }, { status: 400 });
     }
 
     try {
-        const isSpaceAlive = await getSpaceCheck(auth.user_id, space_id);
+        const isSpaceAlive = await getSpaceCheck(auth.user_id, spaceId);
         
         if (!isSpaceAlive) {
             return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
         }
       
         const [spaceName, chats] = await Promise.all([
-            getSpaceName(auth.user_id, space_id),
-            getChatsWithImages(auth.user_id, space_id)
+            getSpaceName(auth.user_id, spaceId),
+            getChatsWithImages(auth.user_id, spaceId)
         ]);
 
         if (!spaceName) {
             return NextResponse.json({ message: MESSAGES.E1010("スペース名") }, { status: 404 });
         }
         
-        return NextResponse.json({spaceName:spaceName, chats: chats,});
+        return NextResponse.json({ 
+            spaceName: spaceName, 
+            chats: chats, 
+            message: MESSAGES.S2001("チャット履歴") 
+        },{ status: 200});
     } catch (error) {
         console.error("GET API Error:", error);
         return NextResponse.json({ message: MESSAGES.E2003("チャット") }, { status: 500 });
@@ -57,10 +61,10 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const message = formData.get("message") as string;
     const files = formData.getAll("images") as File[];
-    const space_id = Number(formData.get("space_id"));
+    const spaceId = Number(formData.get("spaceId"));
     const stamp = formData.get("stamp") as string | null;
 
-    const isSpaceAlive = await getSpaceCheck(auth.user_id, space_id);
+    const isSpaceAlive = await getSpaceCheck(auth.user_id, spaceId);
       
     if (!isSpaceAlive) {
         return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
@@ -98,7 +102,7 @@ export async function POST(request: NextRequest) {
       }
 
       
-      imageUrls = await uploadImages(files, auth.user_id, space_id);
+      imageUrls = await uploadImages(files, auth.user_id, spaceId);
     }
 
     // 4. DB登録 (ループで1枚ずつ登録)
@@ -107,7 +111,7 @@ export async function POST(request: NextRequest) {
       if (!imageUrls || imageUrls.length === 0) {
         const res = await registerChat({
           user_id: auth.user_id,
-          space_id: space_id,
+          space_id: spaceId,
           message: message || undefined,
           stamp: stamp || undefined,
         }, tx);
@@ -119,7 +123,7 @@ export async function POST(request: NextRequest) {
       for (let i = 0; i < imageUrls.length; i++) {
         const res = await registerChat({
           user_id: auth.user_id,
-          space_id: space_id,
+          space_id: spaceId,
           message: message || undefined,
           image_url: imageUrls[i],
           stamp: i === 0 ? (stamp || undefined) : undefined,
@@ -129,7 +133,7 @@ export async function POST(request: NextRequest) {
       return results; // これは元から配列
     });
     // ここで newChat は常に配列として返る。チャットのため成功時のメッセージは送らない
-    return NextResponse.json({ newChat }, { status: 201 });
+    return NextResponse.json({ newChat: newChat, message: MESSAGES.S1001("チャット") }, { status: 201 });
 
 
   } catch (error) {

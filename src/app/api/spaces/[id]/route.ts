@@ -17,7 +17,7 @@ export async function PATCH(
 
     try {
         const { id } = await params;
-        const { name, favorite_flag, is_archived } = await request.json();
+        const { name, favoriteFlag, isArchived } = await request.json();
 
         // --- 単体チェック (POSTと同じ仕様) ---
         if (!name) return NextResponse.json({ error: MESSAGES.E1001("スペース名") }, { status: 400 });
@@ -31,11 +31,15 @@ export async function PATCH(
             return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
         }
         
-        const updated = await updateSpace(Number(id), name, auth.user_id, favorite_flag, is_archived);
+        const updatedSpace = await updateSpace(Number(id), name, auth.user_id, favoriteFlag, isArchived);
         
-        if (!updated) return NextResponse.json({ error: MESSAGES.E2002("スペース") }, { status: 500 });
+        if (!updatedSpace) return NextResponse.json({ error: MESSAGES.E2002("スペース") }, { status: 500 });
 
-        return NextResponse.json(updated);
+        // 成功時：キーを space にし、S1002 を適用
+        return NextResponse.json({ 
+            space: updatedSpace, 
+            message: MESSAGES.S1002("スペース") 
+        }, { status: 200 });
     } catch (error) {
         return NextResponse.json({ error: MESSAGES.E2002("スペース") }, { status: 500 });
     }
@@ -51,10 +55,10 @@ export async function DELETE(
 
     try {
         const { id } = await params;
-        const space_id = Number(id);
+        const spaceId = Number(id);
         
         const { searchParams } = new URL(request.url);
-        const spaceType = searchParams.get("space_type");
+        const spaceType = searchParams.get("spaceType");
 
         // 必須パラメータチェック
         if (!spaceType) {
@@ -64,11 +68,14 @@ export async function DELETE(
             );
         }
         
-        const success = await deleteSpace(space_id, spaceType, auth.user_id);
+        const success = await deleteSpace(spaceId, spaceType, auth.user_id);
         
         if (!success) return NextResponse.json({ error: MESSAGES.E2004("スペース") }, { status: 500 });
         
-        return NextResponse.json({ message: MESSAGES.S1003("スペース") });
+        return NextResponse.json({ 
+            success: true, 
+            message: MESSAGES.S1003("スペース") 
+        });
     } catch (error) {
         return NextResponse.json({ error: MESSAGES.E2004("スペース") }, { status: 500 });
     }

@@ -16,11 +16,11 @@ export async function PATCH(
   try {
     const { id } = await params;
     const taskId = Number(id);
-    const { title, description, due_date, space_id, tag, is_allday, priority, status } = await request.json();
+    const { title, description, dueDate, spaceId, tag, isAllday, priority, status } = await request.json();
 
     // --- 単体チェック ---
     if (!title) return NextResponse.json({ message: MESSAGES.E1001("タスク名") }, { status: 400 });
-    if (!due_date) return NextResponse.json({ message: MESSAGES.E1001("期限") }, { status: 400 });
+    if (!dueDate) return NextResponse.json({ message: MESSAGES.E1001("期限") }, { status: 400 });
     if (!description) return NextResponse.json({ message: MESSAGES.E1001("詳細") }, { status: 400 });
 
     if (title.length > 20) return NextResponse.json({ message: MESSAGES.E1002("タスク名", 20) }, { status: 400 });
@@ -30,14 +30,13 @@ export async function PATCH(
       return NextResponse.json({ message: MESSAGES.E1003("タスク名または詳細", "記号") }, { status: 400 });
     }
 
-    if (isNaN(new Date(due_date).getTime())) {
+    if (isNaN(new Date(dueDate).getTime())) {
       return NextResponse.json({ message: MESSAGES.E1004 }, { status: 400 });
     }
-    console.log(taskId);
-    console.log(space_id);
+
     const [isSpaceAlive, isTaslAlive] = await Promise.all([
-        getSpaceCheck(auth.user_id, space_id), // ※関数名が推測ですが合わせる
-        getTaskCheck(auth.user_id, space_id, taskId)
+        getSpaceCheck(auth.user_id, spaceId), // ※関数名が推測ですが合わせる
+        getTaskCheck(auth.user_id, spaceId, taskId)
     ]);
 
     // スペースチェックの判定
@@ -49,8 +48,11 @@ export async function PATCH(
         return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
     }
 
-    const updated = await updateTask(taskId, auth.user_id, title, description, due_date, space_id, tag, is_allday, priority, status);
-    return NextResponse.json(updated);
+    const updatedTask = await updateTask(taskId, auth.user_id, title, description, dueDate, spaceId, tag, isAllday, priority, status);
+    return NextResponse.json({ 
+        task: updatedTask, 
+        message: MESSAGES.S1002("タスク") 
+    }, { status: 200 });
   } catch (error) {
     return NextResponse.json({ message: MESSAGES.E2002("タスク") }, { status: 500 });
   }
@@ -68,13 +70,16 @@ export async function DELETE(
     const { id } = await params;
     // DELETEメソッドではボディを読み取らないのが安全なため、クエリパラメータから取得を推奨します
     const { searchParams } = new URL(request.url);
-    const space_id = Number(searchParams.get("space_id"));
+    const spaceId = Number(searchParams.get("spaceId"));
 
 
-    const success = await deleteTask(Number(id), auth.user_id, space_id);
+    const success = await deleteTask(Number(id), auth.user_id, spaceId);
     if (!success) return NextResponse.json({ message: MESSAGES.E2004("タスク") }, { status: 500 });
 
-    return NextResponse.json({ message: MESSAGES.S1003("タスク") });
+    return NextResponse.json({ 
+        success: true, 
+        message: MESSAGES.S1003("タスク") 
+    }, { status: 200 });
   } catch (error) {
     return NextResponse.json({ message: MESSAGES.E2004("タスク") }, { status: 500 });
   }

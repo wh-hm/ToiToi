@@ -2,14 +2,14 @@ export interface ChatMessage {
   id: number;
   message: string | null;
   space_id?: number;
-  favorite_flag?: number;
+  favoriteFlag?: number;
   background?: number;
   stamp: string | null;
-  image_url: string | null;
-  created_at: string; // API経由だと文字列として扱われるためstring推奨
+  imageUrl: string | null;
+  createdAt: string; // API経由だと文字列として扱われるためstring推奨
   updated_at: string;
-  question_id?: number;
-  nice_flag?: number;
+  questionId?: number;
+  niceFlag?: number;
   signedImageUrl?: string | null;
   previewImages?: string[] | null;
   isPending?: boolean;
@@ -28,7 +28,7 @@ export interface ChatInputProps {
 
 export interface ChatListProps {
   chats: ChatMessage[];
-  space_id: number;
+  spaceId: number;
   isSubmitting: boolean;
   onToggleFavorite?: (id: number, flag: number) => void;
   onEdit: (id: number) => void;
@@ -45,7 +45,7 @@ export interface ChatListProps {
 
 export interface ChatMessageItemProps {
   message: ChatMessage;
-  space_id: number;
+  spaceId: number;
   isOpen: boolean;
   isSubmitting: boolean;
   onOpenChange: (open: boolean) => void;
@@ -69,7 +69,7 @@ export interface ImageZoomModalProps {
   onDownload: (url: string, chat_id: string) => void;
   msg: ChatMessage;
   isPending?: boolean; // 👈 途切れていたプロパティを正しく定義
-  chat_id: string
+  chatId: string
 }
 
 export interface PreviewModalProps {

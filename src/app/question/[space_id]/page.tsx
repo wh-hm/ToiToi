@@ -12,7 +12,7 @@ export default function QuestionPage() {
   const router = useRouter();
   const params = useParams();
 
-  const space_id = params?.space_id;
+  const spaceId = params?.spaceId;
 
   // 状態管理
   const [questions, setQuestions] = useState<any[]>([]);
@@ -34,10 +34,10 @@ export default function QuestionPage() {
 
   // 2. 質問サービス：getQuestions の実行
   const fetchQuestions = useCallback(async () => {
-    if (!space_id) return;
+    if (!spaceId) return;
     try {
       setIsLoading(true);
-      const res = await fetch(`/api/questions?space_id=${space_id}&space_id=${space_id}`, {
+      const res = await fetch(`/api/questions?spaceId=${spaceId}&spaceId=${spaceId}`, {
         cache: "no-store",
       });
       if (!res.ok) throw new Error("質問データの取得に失敗しました。");
@@ -49,7 +49,7 @@ export default function QuestionPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [space_id]);
+  }, [spaceId]);
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -65,7 +65,7 @@ export default function QuestionPage() {
     setQuestions(
       questions.map((q) =>
         q.id === question.id
-          ? { ...q, status: newStatus, is_resolved: newStatus }
+          ? { ...q, status: newStatus, isResolved: newStatus }
           : q
       )
     );
@@ -77,8 +77,8 @@ export default function QuestionPage() {
         body: JSON.stringify({
           ...question,
           status: newStatus,
-          is_resolved: newStatus,
-          space_id: Number(space_id),
+          isResolved: newStatus,
+          spaceId: Number(spaceId),
         }),
       });
 
@@ -89,7 +89,7 @@ export default function QuestionPage() {
           toast("未解決に戻しました。");
         }
 
-        const refreshRes = await fetch(`/api/questions?space_id=${space_id}&space_id=${space_id}`);
+        const refreshRes = await fetch(`/api/questions?spaceId=${spaceId}&spaceId=${spaceId}`);
         if (refreshRes.ok) {
           const data = await refreshRes.json();
           const list = Array.isArray(data) ? data : (data.questions || []);
@@ -140,15 +140,15 @@ export default function QuestionPage() {
               setQuestions(questions.filter((q) => q.id !== id));
 
               try {
-                const res = await fetch(`/api/questions/${id}?space_id=${space_id}`, {
+                const res = await fetch(`/api/questions/${id}?spaceId=${spaceId}`, {
                   method: "DELETE",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ space_id: Number(space_id) }),
+                  body: JSON.stringify({ spaceId: Number(spaceId) }),
                 });
                 const data = await res.json();
                 if (res.ok) {
                   toast.success(data.message || "削除しました。");
-                  const refreshRes = await fetch(`/api/questions?space_id=${space_id}&space_id=${space_id}`);
+                  const refreshRes = await fetch(`/api/questions?spaceId=${spaceId}&spaceId=${spaceId}`);
                   if (refreshRes.ok) {
                     const data = await refreshRes.json();
                     setQuestions(Array.isArray(data) ? data : (data.questions || []));
@@ -260,7 +260,7 @@ export default function QuestionPage() {
                 <div
                   className="cursor-pointer flex-1 pr-4"
                   onClick={() => {
-                    router.push(`/question/${space_id}/chat/${q.id}`);
+                    router.push(`/question/${spaceId}/chat/${q.id}`);
                   }}
                 >
                   <p className="font-semibold text-slate-900">{q.title}</p>
@@ -336,7 +336,7 @@ export default function QuestionPage() {
         <TaskModal
           task={selectedQuestion}
           mode={modalMode}
-          space_id={space_id}
+          spaceId={spaceId}
           type="question"
           onClose={() => setIsModalOpen(false)}
           onSuccess={async () => {
@@ -347,7 +347,7 @@ export default function QuestionPage() {
               toast.success(MESSAGES.S1001("質問"));
             }
             try {
-              const res = await fetch(`/api/questions?space_id=${space_id}&space_id=${space_id}`);
+              const res = await fetch(`/api/questions?spaceId=${spaceId}&spaceId=${spaceId}`);
               if (res.ok) {
                 const data = await res.json();
                 setQuestions(Array.isArray(data) ? data : (data.questions || []));
