@@ -13,16 +13,18 @@ import { getSpaceCheck } from "@/services/SpaceService";
 // 1. メッセージ一覧取得 (GET)
 export async function GET(
   request: Request,
-  context: { params: Promise<{ id: string }> } // 型定義の書き方を明示的に変更
+   { params }: { params: Promise<{ spaceId: string }> }
 ) {
-  
+
+  const { spaceId } = await params;
   const { searchParams } = new URL(request.url);
-  const questionId = Number(searchParams.get("question_id"));
+  const questionId = Number(searchParams.get("questionId"));
+  const spaceIdNum = Number(spaceId);
+  
+  console.log(spaceId,questionId)
 
-  const resolvedParams = await context.params; // context から受け取る
-  const spaceId = Number(resolvedParams.id);
 
-  if (isNaN(spaceId) || spaceId <= 0) {
+  if (isNaN(spaceIdNum) || spaceIdNum <= 0) {
     return NextResponse.json({ message: MESSAGES.E1001("Space ID") }, { status: 400 });
   }
   if (isNaN(questionId) || questionId <= 0) {
@@ -35,8 +37,8 @@ export async function GET(
   try {
     
     const [isSpaceAlive,  isQuestionAlive] = await Promise.all([
-      getSpaceCheck(auth.user_id, spaceId), // ※関数名が推測ですが合わせる
-      checkQuestion(auth.user_id, spaceId, questionId),
+      getSpaceCheck(auth.user_id, spaceIdNum), // ※関数名が推測ですが合わせる
+      checkQuestion(auth.user_id, spaceIdNum, questionId),
     ]);
         
     // スペースチェックの判定
@@ -65,23 +67,22 @@ export async function GET(
 }
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ spaceId: string }> }
 ) {
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
   
-  const { id } = await params;
-  const spaceId = parseInt(id);
-
+  const { spaceId } = await params;
+  const spaceIdNum = Number(spaceId);
   try {
     
     const formData = await request.formData();
     const message = formData.get("message") as string;
     const files = formData.getAll("images") as File[]; // 複数画像取得
     const stamp = formData.get("stamp") as string | null;
-    const questionId = Number(formData.get("question_id"));
+    const questionId = Number(formData.get("questionId"));
 
-    if (isNaN(spaceId) || spaceId <= 0) {
+    if (isNaN(spaceIdNum) || spaceIdNum <= 0) {
       return NextResponse.json({ message: MESSAGES.E1001("Space ID") }, { status: 400 });
     }
     if (isNaN(questionId) || questionId <= 0) {
@@ -98,8 +99,8 @@ export async function POST(
     }
 
     const [isSpaceAlive,  isQuestionAlive] = await Promise.all([
-      getSpaceCheck(auth.user_id, spaceId), // ※関数名が推測ですが合わせる
-      checkQuestion(auth.user_id, spaceId, questionId),
+      getSpaceCheck(auth.user_id, spaceIdNum), // ※関数名が推測ですが合わせる
+      checkQuestion(auth.user_id, spaceIdNum, questionId),
     ]);
         
     // スペースチェックの判定

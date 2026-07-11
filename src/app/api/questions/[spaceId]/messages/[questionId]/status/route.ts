@@ -1,4 +1,4 @@
-// app/api/questions/[id]/messages/[msgId]/status/route.ts
+// app/api/questions/[id]/messages/[questionId]/status/route.ts
 import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth-guard";
 import { toggleLike } from "@/services/QuestionChatService";
@@ -9,9 +9,9 @@ import { checkQuestionChat } from "@/services/QuestionChatService";
 import { checkQuestion } from "@/services/QuestionService";
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string; msgId: string }> }
+  { params }: { params: Promise<{ id: string; questionId: string }> }
 ) {
-  const { msgId, id,  } = await params;
+  const { questionId, id,  } = await params;
   
   // 1. 認証チェック
   const auth = await getAuthContext();
@@ -19,15 +19,15 @@ export async function PATCH(
 
   try {
     const spaceId = parseInt(id);
-    const questionId = parseInt(msgId);
+    const questionIdNum = parseInt(questionId);
 
     const { searchParams } = new URL(request.url);
     const chatId = Number(searchParams.get("chat_id"));
 
     const [isSpaceAlive, usQuestionAlive, isChatAlive] = await Promise.all([
       getSpaceCheck(auth.user_id, spaceId), // ※関数名が推測ですが合わせる
-      checkQuestion(auth.user_id, spaceId, questionId),
-      checkQuestionChat(chatId, questionId, auth.user_id, )
+      checkQuestion(auth.user_id, spaceId, questionIdNum),
+      checkQuestionChat(chatId, questionIdNum, auth.user_id, )
     ]);
         
     // スペースチェックの判定
@@ -43,7 +43,7 @@ export async function PATCH(
     }
     // 2. いいね状態の更新
     // status は boolean (true:いいね, false:解除) や 1/0 などで受け取る想定
-    const updatedStatus = await toggleLike(chatId, questionId, auth.user_id);
+    const updatedStatus = await toggleLike(chatId, questionIdNum, auth.user_id);
 
     if (!updatedStatus) {
       return NextResponse.json({ message: MESSAGES.E1010("更新対象") }, { status: 404 });

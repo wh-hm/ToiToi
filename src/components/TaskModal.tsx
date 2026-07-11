@@ -1,31 +1,77 @@
+import { fetchWithTimeout } from "@/lib/api";
+import { handleApiResponse } from "@/lib/api-utils";
 import { useState, useEffect } from "react";
-
-type ModalMode = 'create' | 'edit' | 'detail';
-
-export default function TaskModal({ task, onClose, onSuccess, spaceId, mode = 'create', type = 'task' }: any) {
-
+import { ToiToiNotification } from "./Toast";
+export default function TaskModal({ task, onClose, onSuccess, onSave, spaceId, mode = 'create', type = 'task' }: any) {
+  const getNowDateTime = () => {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const hh = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+    return {
+      date: `${yyyy}-${mm}-${dd}`,
+      time: `${hh}:${min}`
+    };
+  }
+  const getTaskDate = (dateVal: any) => {
+    if (!dateVal) return "";
+    try {
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return "";
+      return d.toLocaleDateString("ja-JP", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).replace(/\//g, '-');
+    } catch {
+      return "";
+    }
+  };
+  const getTaskTime = (dateVal: any) => {
+    if (!dateVal) return "";
+    try {
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return "";
+      return d.toLocaleTimeString("ja-JP", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false
+      });
+    } catch {
+      return "";
+    }
+  };
+  const nowDateTime = getNowDateTime();
+  const [dateData, setDateData] = useState(task ? getTaskDate(task.due_date) : nowDateTime.date);
+  const [timeData, setTimeData] = useState(task ? getTaskTime(task.due_date) : nowDateTime.time);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     title: task?.title || "",
-    description: task?.description || "",
-    due_date: task?.due_date || "",
-    isAllday: task?.isAllday || 0,
+    description: task?.question || task?.description || "",
+    dueDate: task ? getTaskDate(task.due_date) : nowDateTime.date,
+    dueTime: task ? getTaskTime(task.due_date) : nowDateTime.time,
+    isAllday: task?.is_allday || 0,
     priority: task?.priority || 1,
-    status: task?.status || 0,
+    status: task?.status ?? (task?.is_resolved ?? 0),
     tag: task?.tag || 1,
   });
 
-  const [dateData, setDateData ]= useState("");
-  const [timeData, setTimeData] = useState("");
-
-
   useEffect(() => {
     if (task) {
+      const initialDate = getTaskDate(task.due_date);
+      const initialTime = getTaskTime(task.due_date);
+      setDateData(initialDate);
+      setTimeData(initialTime);
+
       setFormData({
         title: task.title || "",
         description: task.question || task.description || "",
         status: task.status ?? (task.is_resolved ?? 0),
-        due_date: task.due_date || "",
-        isAllday: task.isAllday || 0,
+        dueDate: getTaskDate(task.due_date),
+        dueTime: getTaskTime(task.due_date),
+        isAllday: task.is_allday || 0,
         tag: task.tag || 0,
         priority: task.priority || 1,
       });
@@ -37,9 +83,12 @@ export default function TaskModal({ task, onClose, onSuccess, spaceId, mode = 'c
   const isCreateMode = mode === 'create';
 
   const handleSubmit = async () => {
-    if (!formData.title.trim()) {
-      return alert(type === "question" ? "質問タイトルを入力してください。" : "タスク名を入力してください。");
-    }
+    console.log("dateData", dateData)
+    if (isSubmitting) return;
+    if (typeof onSave === "function") {
+      const isValid = await onSave(formData.title, formData.description);
+      if (!isValid) return;
+      }
     if (type === "task" && !dateData) {
       return alert("期限を入力してください。");
     }
@@ -61,43 +110,47 @@ export default function TaskModal({ task, onClose, onSuccess, spaceId, mode = 'c
     const baseApiRoute = type === "question" ? "questions" : "task";
 
     const url = isEditMode
-      ? `/api/${baseApiRoute}/${task.id}`
+      ? `/api/${baseApiRoute}/${spaceId}`
       : `/api/${baseApiRoute}`;
     const numericspaceId = parseInt(spaceId as string);
     if (!numericspaceId || isNaN(numericspaceId)) {
       return alert("有効なスペースIDが見つかりません。");
     }
 
+    setIsSubmitting(true);
+
     try {
       const d = dateData || new Date().toISOString().slice(0, 10);
       const t = timeData || "00:00";
-      
-      // ISO 8601形式: YYYY-MM-DDTHH:mm:ss.sssZ 
-      // ここではブラウザ環境のローカル時間として解釈させる文字列を作成
       const dateTimeStr = `${d}T${t}:00`;
-      
       const parsedDate = new Date(dateTimeStr);
       const timeValue = parsedDate.getTime();
-
-      // 2. より厳密なチェック
       if (!timeValue || isNaN(timeValue)) {
-        console.error("解析失敗:", dateTimeStr);
+        console.error("解析失敗：", dateTimeStr);
         return alert("期限の日付または時刻が正しくありません。");
       }
+      const isoDueDate = parsedDate.toISOString();
+      if (typeof onSave === "function"){
+        const isValid = await onSave(
+          formData.title,
+          formData.description,
+          type === "task" ? isoDueDate : undefined
+        );
+        if (!isValid) return;
+      }
 
-    const isoDueDate = parsedDate.toISOString();
-    console.log("成功 - 送信するISO日付:", isoDueDate);
-      const payload = type === "question"
+
+      const basePayload = type === "question"
         ? {
           title: formData.title.trim(),
           question: formData.description.trim(),
-          is_resolved: isEditMode ? Number(formData.status) : 0,
+          isResolved: isEditMode ? Number(formData.status) : 0,
           spaceId: numericspaceId,
           tag: Number(formData.tag) || 0,
         }
         : {
           title: formData.title.trim(),
-          due_date: isoDueDate,
+          dueDate: isoDueDate,
           spaceId: numericspaceId,
           tag: Number(formData.tag) || 0,
           priority: Number(formData.priority) || 1,
@@ -105,26 +158,33 @@ export default function TaskModal({ task, onClose, onSuccess, spaceId, mode = 'c
           status: Number(formData.status),
           description: formData.description.trim(),
         };
+        const editOnlyFields = isEditMode
+          ? (type === "question"
+              ? { questionId: task.id } // 質問の編集時
+              : { taskId: task.id }                         // タスクの編集時
+            )
+          : {}; // 新規作成時は空
 
-        console.log(payload)
-      const response = await fetch(url, {
+        // 3. 最後に結合する
+        const payload = { ...basePayload, ...editOnlyFields };
+      console.log(payload)
+      const res = await fetchWithTimeout(url,
+      {
         method: method,
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify(payload),
       });
-
-      const resData = await response.json();
-
-      if (response.ok) {
-        onSuccess();
-      } else {
-        alert(`保存失敗: ${resData.error || "リクエストが不正です"}`);
-        console.log("POST結果:", resData);
+      if(!res.ok){
+        handleApiResponse(res);
+        throw new Error();
       }
+      const data = await res.json();
+      ToiToiNotification.success(data.message)
     } catch (error) {
-      alert("通信エラーが発生しました。");
       console.error(error);
+    }finally{
+      setIsSubmitting(false);
     }
   };
 
@@ -186,21 +246,21 @@ export default function TaskModal({ task, onClose, onSuccess, spaceId, mode = 'c
               <div className="flex gap-2">
                 <input
                   type="date"
-                  // .slice(0, 10) で YYYY-MM-DD を抽出
                   value={dateData}
                   onChange={e => {
-                      setDateData(e.target.value);
+                    setDateData(e.target.value);
                   }}
-                  disabled={isDetailMode || (isEditMode && formData.isAllday === 1)}
+                  disabled={isDetailMode}
                   className="flex-1 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                 />
                 <input
                   type="time"
-                  disabled={isDetailMode || (isCreateMode && formData.isAllday === 1)}
-                  className="w-28 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                  value={timeData}
                   onChange={e => {
                     setTimeData(e.target.value);
-                    }}
+                  }}
+                  disabled={isDetailMode || formData.isAllday === 1}
+                  className="w-28 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                 />
               </div>
             </div>

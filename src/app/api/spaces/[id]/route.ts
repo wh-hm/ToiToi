@@ -2,9 +2,8 @@ import { NextResponse } from "next/server";
 import { updateSpace, deleteSpace } from "@/services/SpaceService";
 import { getAuthContext } from "@/lib/auth-guard";
 import { MESSAGES } from "@/constants/messages";
-import { getSpaceCheck } from "@/services/SpaceService";
+import { getSpaceCheck,  } from "@/services/SpaceService";
 const safeRegex = /[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uFF01-\uFF5E]/;
-
 
 
 // 1. PATCH: スペースの更新
@@ -37,7 +36,7 @@ export async function PATCH(
 
         // 成功時：キーを space にし、S1002 を適用
         return NextResponse.json({ 
-            space: updatedSpace, 
+            updatedSpace: updatedSpace, 
             message: MESSAGES.S1002("スペース") 
         }, { status: 200 });
     } catch (error) {

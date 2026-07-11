@@ -18,11 +18,11 @@ export async function PATCH(
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
-    const { background, chat_id } = await request.json();
+    const { background, chatId } = await request.json();
 
     const [isSpaceAlive, isChatAlive] = await Promise.all([
         getSpaceCheck(auth.user_id, spaceId), // ※関数名が推測ですが合わせる
-        getChatCheck(auth.user_id, spaceId, chat_id)
+        getChatCheck(auth.user_id, spaceId, chatId)
     ]);
 
     // スペースチェックの判定
@@ -35,7 +35,7 @@ export async function PATCH(
         return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
     }
     // 2. 背景変更を実行
-    const updatedChat = await changeBackground(chat_id, spaceId, auth.user_id, background);
+    const updatedChat = await changeBackground(chatId, spaceId, auth.user_id, background);
 
     if (!updatedChat) {
       return NextResponse.json({ message: MESSAGES.E2001("背景色") }, { status: 403 });

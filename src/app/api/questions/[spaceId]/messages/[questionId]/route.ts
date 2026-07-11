@@ -1,4 +1,4 @@
-// app/api/questions/[id]/messages/[msgId]/route.ts
+// app/api/questions/[id]/messages/[questionId]/route.ts
 import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth-guard";
 import { updateQuestionChat, deleteQuestionChat, checkQuestionChat } from "@/services/QuestionChatService";
@@ -9,15 +9,15 @@ import { checkQuestion } from "@/services/QuestionService";
 
 export async function PATCH(
   request: Request,
-  { params }: { params: Promise<{ id: string; msgId: string }> }
+  { params }: { params: Promise<{ id: string; questionId: string }> }
 ) {
-  const { id, msgId } = await params;
+  const { id, questionId } = await params;
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
-    const spaceId = parseInt(id);
-    const questionId = parseInt(msgId);
+    const spaceId = Number(id);
+    const questionIdNum = Number(questionId);
     // 1. 認証チェックを先に済ませる
 
     const { searchParams } = new URL(request.url);
@@ -25,8 +25,8 @@ export async function PATCH(
 
     const [isSpaceAlive, usQuestionAlive, isChatAlive] = await Promise.all([
       getSpaceCheck(auth.user_id, spaceId), // ※関数名が推測ですが合わせる
-      checkQuestion(auth.user_id, spaceId, questionId),
-      checkQuestionChat(chatId, questionId, auth.user_id, )
+      checkQuestion(auth.user_id, spaceId, questionIdNum),
+      checkQuestionChat(chatId, questionIdNum, auth.user_id, )
     ]);
         
     // スペースチェックの判定
@@ -42,7 +42,7 @@ export async function PATCH(
     }
 
     const { message } = await request.json();
-    const updatedChat = await updateQuestionChat(chatId, questionId, auth.user_id, message);
+    const updatedChat = await updateQuestionChat(chatId, questionIdNum, auth.user_id, message);
     
     if (!updatedChat) return NextResponse.json({ message: MESSAGES.E2001("チャット") }, { status: 404 });
     return NextResponse.json({ 
@@ -58,28 +58,28 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: Promise<{ id: string; msgId: string }> }
+  { params }: { params: Promise<{ spaceId: string; questionId: string }> }
 ) {
- const { id, msgId } = await params;
+ const { spaceId, questionId } = await params;
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
-  const spaceId = parseInt(id);
-  const questionId = parseInt(msgId);
+  const spaceIdNum = Number(spaceId);
+  const questionIdNum = Number(questionId);
   // 1. 認証チェックを先に済ませる
 
   const { searchParams } = new URL(request.url);
   const chatId = Number(searchParams.get("chatId"));
+  console.log(spaceIdNum, questionId, chatId)
 
-
-  if (isNaN(spaceId) || isNaN(chatId)) {
+  if (isNaN(spaceIdNum) || isNaN(chatId)) {
     return NextResponse.json({ message: MESSAGES.E1008 }, { status: 400 });
   }
 
   try {
     
     // 3. 削除実行
-    const result = await deleteQuestionChat(chatId, questionId, auth.user_id);
+    const result = await deleteQuestionChat(chatId, questionIdNum, auth.user_id);
     if(! result){
       return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
     }

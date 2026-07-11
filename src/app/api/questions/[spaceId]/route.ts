@@ -8,26 +8,24 @@ import { checkQuestion } from "@/services/QuestionService";
 // 1. PATCH: 質問または解決ステータスの更新
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ spaceId: string }> }
 ) {
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
-    const { id } = await params;
-    const questionId = Number(id);
+    const { spaceId } = await params;
     const body = await request.json();
 
-    const { title, question, tag } = body;
-    const spaceId = Number(body.spaceId || body.spaceId);
-    const is_resolved = body.is_resolved !== undefined ? Number(body.is_resolved) : (body.status !== undefined ? Number(body.status) : undefined);
+    const { title, question, tag, questionId, isResolved } = body;
+    const spaceIdNum = Number(spaceId);
 
-    if (!spaceId || isNaN(spaceId)) {
+    if (!spaceIdNum || isNaN(spaceIdNum)) {
       return NextResponse.json({ message: MESSAGES.E1001("スペースID") }, { status: 400 });
     }
     const [isSpaceAlive,  isQuestionAlive] = await Promise.all([
-      getSpaceCheck(auth.user_id, spaceId), // ※関数名が推測ですが合わせる
-      checkQuestion(auth.user_id, spaceId, questionId),
+      getSpaceCheck(auth.user_id, spaceIdNum), // ※関数名が推測ですが合わせる
+      checkQuestion(auth.user_id, spaceIdNum, questionId),
     ]);
         
     // スペースチェックの判定
@@ -38,12 +36,12 @@ export async function PATCH(
         return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
     }
 
-    if (!title && !question && is_resolved !== undefined) {
+    if (!title && !question && isResolved !== undefined) {
       const updatedStatus = await updateQuestionStatus(
         questionId,
-        spaceId,
+        spaceIdNum,
         auth.user_id, // ⚠️ サービス側の仕様に合わせ作成者IDを渡します
-        is_resolved
+        isResolved
       );
       return NextResponse.json(updatedStatus);
     }
@@ -59,11 +57,11 @@ export async function PATCH(
 
     const updated = await updateQuestion(
       questionId,
-      spaceId,
+      spaceIdNum,
       auth.user_id,
       title,
       question,
-      is_resolved !== undefined ? is_resolved : 0,
+      isResolved !== undefined ? isResolved : 0,
       tag ? Number(tag) : null
     );
 
@@ -79,22 +77,23 @@ export async function PATCH(
 // 2. DELETE: 質問削除
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ spaceId: string }> }
 ) {
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
-    const { id } = await params;
+    const { spaceId } = await params;
     const { searchParams } = new URL(request.url);
-    const spaceId = Number(searchParams.get("spaceId"));
+    const questionId = Number(searchParams.get("questionId"));
+    const spaceIdNum = Number(spaceId);
 
 
-    if (!spaceId || isNaN(spaceId)) {
+    if (!spaceId || isNaN(spaceIdNum)) {
       return NextResponse.json({ message: MESSAGES.E1001("スペースID") }, { status: 400 });
     }
 
-    const success = await deleteQuestion(Number(id), spaceId, auth.user_id);
+    const success = await deleteQuestion(questionId, spaceIdNum, auth.user_id);
     if (!success) return NextResponse.json({ message: MESSAGES.E2004("質問") }, { status: 500 });
 
     return NextResponse.json({ 

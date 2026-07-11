@@ -1,18 +1,19 @@
 "use client";
-
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
-import { MESSAGES } from "@/constants/messages";
 import { useRouter, useParams } from "next/navigation";
 import TaskModal from "@/components/TaskModal";
+import { fetchWithTimeout } from "@/lib/api";
+import { handleApiResponse } from "@/lib/api-utils";
+import { ToiToiNotification } from "@/components/Toast";
 
 export default function QuestionPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const params = useParams();
-
   const spaceId = params?.spaceId;
+  console.log(spaceId)
 
   // 状態管理
   const [questions, setQuestions] = useState<any[]>([]);
@@ -34,18 +35,22 @@ export default function QuestionPage() {
 
   // 2. 質問サービス：getQuestions の実行
   const fetchQuestions = useCallback(async () => {
+
     if (!spaceId) return;
     try {
       setIsLoading(true);
-      const res = await fetch(`/api/questions?spaceId=${spaceId}&spaceId=${spaceId}`, {
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error("質問データの取得に失敗しました。");
+      const res = await fetchWithTimeout(`/api/questions?spaceId=${spaceId}`);
+      if (!res.ok) {
+        handleApiResponse(res);
+        throw new Error();
+      }
       const data = await res.json();
-      const list = Array.isArray(data) ? data : (data.questions || []);
-      setQuestions(list);
+      console.log(data);
+      setQuestions(data.questions || []);
+      setIsLoading(false);
+      // ToiToiNotification.success(data.message);
     } catch (error: any) {
-      toast.error(error.message || "通信エラーが発生しました。");
+      console.log(error);
     } finally {
       setIsLoading(false);
     }
@@ -59,7 +64,9 @@ export default function QuestionPage() {
 
   // 3. チェックマーク押下・ステータス更新
   const handleStatusToggle = async (question: any) => {
+    console.log(question);
     const currentStatus = Number(question.is_resolved ?? question.status);
+    const targetId = question.id;
     const newStatus = currentStatus === 1 ? 0 : 1;
     const previousQuestions = [...questions];
     setQuestions(
@@ -69,39 +76,32 @@ export default function QuestionPage() {
           : q
       )
     );
-
     try {
-      const res = await fetch(`/api/questions/${question.id}`, {
+      const res = await fetchWithTimeout(`/api/questions/${spaceId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...question,
           status: newStatus,
           isResolved: newStatus,
-          spaceId: Number(spaceId),
+          questionId: targetId,
         }),
       });
-
-      if (res.ok) {
-        if (newStatus === 1) {
+      if(!res.ok){
+        handleApiResponse(res);
+        throw new Error();
+      }
+      const data = await res.json();
+      setQuestions((prev) =>
+        prev.map((q) => (q.id === question.id ? { ...q, ...data.updatedQuestion } : q))
+      );
+      if(data.stauts === 1){
           triggerCelebration();
-        } else {
+      }else if(data.stauts === 0){
           toast("未解決に戻しました。");
-        }
-
-        const refreshRes = await fetch(`/api/questions?spaceId=${spaceId}&spaceId=${spaceId}`);
-        if (refreshRes.ok) {
-          const data = await refreshRes.json();
-          const list = Array.isArray(data) ? data : (data.questions || []);
-          setQuestions(list);
-        }
-      } else {
-        toast.error("更新に失敗しました。元に戻します。");
-        setQuestions(previousQuestions);
       }
     } catch (error) {
       console.error(error);
-      toast.error("通信エラーが発生したため、元に戻します。");
       setQuestions(previousQuestions);
     }
   };
@@ -138,28 +138,19 @@ export default function QuestionPage() {
               toast.dismiss(t.id);
               const previousQuestions = [...questions];
               setQuestions(questions.filter((q) => q.id !== id));
-
               try {
-                const res = await fetch(`/api/questions/${id}?spaceId=${spaceId}`, {
+                const res = await fetchWithTimeout(`/api/questions/${spaceId}?questionId=${id}`, {
                   method: "DELETE",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ spaceId: Number(spaceId) }),
                 });
-                const data = await res.json();
-                if (res.ok) {
-                  toast.success(data.message || "削除しました。");
-                  const refreshRes = await fetch(`/api/questions?spaceId=${spaceId}&spaceId=${spaceId}`);
-                  if (refreshRes.ok) {
-                    const data = await refreshRes.json();
-                    setQuestions(Array.isArray(data) ? data : (data.questions || []));
-                  }
-                } else {
-                  toast.error(MESSAGES.E2004("質問") + " 元に戻します。");
-                  setQuestions(previousQuestions);
+                if(!res.ok){
+                  handleApiResponse(res);
+                  throw new Error();
                 }
+                const data = await res.json();
+                ToiToiNotification.success(data.message);
               } catch (error) {
                 console.error(error);
-                toast.error("通信エラーが発生したため、元に戻します。");
                 setQuestions(previousQuestions);
               }
             }}
@@ -339,23 +330,6 @@ export default function QuestionPage() {
           spaceId={spaceId}
           type="question"
           onClose={() => setIsModalOpen(false)}
-          onSuccess={async () => {
-            setIsModalOpen(false);
-            if (modalMode === "edit") {
-              toast.success(MESSAGES.S1002("質問"));
-            } else {
-              toast.success(MESSAGES.S1001("質問"));
-            }
-            try {
-              const res = await fetch(`/api/questions?spaceId=${spaceId}&spaceId=${spaceId}`);
-              if (res.ok) {
-                const data = await res.json();
-                setQuestions(Array.isArray(data) ? data : (data.questions || []));
-              }
-            } catch (error) {
-              console.error("裏側でのデータ同期に失敗しました", error);
-            }
-          }}
         />
       )}
     </div>

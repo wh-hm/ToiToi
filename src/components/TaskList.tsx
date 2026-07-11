@@ -1,5 +1,33 @@
 import { useState } from "react";
 
+const formatTaskDueDate = (isoString: string | null, isAllDay: number) => {
+  if (!isoString) return "";
+
+  const date = new Date(isoString);
+  const now = new Date();
+
+  if (isAllDay === 1) {
+    return date.toLocaleDateString("ja-JP", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).replace(/\//g, '/');
+  }
+  const isToday = date.toDateString() === now.toDateString();
+  const timeOnly = date.toLocaleTimeString("ja-JP", {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+  if (isToday) {
+    return `今日 ${timeOnly}`;
+  }
+  const dateStr = date.toLocaleDateString("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).replace(/\//g, '/');
+  return `${dateStr} ${timeOnly}`;
+}
 /// src/components/TaskList.tsx
 export default function TaskList({
   tasks,
@@ -60,8 +88,8 @@ export default function TaskList({
                 <button
                   onClick={() => toggleComplete(task)}
                   className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${activeTab === "complete"
-                      ? "bg-emerald-500 border-emerald-500 text-white"
-                      : "border-slate-300 hover:border-indigo-500 bg-white"
+                    ? "bg-emerald-500 border-emerald-500 text-white"
+                    : "border-slate-300 hover:border-indigo-500 bg-white"
                     }`}
                 >
                   {activeTab === "complete" && <span className="text-xs">✓</span>}
@@ -77,7 +105,21 @@ export default function TaskList({
                 </span>
 
                 {/* 優先度バッジ（例） */}
-                {task.priority === 3 && <span className="text-[10px] bg-rose-50 text-rose-600 px-2 py-0.5 rounded-md font-semibold">高</span>}
+                {/* 優先度バッジ */}
+                {task.priority === 1 && (
+                  <span className="text-[10px] bg-rose-50 text-rose-600 px-2 py-0.5 rounded-md font-semibold">高</span>
+                )}
+                {task.priority === 2 && (
+                  <span className="text-[10px] bg-amber-50 text-amber-600 px-2 py-0.5 rounded-md font-semibold">中</span>
+                )}
+                {task.priority === 3 && (
+                  <span className="text-[10px] bg-slate-50 text-slate-500 px-2 py-0.5 rounded-md font-semibold">低</span>
+                )}
+                {task.due_date && (
+                  <span className={`text-xs px-2 py-1 bg-slate-100 rounded-md shrink-0 ${activeTab === "complete" ? "text-slate-400" : "text-slate-500"}`}>
+                    {formatTaskDueDate(task.due_date, task.is_allday ?? 0)}
+                  </span>
+                )}
               </div>
 
               {/* 操作ボタン（マウスホバー時だけクッキリ見せるギミックつき） */}

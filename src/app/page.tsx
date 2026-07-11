@@ -76,7 +76,6 @@ function TopPageContent() {
             }
         } catch (err: any) {
             await signOut({ redirect: false });
-            ToiToiNotification.error(err.message);
             initializedRef.current = false;
         } finally {
             setIsProcessing(false);

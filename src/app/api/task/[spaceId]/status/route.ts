@@ -5,26 +5,26 @@ import { MESSAGES } from "@/constants/messages";
 import { getSpaceCheck } from "@/services/SpaceService";
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ spaceId: string }> }
 ) {
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
-    const { id } = await params;
-    const taskId = Number(id);
+    const { spaceId } = await params;
+    const spaceIdNum = Number(spaceId);
     
     // ボディからの値取得
     const body = await request.json();
-    const { status, spaceId } = body;
+    const { status, taskId } = body;
 
     if (status === undefined || !spaceId) {
       return NextResponse.json({ message: MESSAGES.E1001("ステータスまたはスペースID") }, { status: 400 });
     }
 
     const [isSpaceAlive, isTaslAlive] = await Promise.all([
-      getSpaceCheck(auth.user_id, spaceId), // ※関数名が推測ですが合わせる
-      getTaskCheck(auth.user_id, spaceId, Number(id))
+      getSpaceCheck(auth.user_id, spaceIdNum), // ※関数名が推測ですが合わせる
+      getTaskCheck(auth.user_id, spaceIdNum, taskId)
     ]);
 
     // スペースチェックの判定
@@ -39,7 +39,7 @@ export async function PATCH(
     // 更新処理
     const updatedTask = await updateStatusTask(
       taskId,
-      spaceId,
+      spaceIdNum,
       auth.user_id,
       status
     );

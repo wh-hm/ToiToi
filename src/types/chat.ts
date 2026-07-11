@@ -2,13 +2,13 @@ export interface ChatMessage {
   id: number;
   message: string | null;
   space_id?: number;
-  favoriteFlag?: number;
+  favorite_flag?: number;
   background?: number;
   stamp: string | null;
   imageUrl: string | null;
-  createdAt: string; // API経由だと文字列として扱われるためstring推奨
+  created_at: string; // API経由だと文字列として扱われるためstring推奨
   updated_at: string;
-  questionId?: number;
+  question_id?: number;
   niceFlag?: number;
   signedImageUrl?: string | null;
   previewImages?: string[] | null;

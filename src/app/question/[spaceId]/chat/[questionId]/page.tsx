@@ -1,4 +1,5 @@
 'use client';
+//修正中
 import { useState, useEffect, useRef, use } from "react";
 import ChatInput from "@/components/chat/ChatInput";
 import ChatList from "@/components/chat/ChatList";
@@ -12,7 +13,6 @@ import { MESSAGES } from "@/constants/messages";
 import { Switch } from "@nextui-org/react";
 import { fetchWithTimeout } from "@/lib/api";
 import { handleApiResponse } from "@/lib/api-utils";
-import { SegmentViewStateNode } from "next/dist/next-devtools/userspace/app/segment-explorer-node";
 
 export default function ChatPage({ params }: { params: Promise<{ questionId: string, spaceId: string }> }) {
   const [inputText, setInputText] = useState("");
@@ -142,7 +142,7 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
     
 
     if (stampId) {
-      pendingMessages.push({ id: Date.now(), stamp: stampId, isPending: true, createdAt: now } as ChatMessage);
+      pendingMessages.push({ id: Date.now(), stamp: stampId, isPending: true, created_at: now } as ChatMessage);
     } else {
       if (selectedFiles.length > 0) {
         selectedFiles.forEach((file, i) => {
@@ -150,12 +150,12 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
             id: Date.now() + i,
             signedImageUrl: URL.createObjectURL(file), // 表示用ローカルURL
             isPending: false,
-            createdAt: now,
+            created_at: now,
             message: inputText, // 画像と一緒に送るメッセージ
           } as ChatMessage);
         });
       } else {
-        pendingMessages.push({ id: Date.now(), message: inputText, isPending: true, createdAt: now } as ChatMessage);
+        pendingMessages.push({ id: Date.now(), message: inputText, isPending: true, created_at: now } as ChatMessage);
       }
     }
 

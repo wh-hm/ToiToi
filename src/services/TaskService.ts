@@ -1,19 +1,19 @@
-
 import { prisma } from "@/lib/prisma";
 import { Task } from "@prisma/client";
 
-export const getTaskCheck = async (user_id: string, space_id: number, task_id: number): Promise<boolean> => {
+export const getTaskCheck = async (userId: string, spaceId: number, taskId: number): Promise<boolean> => {
   try {
-    const  result = await prisma.chat.findFirst({
+    console.log(userId, spaceId, taskId)
+    const  result = await prisma.task.findFirst({
       where: { 
-        id: task_id,
-        user_id: user_id, 
-        delete_flag: 0, 
-        space_id: space_id, 
+        id: taskId,
+        user_id: userId, 
+        space_id: spaceId, 
       }
     });
+    console.log("result", result);
 
-    if(!result){
+    if(!result || result.delete_flag === 1){
       return false;
     }
     return true;

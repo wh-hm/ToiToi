@@ -76,9 +76,9 @@ export default function ChatMessageItem({
             {type === "chat" && (
               <button 
                 disabled={isSubmitting}
-                onClick={() => { onOpenChange(false); onToggleFavorite?.(message.id, message.favoriteFlag === 1 ? 0 : 1); }} 
+                onClick={() => { onOpenChange(false); onToggleFavorite?.(message.id, message.favorite_flag === 1 ? 0 : 1); }} 
                 className="w-full text-left p-3 text-sm text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              >{message.favoriteFlag === 1 ? "お気に入り解除" : "お気に入り登録"}</button>
+              >{message.favorite_flag === 1 ? "お気に入り解除" : "お気に入り登録"}</button>
             )}
             {type === "question" && (
               <button 
@@ -116,9 +116,10 @@ export default function ChatMessageItem({
         <div className="w-4 h-4  flex-shrink-0 mr-3">
           {type === "chat" ? (
             <>
-              {message.favoriteFlag === 1 && (
+              {message.favorite_flag === 1 && (
                 <Star className="text-yellow-400 fill-yellow-400"/>
               )}
+              
             </>
           ) : (
             <>
@@ -194,7 +195,7 @@ export default function ChatMessageItem({
           })}
         </div>
       </div>
-      <span className="text-[10px] text-gray-400 mt-1">{formatDateTime(message.createdAt, message.updated_at)}</span>
+      <span className="text-[10px] text-gray-400 mt-1">{formatDateTime(message.created_at, message.updated_at)}</span>
     </div>
   );
 }

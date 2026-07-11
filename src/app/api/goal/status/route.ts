@@ -12,7 +12,6 @@ export async function PATCH(request: NextRequest) {
       { status: auth.status }
     );
   }
-
   try {
     const { status } = await request.json();
 
