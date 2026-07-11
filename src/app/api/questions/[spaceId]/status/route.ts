@@ -7,28 +7,29 @@ import { checkQuestion } from "@/services/QuestionService";
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ spaceId: string }> }
 ) {
   // 認証ガードを適用
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
-    const { id } = await params;
+    const { spaceId } = await params;
     const body = await request.json();
-    const { isResolved, spaceId } = body;
-    const questionId = Number(id);
+    const { isResolved, questionId } = body;
+    const spaceIdNum = Number(spaceId);
+    const questionIdNum = Number(questionId);
 
     // バリデーションチェック
-    if (isNaN(questionId) || isNaN(spaceId) || isNaN(isResolved)) {
+    if (isNaN(questionId) || isNaN(spaceIdNum) || isNaN(isResolved)) {
       return NextResponse.json(
         { message: MESSAGES.E1001("必須パラメータ") }, 
         { status: 400 }
       );
     }
     const [isSpaceAlive,  isQuestionAlive] = await Promise.all([
-      getSpaceCheck(auth.user_id, spaceId), // ※関数名が推測ですが合わせる
-      checkQuestion(auth.user_id, spaceId, questionId),
+      getSpaceCheck(auth.user_id, spaceIdNum), // ※関数名が推測ですが合わせる
+      checkQuestion(auth.user_id, spaceIdNum, questionIdNum),
     ]);
         
     // スペースチェックの判定
@@ -40,7 +41,7 @@ export async function PATCH(
     }
 
     // 更新処理
-    const updatedQuestion = await updateQuestionStatus(questionId, spaceId, auth.user_id, isResolved);
+    const updatedQuestion = await updateQuestionStatus(questionIdNum, spaceIdNum, auth.user_id, isResolved);
 
     if (!updatedQuestion) {
       return NextResponse.json({ message: MESSAGES.E2002("質問ステータス") }, { status: 500 });
