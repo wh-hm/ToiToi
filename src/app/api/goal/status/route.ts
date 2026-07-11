@@ -12,7 +12,6 @@ export async function PATCH(request: NextRequest) {
       { status: auth.status }
     );
   }
-
   try {
     const { status } = await request.json();
 
@@ -24,12 +23,15 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const goal = await updateGoalStatus(
+    const updatedGoal = await updateGoalStatus(
       auth.user_id,
       Number(status)
     );
 
-    return NextResponse.json(goal);
+    return NextResponse.json({ 
+        updatedGoal: updatedGoal, 
+        message: MESSAGES.S1002("目標ステータス") 
+    }, { status: 200 });
   } catch (error) {
     console.error("目標ステータス更新エラー:", error);
 

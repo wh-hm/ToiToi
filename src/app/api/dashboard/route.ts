@@ -50,20 +50,23 @@ export async function GET() {
           .filter(s => s.space_type === 2)
           .map(s => ({
             ...s, 
-            task_count: s.task_count 
+            taskCount: s.task_count 
         })),
         question: spacesWithQuestionCount
           .filter(s => s.space_type === 3)
           .map(s => ({
             ...s, 
-            question_count: s.question_count 
+            questionCount: s.question_count 
         })),
       },
-      goal,             // 目標データ
-      login_management, // ログイン管理情報
+      goal: goal,             // 目標データ
+      login_management: login_management, // ログイン管理情報
     };
 
-    return NextResponse.json(result);
+    return NextResponse.json({ 
+        ...result, 
+        message: MESSAGES.S2001("ダッシュボードデータ") 
+    }, { status: 200});
   } catch (error) {
     console.error("データ取得エラー:", error);
     return NextResponse.json({ error: MESSAGES.E2001("データ取得") }, { status: 500 });

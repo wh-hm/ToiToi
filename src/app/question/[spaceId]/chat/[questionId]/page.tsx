@@ -1,4 +1,5 @@
 'use client';
+//修正中
 import { useState, useEffect, useRef, use } from "react";
 import ChatInput from "@/components/chat/ChatInput";
 import ChatList from "@/components/chat/ChatList";
@@ -12,9 +13,8 @@ import { MESSAGES } from "@/constants/messages";
 import { Switch } from "@nextui-org/react";
 import { fetchWithTimeout } from "@/lib/api";
 import { handleApiResponse } from "@/lib/api-utils";
-import { SegmentViewStateNode } from "next/dist/next-devtools/userspace/app/segment-explorer-node";
 
-export default function ChatPage({ params }: { params: Promise<{ question_id: string, space_id: string }> }) {
+export default function ChatPage({ params }: { params: Promise<{ questionId: string, spaceId: string }> }) {
   const [inputText, setInputText] = useState("");
   const [editValue, setEditValue] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -24,8 +24,8 @@ export default function ChatPage({ params }: { params: Promise<{ question_id: st
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { question_id, space_id } = use(params);
-  const numericspace_id = Number(space_id);
+  const { questionId, spaceId } = use(params);
+  const numericspaceId = Number(spaceId);
   const { status } = useSession();
   const router = useRouter();
   const isInitialLoad = useRef(true);
@@ -86,14 +86,14 @@ export default function ChatPage({ params }: { params: Promise<{ question_id: st
 }, [messages, isLoading]);
 
   useEffect(() => {
-    if (question_id) fetchMessages();
-  }, [question_id]);
+    if (questionId) fetchMessages();
+  }, [questionId]);
 
   const fetchMessages = async () => {
     setIsLoading(true); // 開始
     try {
-      const { question_id, space_id } = await params;
-      const res = await fetchWithTimeout(`/api/questions/${space_id}/messages?question_id=${question_id}`);
+      const { questionId, spaceId } = await params;
+      const res = await fetchWithTimeout(`/api/questions/${spaceId}/messages?questionId=${questionId}`);
       const data = await res.json();
 
       if (!res.ok) {
@@ -172,7 +172,7 @@ export default function ChatPage({ params }: { params: Promise<{ question_id: st
 
     // 3. FormDataの構築
     const formData = new FormData();
-    formData.append("question_id", String(question_id)); // API側のバリデーション用に確実に含める
+    formData.append("questionId", String(questionId)); // API側のバリデーション用に確実に含める
     
     if (stampId) {
       formData.append("stamp", stampId);
@@ -182,7 +182,7 @@ export default function ChatPage({ params }: { params: Promise<{ question_id: st
     }
 
     try {
-      const res = await fetchWithTimeout(`/api/questions/${space_id}/messages`, { method: "POST", body: formData });
+      const res = await fetchWithTimeout(`/api/questions/${spaceId}/messages`, { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) {
         await handleApiResponse(res); // 内部のthrowを待つ
@@ -209,7 +209,7 @@ export default function ChatPage({ params }: { params: Promise<{ question_id: st
             signedImageUrl: msg.signedImageUrl, 
             
             // 💡 ダウンロードや拡大用に、サーバーから届いた本物のキーを別名で保存しておく
-            storageKey: match.signedImageUrl || match.image_url, 
+            storageKey: match.signedImageUrl || match.imageUrl, 
             
             isPending: true 
           };
@@ -254,7 +254,7 @@ export default function ChatPage({ params }: { params: Promise<{ question_id: st
 
     setIsSubmitting(true);
     try {
-      const res = await fetchWithTimeout(`/api/questions/${space_id}/messages/${question_id}?chat_id=${chatId}`, {
+      const res = await fetchWithTimeout(`/api/questions/${spaceId}/messages/${questionId}?chatId=${chatId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: editValue }),
@@ -287,13 +287,13 @@ export default function ChatPage({ params }: { params: Promise<{ question_id: st
     setMessages((prev) => 
       prev.map((msg) => 
         msg.id === chatId 
-          ? { ...msg, nice_flag: msg.nice_flag === 1 ? 0 : 1 } // ★ここを修正！
+          ? { ...msg, niceFlag: msg.niceFlag === 1 ? 0 : 1 } // ★ここを修正！
           : msg
       )
     );
 
     try {
-      const res = await fetchWithTimeout(`/api/questions/${question_id}/messages/${chatId}/status`, { 
+      const res = await fetchWithTimeout(`/api/questions/${questionId}/messages/${chatId}/status`, { 
         method: "PATCH" 
       });
       const data = await res.json();
@@ -317,7 +317,7 @@ export default function ChatPage({ params }: { params: Promise<{ question_id: st
     setMessages((prev) => prev.filter((msg) => msg.id !== chatId));
 
     try {
-      const res = await fetchWithTimeout(`/api/questions/${space_id}/messages/${question_id}?chat_id=${chatId}`, {
+      const res = await fetchWithTimeout(`/api/questions/${spaceId}/messages/${questionId}?chatId=${chatId}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
       });
@@ -336,16 +336,16 @@ export default function ChatPage({ params }: { params: Promise<{ question_id: st
 
 
 
-   const handleDownload = async (imageUrl: string, chat_id: string) => {
+   const handleDownload = async (imageUrl: string, chatId: string) => {
   const res = await fetchWithTimeout("/api/images", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ 
       targetUrl: imageUrl,
-      space_id: space_id,
+      spaceId: spaceId,
       type: "question",
-      question_id: question_id,
-      chat_id: chat_id 
+      questionId: questionId,
+      chatId: chatId 
     })
   });
 
@@ -392,12 +392,12 @@ export default function ChatPage({ params }: { params: Promise<{ question_id: st
     }
 
     try {
-      const res = await fetchWithTimeout(`/api/questions/${question_id}/status`, {
+      const res = await fetchWithTimeout(`/api/questions/${questionId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          is_resolved: newStatus,
-          space_id: space_id 
+          isResolved: newStatus,
+          spaceId: spaceId 
         }),
       });
       const data = await res.json();
@@ -464,7 +464,7 @@ return (
       <div className="flex-1 overflow-y-auto relative w-full p-4">
         <ChatList 
           chats={messages}
-          space_id={numericspace_id}
+          spaceId={numericspaceId}
           isSubmitting={isSubmitting}
           ref={scrollRef}
           onEdit={(id) => { setEditingId(id); setEditValue(messages.find((m: any) => m.id === id)?.message || ""); }}

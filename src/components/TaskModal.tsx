@@ -1,8 +1,8 @@
+import { fetchWithTimeout } from "@/lib/api";
+import { handleApiResponse } from "@/lib/api-utils";
 import { useState, useEffect } from "react";
-
-type ModalMode = 'create' | 'edit' | 'detail';
-
-export default function TaskModal({ task, onClose, onSuccess, onSave, space_id, mode = 'create', type = 'task' }: any) {
+import { ToiToiNotification } from "./Toast";
+export default function TaskModal({ task, onClose, onSuccess, onSave, spaceId, mode = 'create', type = 'task' }: any) {
   const getNowDateTime = () => {
     const now = new Date();
     const yyyy = now.getFullYear();
@@ -50,9 +50,9 @@ export default function TaskModal({ task, onClose, onSuccess, onSave, space_id, 
   const [formData, setFormData] = useState({
     title: task?.title || "",
     description: task?.question || task?.description || "",
-    due_date: task ? getTaskDate(task.due_date) : nowDateTime.date,
-    due_time: task ? getTaskTime(task.due_date) : nowDateTime.time,
-    is_allday: task?.is_allday || 0,
+    dueDate: task ? getTaskDate(task.due_date) : nowDateTime.date,
+    dueTime: task ? getTaskTime(task.due_date) : nowDateTime.time,
+    isAllday: task?.is_allday || 0,
     priority: task?.priority || 1,
     status: task?.status ?? (task?.is_resolved ?? 0),
     tag: task?.tag || 1,
@@ -69,9 +69,9 @@ export default function TaskModal({ task, onClose, onSuccess, onSave, space_id, 
         title: task.title || "",
         description: task.question || task.description || "",
         status: task.status ?? (task.is_resolved ?? 0),
-        due_date: getTaskDate(task.due_date),
-        due_time: getTaskTime(task.due_date),
-        is_allday: task.is_allday || 0,
+        dueDate: getTaskDate(task.due_date),
+        dueTime: getTaskTime(task.due_date),
+        isAllday: task.is_allday || 0,
         tag: task.tag || 0,
         priority: task.priority || 1,
       });
@@ -83,6 +83,7 @@ export default function TaskModal({ task, onClose, onSuccess, onSave, space_id, 
   const isCreateMode = mode === 'create';
 
   const handleSubmit = async () => {
+    console.log("dateData", dateData)
     if (isSubmitting) return;
     if (typeof onSave === "function") {
       const isValid = await onSave(formData.title, formData.description);
@@ -109,10 +110,10 @@ export default function TaskModal({ task, onClose, onSuccess, onSave, space_id, 
     const baseApiRoute = type === "question" ? "questions" : "task";
 
     const url = isEditMode
-      ? `/api/${baseApiRoute}/${task.id}`
+      ? `/api/${baseApiRoute}/${spaceId}`
       : `/api/${baseApiRoute}`;
-    const numericspace_id = parseInt(space_id as string);
-    if (!numericspace_id || isNaN(numericspace_id)) {
+    const numericspaceId = parseInt(spaceId as string);
+    if (!numericspaceId || isNaN(numericspaceId)) {
       return alert("有効なスペースIDが見つかりません。");
     }
 
@@ -138,43 +139,49 @@ export default function TaskModal({ task, onClose, onSuccess, onSave, space_id, 
         if (!isValid) return;
       }
 
-      const payload = type === "question"
+
+      const basePayload = type === "question"
         ? {
           title: formData.title.trim(),
           question: formData.description.trim(),
-          is_resolved: isEditMode ? Number(formData.status) : 0,
-          space_id: numericspace_id,
+          isResolved: isEditMode ? Number(formData.status) : 0,
+          spaceId: numericspaceId,
           tag: Number(formData.tag) || 0,
         }
         : {
           title: formData.title.trim(),
-          due_date: isoDueDate,
-          space_id: numericspace_id,
+          dueDate: isoDueDate,
+          spaceId: numericspaceId,
           tag: Number(formData.tag) || 0,
           priority: Number(formData.priority) || 1,
-          is_allday: Number(formData.is_allday),
+          isAllday: Number(formData.isAllday),
           status: Number(formData.status),
           description: formData.description.trim(),
         };
+        const editOnlyFields = isEditMode
+          ? (type === "question"
+              ? { questionId: task.id } // 質問の編集時
+              : { taskId: task.id }                         // タスクの編集時
+            )
+          : {}; // 新規作成時は空
+
+        // 3. 最後に結合する
+        const payload = { ...basePayload, ...editOnlyFields };
       console.log(payload)
-      const response = await fetch(url,
-        {
-          method: method,
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify(payload),
-        });
-
-      const resData = await response.json();
-
-      if (response.ok) {
-        onSuccess();
-      } else {
-        alert(`保存失敗: ${resData.error || "リクエストが不正です"}`);
-        console.log("POST結果:", resData);
+      const res = await fetchWithTimeout(url,
+      {
+        method: method,
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+      if(!res.ok){
+        handleApiResponse(res);
+        throw new Error();
       }
+      const data = await res.json();
+      ToiToiNotification.success(data.message)
     } catch (error) {
-      alert("通信エラーが発生しました。");
       console.error(error);
     }finally{
       setIsSubmitting(false);
@@ -227,8 +234,8 @@ export default function TaskModal({ task, onClose, onSuccess, onSave, space_id, 
                 <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={formData.is_allday === 1}
-                    onChange={e => setFormData({ ...formData, is_allday: e.target.checked ? 1 : 0 })}
+                    checked={formData.isAllday === 1}
+                    onChange={e => setFormData({ ...formData, isAllday: e.target.checked ? 1 : 0 })}
                     disabled={isDetailMode}
                     className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4"
                   />
@@ -252,7 +259,7 @@ export default function TaskModal({ task, onClose, onSuccess, onSave, space_id, 
                   onChange={e => {
                     setTimeData(e.target.value);
                   }}
-                  disabled={isDetailMode || formData.is_allday === 1}
+                  disabled={isDetailMode || formData.isAllday === 1}
                   className="w-28 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                 />
               </div>

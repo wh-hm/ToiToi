@@ -1,5 +1,4 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
@@ -25,7 +24,7 @@ export default function SpaceList(props: SpaceListProps) {
   const { items, title, showArchived, onToggleArchive, onEdit, onDelete, onCheckError } = props;
   const [open, setOpen] = useState(true);
   const [localItems, setLocalItems] = useState<Space[]>(items);
-  const router = useRouter();
+  // const router = useRouter();
 
   useEffect(() => {
     setLocalItems(items);
@@ -39,22 +38,21 @@ export default function SpaceList(props: SpaceListProps) {
       default: return `/chat/${id}`;
     }
   };
-  const handleSpaceClick = async (e: React.MouseEvent, type: number, id: string) => {
-    e.preventDefault();
-    try {
-      const res = await fetch(`/api/spaces/${id}?space_type=${type}`, { method: "GET" });
-
-      if (res.status === 404 || !res.ok) {
-        onCheckError("このスペースは既に削除されています。");
-        router.push("/404");
-      } else {
-        router.push(getLinkPath(type, id));
-      }
-    } catch (error) {
-      console.error("生存チェック失敗:", error);
-      onCheckError("通信エラーが発生しました。");
-    }
-  };
+  // 遷移先で入れたから問題なし
+  // const handleSpaceClick = async (e: React.MouseEvent, type: number, id: string) => {
+  //   e.preventDefault();
+  //   try {
+  //     const res = await fetchWithTimeout(`/api/spaces/${id}?spaceType=${type}`, { method: "GET" });
+  //     if(!res.ok){
+  //       handleApiResponse(res);
+  //       throw new Error();
+  //     }
+  //       router.push(getLinkPath(type, id));
+  //   } catch (error) {
+  //     console.error(error);
+  //     onCheckError("通信エラーが発生しました。");
+  //   }
+  // };
   return (
     <div style={{ marginBottom: "20px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f3f3f3", padding: "10px", borderRadius: "4px", border: "1px solid #ddd" }}>

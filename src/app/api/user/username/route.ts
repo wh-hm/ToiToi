@@ -39,13 +39,16 @@ export async function PATCH(request: Request) {
         }
 
         // 3. ユーザー名を更新
-        const isUpdated = await updateUsername(auth.user_id, username);
+        const updatedUser = await updateUsername(auth.user_id, username);
         
-        if (!isUpdated) {
+        if (!updatedUser) {
             return NextResponse.json({ message: MESSAGES.E2002("ユーザー名") }, { status: 500 });
         }
 
-        return NextResponse.json({ success: true, message: MESSAGES.S1002("ユーザー名") });
+        return NextResponse.json({ 
+            user: updatedUser, 
+            message: MESSAGES.S1002("ユーザー名") 
+        }, { status: 200 });
 
     } catch (error) {
         console.error("API Error:", error);

@@ -22,8 +22,10 @@ export async function DELETE() {
                 { status: 500 }
             );
         }
-        
-        return NextResponse.json({ message: MESSAGES.S1003("チャットスペース全削除") });
+        return NextResponse.json({ 
+            success: true, 
+            message: MESSAGES.S1003("チャットスペース全削除") 
+        });
     } catch (error) {
         console.error("【全削除エラー】", error);
         return NextResponse.json(

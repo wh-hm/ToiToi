@@ -16,11 +16,11 @@ export async function PATCH(
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
-    const { message, space_id } = await request.json();
+    const { message, spaceId } = await request.json();
 
     const [isSpaceAlive, isChatAlive] = await Promise.all([
-        getSpaceCheck(auth.user_id, space_id), // ※関数名が推測ですが合わせる
-        getChatCheck(auth.user_id, space_id, chatId)
+        getSpaceCheck(auth.user_id, spaceId), // ※関数名が推測ですが合わせる
+        getChatCheck(auth.user_id, spaceId, chatId)
     ]);
 
     // スペースチェックの判定
@@ -34,13 +34,16 @@ export async function PATCH(
     }
     
     // 2. 更新実行 (message をオブジェクトで渡す構成に統一)
-    const updatedChat = await updateChat(chatId, parseInt(space_id), auth.user_id, message );
+    const updatedChat = await updateChat(chatId, parseInt(spaceId), auth.user_id, message );
 
     if (!updatedChat) {
       return NextResponse.json({ message: MESSAGES.E2002("チャット内容") }, { status: 403 });
     }
 
-    return NextResponse.json(updatedChat);
+    return NextResponse.json({ 
+        updatedChat: updatedChat, 
+        message: MESSAGES.S1002("チャット内容") 
+    }, { status: 200 });
   } catch (error) {
     return NextResponse.json({ message: MESSAGES.E2002("チャット内容") }, { status: 500 });
   }
@@ -57,21 +60,21 @@ export async function DELETE(
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
-  
-
-  // 2. URLから space_id を取得
   const { searchParams } = new URL(request.url);
-  const space_id = parseInt(searchParams.get("space_id") || "");
+  const spaceId = parseInt(searchParams.get("spaceId") || "");
 
-  if (isNaN(chatId) || isNaN(space_id)) {
+  if (isNaN(chatId) || isNaN(spaceId)) {
     return NextResponse.json({ message: MESSAGES.E1008 }, { status: 400 });
   }
 
   try {
     
     // 3. 削除実行
-    await deleteChat(chatId, auth.user_id, space_id);
-    return NextResponse.json({ success: true });
+    await deleteChat(chatId, auth.user_id, spaceId);
+    return NextResponse.json({ 
+        success: true, 
+        message: MESSAGES.S1003("チャット") 
+    }, { status: 200 });
   } catch (error) {
     console.log(error);
     return NextResponse.json({ message: MESSAGES.E2001("チャット") }, { status: 500 });

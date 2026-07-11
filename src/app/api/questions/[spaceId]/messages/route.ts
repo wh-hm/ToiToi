@@ -13,19 +13,21 @@ import { getSpaceCheck } from "@/services/SpaceService";
 // 1. メッセージ一覧取得 (GET)
 export async function GET(
   request: Request,
-  context: { params: Promise<{ id: string }> } // 型定義の書き方を明示的に変更
+   { params }: { params: Promise<{ spaceId: string }> }
 ) {
-  
+
+  const { spaceId } = await params;
   const { searchParams } = new URL(request.url);
-  const question_id = Number(searchParams.get("question_id"));
+  const questionId = Number(searchParams.get("questionId"));
+  const spaceIdNum = Number(spaceId);
+  
+  console.log(spaceId,questionId)
 
-  const resolvedParams = await context.params; // context から受け取る
-  const space_id = Number(resolvedParams.id);
 
-  if (isNaN(space_id) || space_id <= 0) {
+  if (isNaN(spaceIdNum) || spaceIdNum <= 0) {
     return NextResponse.json({ message: MESSAGES.E1001("Space ID") }, { status: 400 });
   }
-  if (isNaN(question_id) || question_id <= 0) {
+  if (isNaN(questionId) || questionId <= 0) {
     return NextResponse.json({ message: MESSAGES.E1001("Question ID") }, { status: 400 });
   }
 
@@ -35,8 +37,8 @@ export async function GET(
   try {
     
     const [isSpaceAlive,  isQuestionAlive] = await Promise.all([
-      getSpaceCheck(auth.user_id, space_id), // ※関数名が推測ですが合わせる
-      checkQuestion(auth.user_id, space_id, question_id),
+      getSpaceCheck(auth.user_id, spaceIdNum), // ※関数名が推測ですが合わせる
+      checkQuestion(auth.user_id, spaceIdNum, questionId),
     ]);
         
     // スペースチェックの判定
@@ -48,39 +50,42 @@ export async function GET(
     }
 
     const [messages, question] = await Promise.all([
-      getQuestionChats(question_id, auth.user_id),
-      getQuestion(question_id, auth.user_id)
+      getQuestionChats(questionId, auth.user_id),
+      getQuestion(questionId, auth.user_id)
     ]);
 
     
 
-    return NextResponse.json({ messages: messages || [], question: question || null });
+   return NextResponse.json({ 
+        chats: messages || [], 
+        question: question || null,
+        message: MESSAGES.S2001("メッセージ一覧") 
+    });
   } catch (error) {
     return NextResponse.json({ message: MESSAGES.E2003("チャット") }, { status: 500 });
   }
 }
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ spaceId: string }> }
 ) {
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
   
-  const { id } = await params;
-  const space_id = parseInt(id);
-
+  const { spaceId } = await params;
+  const spaceIdNum = Number(spaceId);
   try {
     
     const formData = await request.formData();
     const message = formData.get("message") as string;
     const files = formData.getAll("images") as File[]; // 複数画像取得
     const stamp = formData.get("stamp") as string | null;
-    const question_id = Number(formData.get("question_id"));
+    const questionId = Number(formData.get("questionId"));
 
-    if (isNaN(space_id) || space_id <= 0) {
+    if (isNaN(spaceIdNum) || spaceIdNum <= 0) {
       return NextResponse.json({ message: MESSAGES.E1001("Space ID") }, { status: 400 });
     }
-    if (isNaN(question_id) || question_id <= 0) {
+    if (isNaN(questionId) || questionId <= 0) {
       return NextResponse.json({ message: MESSAGES.E1001("Question ID") }, { status: 400 });
     }
 
@@ -94,8 +99,8 @@ export async function POST(
     }
 
     const [isSpaceAlive,  isQuestionAlive] = await Promise.all([
-      getSpaceCheck(auth.user_id, space_id), // ※関数名が推測ですが合わせる
-      checkQuestion(auth.user_id, space_id, question_id),
+      getSpaceCheck(auth.user_id, spaceIdNum), // ※関数名が推測ですが合わせる
+      checkQuestion(auth.user_id, spaceIdNum, questionId),
     ]);
         
     // スペースチェックの判定
@@ -125,21 +130,21 @@ export async function POST(
       }
     }
 
-    imageUrls = await uploadImages(files, auth.user_id, space_id);
+    imageUrls = await uploadImages(files, auth.user_id, spaceId);
   }
 
     // 2. DB登録処理
     const newChats = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 画像がない場合
       if (imageUrls.length === 0) {
-        return [await registerQuestionChat(question_id, auth.user_id, message || undefined, undefined, stamp || undefined, tx)];
+        return [await registerQuestionChat(questionId, auth.user_id, message || undefined, undefined, stamp || undefined, tx)];
       }
 
       // 画像がある場合はループして個別に登録
       const results = [];
       for (let i = 0; i < imageUrls.length; i++) {
         const res = await registerQuestionChat(
-          question_id,
+          questionId,
           auth.user_id,
           i === 0 ? (message || undefined) : undefined, // 1枚目にメッセージ/スタンプ付与
           imageUrls[i],
@@ -151,7 +156,10 @@ export async function POST(
       return results;
     });
 
-    return NextResponse.json({ messages: newChats }, { status: 201 });
+    return NextResponse.json({ 
+        chats: newChats, 
+        message: MESSAGES.S1001("メッセージ") 
+    }, { status: 201 });
 
   } catch (error) {
     console.error("❌ POSTメッセージ登録エラーの本当の理由:", error);

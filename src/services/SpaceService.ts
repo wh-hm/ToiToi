@@ -31,6 +31,7 @@ export async function getSpaces(
   }
 }
 
+
 //スペースが生きているかどうかの確認
 export async function getSpaceCheck(
   user_id: string,

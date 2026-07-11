@@ -1,4 +1,5 @@
 "use client";
+//修正中
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -7,12 +8,15 @@ import { MESSAGES } from "@/constants/messages";
 import TaskList from "@/components/TaskList";
 import TaskModal from "@/components/TaskModal";
 import { Loading } from "@/components/LoadingSpinner";
+import { fetchWithTimeout } from "@/lib/api";
+import { handleApiResponse } from "@/lib/api-utils";
+import { ToiToiNotification } from "@/components/Toast";
 
 export default function TaskPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const params = useParams();
-  const space_id = params?.id;
+  const spaceId = params?.id;
 
   // 1. 状態管理（State）の設計
   const [taskData, setTaskData] = useState<{ incomplete: any[]; complete: any[] }>({
@@ -37,19 +41,6 @@ export default function TaskPage() {
   const [celebrationOpacity, setCelebrationOpacity] = useState(false);
 
   const triggerCelebration = () => {
-    /*
-    toast.success("タスク完了！お疲れ様でした！ ", {
-      style: {
-        border: '2px solid #10B981',
-        padding: '16px',
-        color: '#065F46',
-        fontWeight: 'bold',
-        background: '#ECFDF5',
-        fontSize: '15px',
-      },
-        duration: 4000,
-      });
-     }; */
     setShowCelebration(true);
 
     setTimeout(() => {
@@ -65,18 +56,17 @@ export default function TaskPage() {
 
   // 2. タスクデータの取得
   const fetchTasks = useCallback(async () => {
-    if (!space_id) return;
+    if (!spaceId) return;
 
     try {
       // URLのパラメータ重複を修正
-      const res = await fetch(`/api/task?space_id=${space_id}`, {
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error("API error");
-
+      const res = await fetchWithTimeout(`/api/task?spaceId=${spaceId}`);
+      if (!res.ok){
+        handleApiResponse(res);
+        throw new Error();
+      }
       const data = await res.json();
       console.log("認証情報を含めた最新データ:", data);
-
       setTaskData({
         incomplete: Array.isArray(data.incomplete) ? data.incomplete : [],
         complete: Array.isArray(data.complete) ? data.complete : [],
@@ -86,7 +76,7 @@ export default function TaskPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [space_id]);
+  }, [spaceId]);
 
   // セッションチェックと自動フェッチ
   useEffect(() => {
@@ -96,10 +86,10 @@ export default function TaskPage() {
       router.push("/");
       return;
     }
-    if (space_id) {
+    if (spaceId) {
       fetchTasks();
     }
-  }, [space_id, status, router, fetchTasks]);
+  }, [spaceId, status, router, fetchTasks]);
 
   // 3. 検索・ソート・完了未完了の分配ロジック
   const processedTasks = useMemo(() => {
@@ -182,30 +172,20 @@ export default function TaskPage() {
               });
 
               try {
+                console.log(t.id);
                 // パラメータ重複を修正
-                const res = await fetch(`/api/task/${id}?space_id=${space_id}`, {
+                const res = await fetchWithTimeout(`/api/task/${spaceId}?taskId=${id}`, {
                   method: "DELETE",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ space_id: Number(space_id) }),
                 });
                 const data = await res.json();
-                if (res.ok) {
-                  toast.success(data.message || "削除しました");
-                  const refreshRes = await fetch(`/api/task?space_id=${space_id}`);
-                  if (refreshRes.ok) {
-                    const data = await refreshRes.json();
-                    setTaskData({
-                      incomplete: Array.isArray(data.incomplete) ? data.incomplete : [],
-                      complete: Array.isArray(data.complete) ? data.complete : [],
-                    });
-                  }
-                } else {
-                  toast.error(MESSAGES.E2004("タスク") + " 元に戻します。");
-                  setTaskData(previousTaskData);
+                if(!res.ok){
+                  handleApiResponse(res);
+                  throw new Error();
                 }
+                ToiToiNotification.success(data.message)
               } catch (error) {
                 console.error(error);
-                toast.error("通信エラーが発生したため、元に戻します。");
                 setTaskData(previousTaskData);
               }
             }}
@@ -237,40 +217,29 @@ export default function TaskPage() {
         complete: taskData.complete.filter((t) => t.id !== task.id),
       });
     }
-
-    console.log("【デバッグ】関数内の space_id:", space_id);
-    console.log("【デバッグ】task オブジェクトの中身:", task);
     try {
-      const res = await fetch(`/api/task/${task.id}/status`, {
+      const res = await fetchWithTimeout(`/api/task/${spaceId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...task,
           status: newStatus,
-          space_id: Number(space_id),
+          taskId: task.id,
         }),
       });
-      if (res.ok) {
-        if (newStatus === 1) {
-          triggerCelebration();
-        } else {
-          toast("未完了に戻しました");
-        }
-        // パラメータ重複を修正
-        const refreshRes = await fetch(`/api/task?space_id=${space_id}`);
-        if (refreshRes.ok) {
-          const data = await refreshRes.json();
-          setTaskData({
-            incomplete: Array.isArray(data.incomplete) ? data.incomplete : [],
-            complete: Array.isArray(data.complete) ? data.complete : [],
-          });
-        }
-      } else {
-        toast.error("更新に失敗しました。元に戻します。");
-        setTaskData(previousTaskData);
+      if(!res.ok){
+        handleApiResponse(res);
+        throw new Error();
       }
+      const data = await res.json();
+      if(data.status === 1){
+        triggerCelebration();
+        ToiToiNotification.info("未完了に戻しました");
+      }else if(data.status === 0){
+        ToiToiNotification.info("未完了に戻しました");
+      }
+      
     } catch (error) {
-      toast.error("通信エラーが発生したため、元に戻します。");
+      console.log(error);
       setTaskData(previousTaskData);
     }
   };
@@ -381,7 +350,7 @@ export default function TaskPage() {
         <TaskModal
           mode={modalMode}
           task={editingTask}
-          space_id={space_id}
+          spaceId={spaceId}
           type="task"
           onClose={() => setIsModalOpen(false)}
           onSave={async (title: string, description: string, dueDateString?: string) => {
@@ -430,19 +399,6 @@ export default function TaskPage() {
               toast.success(MESSAGES.S1002("タスク"));
             } else {
               toast.success(MESSAGES.S1001("タスク"));
-            }
-            try {
-              // パラメータ重複を修正
-              const res = await fetch(`/api/task?space_id=${space_id}`);
-              if (res.ok) {
-                const data = await res.json();
-                setTaskData({
-                  incomplete: Array.isArray(data.incomplete) ? data.incomplete : [],
-                  complete: Array.isArray(data.complete) ? data.complete : [],
-                });
-              }
-            } catch (error) {
-              console.error(error);
             }
           }}
         />

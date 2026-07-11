@@ -11,13 +11,13 @@ export async function GET(request: NextRequest) {
     if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
     const { searchParams } = new URL(request.url);
-    const space_id = Number(searchParams.get("space_id"));
+    const spaceId = Number(searchParams.get("spaceId"));
 
-    if (!space_id || isNaN(space_id)) {
+    if (!spaceId || isNaN(spaceId)) {
         return NextResponse.json({ message: MESSAGES.E1001("スペースID") }, { status: 400 });
     }
 
-    const isSpaceAlive = await getSpaceCheck(auth.user_id, space_id);
+    const isSpaceAlive = await getSpaceCheck(auth.user_id, spaceId);
     // スペースチェックの判定
     if (!isSpaceAlive) {
         return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
@@ -25,8 +25,11 @@ export async function GET(request: NextRequest) {
 
 
     try {
-        const questions = await getQuestions(space_id, auth.user_id);
-        return NextResponse.json(questions);
+        const questions = await getQuestions(spaceId, auth.user_id);
+        return NextResponse.json({ 
+            questions: questions, 
+            message: MESSAGES.S2001("質問一覧") 
+        });
     } catch (error) {
         return NextResponse.json({ message: MESSAGES.E2003("質問") }, { status: 500 });
     }
@@ -38,7 +41,7 @@ export async function POST(request: NextRequest) {
     if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
     try {
-        const { title, question, space_id, tag } = await request.json();
+        const { title, question, spaceId, tag } = await request.json();
 
         // --- 単体チェック ---
         // 1. 必須チェック (E1001)
@@ -50,7 +53,7 @@ export async function POST(request: NextRequest) {
         if (question.length > 100) return NextResponse.json({ message: MESSAGES.E1002("質問詳細", 100) }, { status: 400 });
 
              // ※関数名が推測ですが合わせる
-        const isSpaceAlive = await getSpaceCheck(auth.user_id, space_id);
+        const isSpaceAlive = await getSpaceCheck(auth.user_id, spaceId);
         // スペースチェックの判定
         if (!isSpaceAlive) {
             return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
@@ -58,14 +61,17 @@ export async function POST(request: NextRequest) {
 
         // データベースに保存
         const newQuestion = await registerQuestion(
-            space_id,
+            spaceId,
             auth.user_id,
             title,
             question,
             tag || 0
         );
 
-        return NextResponse.json(newQuestion, { status: 201 });
+        return NextResponse.json({ 
+            newQuestion: newQuestion, 
+            message: MESSAGES.S1001("質問") 
+        }, { status: 201 });
     } catch (error) {
         return NextResponse.json({ message: MESSAGES.E2001("質問") }, { status: 500 });
     }

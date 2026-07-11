@@ -16,7 +16,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [editValue, setEditValue] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [space_id, setspace_id] = useState<number | null>(null);
+  const [spaceId, setspaceId] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { status } = useSession();
   const router = useRouter();
@@ -34,14 +34,6 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     }
   }, [status, router]);
 
-  // 初回ロード完了時に一度だけ実行
-  // useEffect(() => {
-    
-  //   if (chats.length > 0 && scrollRef.current && isInitialLoad.current) {
-  //     scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'instant' });
-  //     isInitialLoad.current = false;
-  //   }
-  // }, [chats]);
   // 修正後
   useEffect(() => {
     // Array.isArray(chats) で安全に配列かどうかを確認してから length を見る
@@ -72,7 +64,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   };
 
   useEffect(() => {
-    params.then((p) => setspace_id(Number(p.id)));
+    params.then((p) => setspaceId(Number(p.id)));
   }, [params]);
 
   useEffect(() => { fetchMessages(); }, []);
@@ -82,7 +74,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     setIsChatsLoadFailed(true); // 読み込み開始時は一旦Failed扱いにしておく
     try {
       const { id } = await params;
-      const res = await fetchWithTimeout(`/api/chats?space_id=${id}`);
+      const res = await fetchWithTimeout(`/api/chats?spaceId=${id}`);
       const data = await res.json();
       if (!res.ok) {
         await handleApiResponse(res); // 内部のthrowを待つ
@@ -97,13 +89,8 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       
     } catch (e) {
       console.error("メッセージ取得エラー:", e);
-      console.error("API Error at /api/chats:", e);
       setIsError(true);
-      ToiToiNotification.error("チャットの取得に失敗しました。");
     } finally {
-      // 💡 【超重要】ここで一律でfalseにするのではなく、
-      // データのマウントが終わったので isLoading を解除。
-      // これにより、ChatList内部の「画像ロード監視（isImagesLoading）」へバトンが綺麗に渡ります！
       setIsLoading(false); 
     }
   };
@@ -158,7 +145,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     const backupFiles = [...selectedFiles];
 
     const formData = new FormData();
-    formData.append("space_id", id);
+    formData.append("spaceId", id);
 
     if (stampId) {
       formData.append("stamp", stampId);
@@ -208,6 +195,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     try {
       const res = await fetchWithTimeout(`/api/chats/`, { method: "POST", body: formData });
       const data = await res.json();
+      console.log(data);
       if (!res.ok) {
         await handleApiResponse(res); // 内部のthrowを待つ
         throw new Error(); // 明示的にエラーを投げる
@@ -237,7 +225,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   };
 
   const handleUpdate = async () => {
-    if (isSubmitting || !editingId || space_id === null) return;
+    if (isSubmitting || !editingId || spaceId === null) return;
     
     const previousMessages = [...chats];
 
@@ -255,12 +243,17 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       const res = await fetchWithTimeout(`/api/chats/${editingId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: editValue, space_id: space_id }),
+        body: JSON.stringify({ message: editValue, spaceId: spaceId }),
       });
       const data = await res.json();
       if (!res.ok) {
         await handleApiResponse(res); // 内部のthrowを待つ
         throw new Error(); // 明示的にエラーを投げる
+      }
+      if (data.updatedChat) {
+        setChats((prev) => 
+          prev.map((msg) => (msg.id === editingId ? { ...msg, ...data.updatedChat } : msg))
+        );
       }
       
     } catch (e) {
@@ -276,10 +269,9 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     setChats((prev) => prev.filter((msg) => msg.id !== chatId));
 
     try {
-      const res = await fetchWithTimeout(`/api/chats/${chatId}?space_id=${sId}`, { 
+      const res = await fetchWithTimeout(`/api/chats/${chatId}?spaceId=${sId}`, { 
         method: "DELETE" 
       });
-      const data = await res.json();
       if (!res.ok) {
         await handleApiResponse(res); // 内部のthrowを待つ
         throw new Error(); // 明示的にエラーを投げる
@@ -290,30 +282,77 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     }
   };
 
-  const handleToggleFavorite = async (chatId: number, current: number) => {
+const handleToggleFavorite = async (chatId: number) => {
+  const targetChat = chats.find(c => c.id === chatId);
+  if (!targetChat) return;
+
+  // 現在が 1 なら 0 に、そうでなければ 1 にする
+  const nextValue = targetChat.favorite_flag === 1 ? 0 : 1;
+
+  // 1. 現在のステートをバックアップ（エラー時の復元用）
+  const previousMessages = [...chats];
+
+  // 2. 楽観的更新（即座に反映）
+  setChats((prev) => 
+    prev.map((msg) => 
+      msg.id === chatId ? { ...msg, favorite_flag: nextValue } : msg
+    )
+  );
+
+  try {
+    const res = await fetchWithTimeout(`/api/chats/${spaceId}/favorite`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ 
+        favoriteFlag: nextValue,
+        chatId: chatId
+      }),
+    });
+
+    if (!res.ok) {
+      handleApiResponse(res);
+      throw new Error("Failed to update favorite");
+    }
+
+    const data = await res.json();
+    
+    // 3. APIの結果を適用（ここで確実にサーバー側の状態と一致させる）
+    if (data.updatedChat) {
+      setChats((prev) => 
+        prev.map((msg) => (msg.id === chatId ? { ...msg, ...data.updatedChat } : msg))
+      );
+    }
+  } catch (e) {
+    console.error(e);
+    ToiToiNotification.error("お気に入りの更新に失敗しました。");
+    // 4. エラー時は元の状態に戻す
+    setChats(previousMessages);
+  }
+};
+  const changeBackground = async (chatId: number, bg: number) => {
     const previousMessages = [...chats];
 
     setChats((prev) => 
       prev.map((msg) => 
-        msg.id === chatId ? { ...msg, favorite_flag: current } : msg
+        msg.id === chatId ? { ...msg, background: bg } : msg
       )
     );
 
     try {
-      const res = await fetchWithTimeout(`/api/chats/${space_id}/favorite`, {
+      const res = await fetchWithTimeout(`/api/chats/${spaceId}/background`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          favorite_flag: current,
-          chat_id: chatId
-        }),
+        body: JSON.stringify({ background: bg, chatId: chatId }),
       });
       const data = await res.json();
-
-
       if (!res.ok) {
         await handleApiResponse(res); // 内部のthrowを待つ
         throw new Error(); // 明示的にエラーを投げる
+      };
+      if (data.updatedChat) {
+        setChats((prev) => 
+          prev.map((msg) => (msg.id === chatId ? { ...msg, ...data.updatedChat } : msg))
+        );
       }
     } catch (e) {
       console.log(e);
@@ -321,47 +360,18 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     }
   };
 
-  const changeBackground = async (chat_id: number, bg: number) => {
-    const previousMessages = [...chats];
-
-    setChats((prev) => 
-      prev.map((msg) => 
-        msg.id === chat_id ? { ...msg, background: bg } : msg
-      )
-    );
-
-    try {
-      const res = await fetchWithTimeout(`/api/chats/${space_id}/background`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ background: bg, chat_id: chat_id }),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        await handleApiResponse(res); // 内部のthrowを待つ
-        throw new Error(); // 明示的にエラーを投げる
-      };
-    } catch (e) {
-      console.log(e);
-      setChats(previousMessages);
-    }
-  };
-
-  const handleDownload = async (imageUrl: string, chat_id: string) => {
+  const handleDownload = async (imageUrl: string, chatId: string) => {
     try {
       const res = await fetchWithTimeout("/api/images", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           targetUrl: imageUrl,
-          space_id: space_id,
+          spaceId: spaceId,
           type: "chat",
-          chat_id: chat_id 
+          chatId: chatId 
         })
       });
-
-
       if (!res.ok) {
         await handleApiResponse(res); // 内部のthrowを待つ
         throw new Error(); // 明示的にエラーを投げる
@@ -415,7 +425,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       <div className="flex-1 overflow-y-auto relative w-full">
         <ChatList 
           chats={chats}
-          space_id={space_id || 0}
+          spaceId={spaceId || 0}
           isSubmitting={isSubmitting}
           ref={scrollRef}
           onToggleFavorite={handleToggleFavorite}

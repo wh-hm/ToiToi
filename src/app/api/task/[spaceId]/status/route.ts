@@ -5,27 +5,26 @@ import { MESSAGES } from "@/constants/messages";
 import { getSpaceCheck } from "@/services/SpaceService";
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ spaceId: string }> }
 ) {
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
-    const { id } = await params;
-    const taskId = Number(id);
+    const { spaceId } = await params;
+    const spaceIdNum = Number(spaceId);
     
     // ボディからの値取得
     const body = await request.json();
-    const { status, space_id } = body;
+    const { status, taskId } = body;
 
-    // 必須チェック (statusとspace_idは更新に必須とする)
-    if (status === undefined || !space_id) {
+    if (status === undefined || !spaceId) {
       return NextResponse.json({ message: MESSAGES.E1001("ステータスまたはスペースID") }, { status: 400 });
     }
 
     const [isSpaceAlive, isTaslAlive] = await Promise.all([
-      getSpaceCheck(auth.user_id, space_id), // ※関数名が推測ですが合わせる
-      getTaskCheck(auth.user_id, space_id, Number(id))
+      getSpaceCheck(auth.user_id, spaceIdNum), // ※関数名が推測ですが合わせる
+      getTaskCheck(auth.user_id, spaceIdNum, taskId)
     ]);
 
     // スペースチェックの判定
@@ -38,18 +37,21 @@ export async function PATCH(
     }
 
     // 更新処理
-    const updated = await updateStatusTask(
+    const updatedTask = await updateStatusTask(
       taskId,
-      space_id,
+      spaceIdNum,
       auth.user_id,
       status
     );
 
-    if (!updated) {
+    if (!updatedTask) {
       return NextResponse.json({ message: MESSAGES.E2002("タスクステータス") }, { status: 500 });
     }
 
-    return NextResponse.json(updated);
+    return NextResponse.json({ 
+        task: updatedTask, 
+        message: MESSAGES.S1002("タスクステータス") 
+    }, { status: 200 });
   } catch (error) {
     return NextResponse.json({ message: MESSAGES.E2002("タスクステータス") }, { status: 500 });
   }

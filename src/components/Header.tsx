@@ -9,6 +9,8 @@ import {
   Accordion, AccordionItem
 } from "@nextui-org/react";
 import {ChevronDownIcon} from "lucide-react"
+import { fetchWithTimeout } from "@/lib/api";
+import { handleApiResponse } from "@/lib/api-utils";
 
 
 
@@ -41,8 +43,13 @@ export default function Header() {
   const refreshData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/spaces`);
-      if (res.ok) setData(await res.json());
+      const res = await fetchWithTimeout(`/api/spaces`);
+      const data = await res.json();
+      if(!res.ok){
+        handleApiResponse(res);
+        throw new Error();
+      }
+      setData(data.spaces);
     } catch (e) { console.error(e); }
     finally { setIsLoading(false); }
   }, []);

@@ -11,13 +11,13 @@ export async function GET(request: Request) {
     if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
     const { searchParams } = new URL(request.url);
-    const space_id = Number(searchParams.get("space_id"));
+    const spaceId = Number(searchParams.get("spaceId"));
 
-    if (!space_id || isNaN(space_id)) {
+    if (!spaceId || isNaN(spaceId)) {
         return NextResponse.json({ message: MESSAGES.E1001("スペースID") }, { status: 400 });
     }
 
-    const isSpaceAlive = await getSpaceCheck(auth.user_id, space_id);
+    const isSpaceAlive = await getSpaceCheck(auth.user_id, spaceId);
         
     if (!isSpaceAlive) {
         return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
@@ -25,19 +25,23 @@ export async function GET(request: Request) {
 
     try {
 
-        const isSpaceAlive = await getSpaceCheck(auth.user_id, space_id);
+        const isSpaceAlive = await getSpaceCheck(auth.user_id, spaceId);
         if (!isSpaceAlive) {
             return NextResponse.json({ message: MESSAGES.E1010("対象のスペース") }, { status: 404 });
         }
-        const tasks = await getTasks(space_id, auth.user_id);
+        const tasks = await getTasks(spaceId, auth.user_id);
+
         return NextResponse.json({
             incomplete: tasks.filter((t) => t.status === 0),
             complete: tasks.filter((t) => t.status === 1),
+            message: MESSAGES.S2001("タスク一覧") // 成功時も一貫して追加
         });
     } catch (error) {
         return NextResponse.json({ message: MESSAGES.E2003("タスク") }, { status: 500 });
     }
 }
+
+
 
 // 2. POST: タスク登録（単体チェック実装）
 export async function POST(request: Request) {
@@ -45,15 +49,12 @@ export async function POST(request: Request) {
     if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
     try {
-        const { title, description, due_date, space_id, tag, is_allday, priority } = await request.json();
-
-        
-
+        const { title, description, dueDate, spaceId, tag, isAllday, priority } = await request.json();
 
         // --- 単体チェック ---
         // 1. 必須チェック (E1001)
         if (!title) return NextResponse.json({ message: MESSAGES.E1001("タスク名") }, { status: 400 });
-        if (!due_date) return NextResponse.json({ message: MESSAGES.E1001("期限") }, { status: 400 });
+        if (!dueDate) return NextResponse.json({ message: MESSAGES.E1001("期限") }, { status: 400 });
         // if (!description) return NextResponse.json({ message: MESSAGES.E1001("詳細") }, { status: 400 });
 
         // 2. 桁数チェック (E1002)
@@ -66,8 +67,8 @@ export async function POST(request: Request) {
         }
 
         // 4. 日付形式チェック & 過去日チェック (E1004)
-        const inputDate = new Date(due_date);
-        console.log(due_date)
+        const inputDate = new Date(dueDate);
+        console.log(dueDate)
 
         console.log(inputDate)
         if (inputDate.toString() === "Invalid Date") {
@@ -82,7 +83,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: MESSAGES.E1011 }, { status: 400 });
         }
 
-        const isSpaceAlive = await getSpaceCheck(auth.user_id, space_id);
+        const isSpaceAlive = await getSpaceCheck(auth.user_id, spaceId);
         
         if (!isSpaceAlive) {
             return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
@@ -90,10 +91,13 @@ export async function POST(request: Request) {
 
         // データベース保存
         const newTask = await registerTask(
-            auth.user_id, title, description, due_date, space_id, tag || 0, is_allday, priority
+            auth.user_id, title, description, dueDate, spaceId, tag || 0, isAllday, priority
         );
 
-        return NextResponse.json(newTask, { status: 201 });
+        return NextResponse.json({ 
+            task: newTask, // キーをタスク単体へ
+            message: MESSAGES.S1001("タスク") 
+        }, { status: 201 });
 
     } catch (error) {
         return NextResponse.json({ message: MESSAGES.E2001("タスク") }, { status: 500 });
