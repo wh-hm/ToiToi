@@ -9,6 +9,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { fetchWithTimeout } from "@/lib/api";
 import { handleApiResponse } from "@/lib/api-utils";
+import SpaceModal from "@/components/SpaceModal";
 
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const [chats, setChats] = useState<ChatMessage[]>([]);
@@ -65,6 +66,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
   useEffect(() => {
     params.then((p) => setspaceId(Number(p.id)));
+    console.log(spaceId)
   }, [params]);
 
   useEffect(() => { fetchMessages(); }, []);
@@ -238,12 +240,11 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     setEditingId(null);
     setEditValue("");
     setIsSubmitting(true);
-
     try {
-      const res = await fetchWithTimeout(`/api/chats/${editingId}`, {
+      const res = await fetchWithTimeout(`/api/chats/${spaceId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: editValue, spaceId: spaceId }),
+        body: JSON.stringify({ message: editValue, chatId: editingId }),
       });
       const data = await res.json();
       if (!res.ok) {
