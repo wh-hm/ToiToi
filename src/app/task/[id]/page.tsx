@@ -68,7 +68,6 @@ export default function TaskPage() {
     if (!space_id) return;
 
     try {
-      // URLのパラメータ重複を修正
       const res = await fetch(`/api/task?space_id=${space_id}`, {
         cache: "no-store",
       });
@@ -384,6 +383,7 @@ export default function TaskPage() {
           space_id={space_id}
           type="task"
           onClose={() => setIsModalOpen(false)}
+          onError={(msg: string) => toast.error(msg)}
           onSave={async (title: string, description: string, dueDateString?: string) => {
             if (!title.trim()) {
               toast.error("タスク名を入力してください。");

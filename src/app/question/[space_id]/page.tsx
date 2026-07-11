@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
-import toast from "react-hot-toast";
+import toast, { Toaster } from "react-hot-toast";
 import { MESSAGES } from "@/constants/messages";
 import { useRouter, useParams } from "next/navigation";
 import TaskModal from "@/components/TaskModal";
+import { Loading } from "@/components/LoadingSpinner";
 
 export default function QuestionPage() {
   const { data: session, status } = useSession();
@@ -25,6 +26,10 @@ export default function QuestionPage() {
   const [searchTag, setSearchTag] = useState<string>("");
   const [searchKnowledge, setSearchKnowledge] = useState<string>("");
 
+   //お祝い演出
+    const [showCelebration, setShowCelebration] = useState(false);
+    const [celebrationOpacity, setCelebrationOpacity] = useState(false);
+  
   // 1. 初期表示・セッション有効チェック
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -175,6 +180,30 @@ export default function QuestionPage() {
     });
   };
 
+  const handleModalSubmit = async (payload: any) => {
+    const isEdit = modalMode === "edit";
+    const url = isEdit ? `/api/questions/${selectedQuestion.id}` : `/api/questions`;
+    const method = isEdit ? "PATCH" : "POST";
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        toast.success(isEdit ? "質問を更新しました" : "質問を作成しました");
+        setIsModalOpen(false);
+        fetchQuestions(); // リスト再取得
+      } else {
+        toast.error(isEdit ? "更新に失敗しました" : "作成に失敗しました");
+      }
+    } catch (error) {
+      toast.error("通信エラーが発生しました");
+    }
+  };
+
   // 5. 検索機能 ＆ 解決・未解決の仕分けロジック (useMemoでリアルタイム処理)
   const processedQuestions = useMemo(() => {
     const filtered = questions.filter((q) => {
@@ -196,12 +225,18 @@ export default function QuestionPage() {
     };
   }, [questions, searchTag, searchKnowledge]);
 
-  if (status === "loading" || isLoading) {
-    return <div className="p-8 text-center text-slate-500 font-medium">質問スペースを読み込み中...</div>;
+  if (status === "loading" || status === "unauthenticated") {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#f8fafc" }}>
+        <p>読み込み中...</p>
+        <Loading />
+      </div>
+    );
   }
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6 text-slate-800">
+      <Toaster position="top-center" />
       {/* ヘッダーエリア */}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-slate-900">質問スペース</h1>
@@ -233,7 +268,7 @@ export default function QuestionPage() {
             backgroundSize: "16px"
           }}
         >
-          <option value="">全てのタグ</option>
+          <option value="">全件表示</option>
           <option value="1">学習</option>
           <option value="2">重要</option>
           <option value="3">プライベート</option>
@@ -243,7 +278,7 @@ export default function QuestionPage() {
 
       {/* データの表示判定 */}
       {!processedQuestions.hasOriginalData ? (
-        <div className="text-center py-12 text-slate-400 font-medium">データがありません</div>
+        <div className="text-center py-12 text-slate-400 font-medium">質問がありません</div>
       ) : processedQuestions.totalFiltered === 0 ? (
         <div className="text-center py-12 text-slate-400 font-medium">該当のデータはありません</div>
       ) : (
@@ -331,6 +366,25 @@ export default function QuestionPage() {
         </div>
       )}
 
+       {/*お祝い演出*/}
+        {showCelebration && (
+          <div
+            className={`fixed inset-0 flex items-center justify-center z-50 pointer-events-none
+              transition-all duration-500 ease-out
+              ${celebrationOpacity
+                ? "opacity-100 translate-y-0"
+                : "opacity-0 -translate-y-8"
+              }
+              }`}
+          >
+            <img
+              src="/complete.png"
+              alt="お祝い"
+              className={`max-w-[90vw] w-full transform transition-all duration-500 scale-100`}
+            />
+          </div>
+        )}
+
       {/* 5. 共通モーダル*/}
       {isModalOpen && (
         <TaskModal
@@ -339,23 +393,8 @@ export default function QuestionPage() {
           space_id={space_id}
           type="question"
           onClose={() => setIsModalOpen(false)}
-          onSuccess={async () => {
-            setIsModalOpen(false);
-            if (modalMode === "edit") {
-              toast.success(MESSAGES.S1002("質問"));
-            } else {
-              toast.success(MESSAGES.S1001("質問"));
-            }
-            try {
-              const res = await fetch(`/api/questions?space_id=${space_id}&space_id=${space_id}`);
-              if (res.ok) {
-                const data = await res.json();
-                setQuestions(Array.isArray(data) ? data : (data.questions || []));
-              }
-            } catch (error) {
-              console.error("裏側でのデータ同期に失敗しました", error);
-            }
-          }}
+          onSubmit={handleModalSubmit}
+          onError={(msg: string) => toast.error(msg)}
         />
       )}
     </div>

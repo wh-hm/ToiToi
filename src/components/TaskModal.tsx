@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 
 type ModalMode = 'create' | 'edit' | 'detail';
 
-export default function TaskModal({ task, onClose, onSuccess, onSave, space_id, mode = 'create', type = 'task' }: any) {
+export default function TaskModal({ task, onClose, onSuccess, onSave, space_id, mode = 'create', type = 'task' , onSubmit,onError}: any) {
   const getNowDateTime = () => {
     const now = new Date();
     const yyyy = now.getFullYear();
@@ -60,10 +60,8 @@ export default function TaskModal({ task, onClose, onSuccess, onSave, space_id, 
 
   useEffect(() => {
     if (task) {
-      const initialDate = getTaskDate(task.due_date);
-      const initialTime = getTaskTime(task.due_date);
-      setDateData(initialDate);
-      setTimeData(initialTime);
+      setDateData(getTaskDate(task.due_date));
+      setTimeData(getTaskTime(task.due_date));
 
       setFormData({
         title: task.title || "",
@@ -84,36 +82,53 @@ export default function TaskModal({ task, onClose, onSuccess, onSave, space_id, 
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
+    // ----------------------------------------------------
+    // 【1. エラー表示の共通化（toast対応）】
+    // ----------------------------------------------------
+    // ※親からonErrorが渡されていれば(質問画面)toastで出し、なければ(タスク画面)alertで出す
+    const showError = (msg: string) => {
+      if (onError) onError(msg);
+      else alert(msg);
+    };
+
+    const titleText = formData.title || "";
+    const descText = formData.description || "";
+
+    // ----------------------------------------------------
+    // 【2. バリデーション（空白チェックを追加）】
+    // ----------------------------------------------------
+    if (!titleText.trim()) {
+      return showError(type === "question" ? "質問タイトルを入力してください。" : "タスク名を入力してください。");
+    }
+    if (type === "question" && !descText.trim()){
+      return showError("詳細を入力してください。");
+    }
+
+    if (titleText.length > 20) return showError("タスク名（質問）は20文字以内で入力してください。");
+    if (descText.length > 100) return showError("詳細は100文字以内で入力してください。");
+
+    // ※空白(スペース)も許容するため、正規表現の最後に \s を追加しています
+    const safeRegex = /[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uFF01-\uFF5E\s]/;
+
+    if (safeRegex.test(titleText)) {
+      return showError("タスク名（質問）に不適切な記号は使用できません。");
+    }
+    if (type === "task" && safeRegex.test(descText)) {
+      return showError("詳細に不適切な記号は使用できません。");
+    }
+
+    if (type === "task" && !dateData) {
+      return showError("期限を入力してください。");
+    }
+
     if (typeof onSave === "function") {
       const isValid = await onSave(formData.title, formData.description);
       if (!isValid) return;
-      }
-    if (type === "task" && !dateData) {
-      return alert("期限を入力してください。");
     }
 
-    if (formData.title.length > 20) return alert("タスク名は20文字以内で入力してください。");
-    if (formData.description.length > 100) return alert("詳細は100文字以内で入力してください。");
-
-    const safeRegex = /[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uFF01-\uFF5E]/;
-
-    if (safeRegex.test(formData.title)) {
-      return alert("タスク名に記号やスペース（空白）は使用できません。");
-    }
-
-    if (type === "task" && safeRegex.test(formData.description)) {
-      return alert("詳細に記号やスペース（空白）は使用できません。");
-    }
-
-    const method = isEditMode ? "PATCH" : "POST";
-    const baseApiRoute = type === "question" ? "questions" : "task";
-
-    const url = isEditMode
-      ? `/api/${baseApiRoute}/${task.id}`
-      : `/api/${baseApiRoute}`;
     const numericspace_id = parseInt(space_id as string);
     if (!numericspace_id || isNaN(numericspace_id)) {
-      return alert("有効なスペースIDが見つかりません。");
+      return showError("有効なスペースIDが見つかりません。");
     }
 
     setIsSubmitting(true);
@@ -124,63 +139,84 @@ export default function TaskModal({ task, onClose, onSuccess, onSave, space_id, 
       const dateTimeStr = `${d}T${t}:00`;
       const parsedDate = new Date(dateTimeStr);
       const timeValue = parsedDate.getTime();
+      
       if (!timeValue || isNaN(timeValue)) {
         console.error("解析失敗：", dateTimeStr);
-        return alert("期限の日付または時刻が正しくありません。");
+        setIsSubmitting(false);
+        return showError("期限の日付または時刻が正しくありません。");
       }
+      
       const isoDueDate = parsedDate.toISOString();
+      
       if (typeof onSave === "function"){
         const isValid = await onSave(
           formData.title,
           formData.description,
           type === "task" ? isoDueDate : undefined
         );
-        if (!isValid) return;
+        if (!isValid) {
+          setIsSubmitting(false);
+          return;
+        }
       }
 
+      // 送信データの作成
       const payload = type === "question"
         ? {
-          title: formData.title.trim(),
-          question: formData.description.trim(),
+          title: titleText.trim(),
+          question: descText.trim(),
           is_resolved: isEditMode ? Number(formData.status) : 0,
           space_id: numericspace_id,
           tag: Number(formData.tag) || 0,
         }
         : {
-          title: formData.title.trim(),
+          title: titleText.trim(),
           due_date: isoDueDate,
           space_id: numericspace_id,
           tag: Number(formData.tag) || 0,
           priority: Number(formData.priority) || 1,
           is_allday: Number(formData.is_allday),
           status: Number(formData.status),
-          description: formData.description.trim(),
+          description: descText.trim(),
         };
-      console.log(payload)
-      const response = await fetch(url,
-        {
-          method: method,
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify(payload),
-        });
+
+      // ----------------------------------------------------
+      // 【3. 親への委譲（これが抜けてクラッシュしていました）】
+      // ----------------------------------------------------
+      // 質問管理画面(onSubmitがある場合)は、ここで親にpayloadを渡して通信を任せます。
+      if (onSubmit) {
+        await onSubmit(payload);
+        setIsSubmitting(false);
+        return; 
+      }
+
+      // ＝＝＝ 以降はタスク管理画面用のAPI通信 ＝＝＝
+      const method = isEditMode ? "PATCH" : "POST";
+      const baseApiRoute = type === "question" ? "questions" : "task";
+      const url = isEditMode ? `/api/${baseApiRoute}/${task.id}` : `/api/${baseApiRoute}`;
+
+      const response = await fetch(url, {
+        method: method,
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
 
       const resData = await response.json();
 
       if (response.ok) {
         onSuccess();
       } else {
-        alert(`保存失敗: ${resData.error || "リクエストが不正です"}`);
+        showError(`保存失敗: ${resData.error || "リクエストが不正です"}`);
         console.log("POST結果:", resData);
       }
     } catch (error) {
-      alert("通信エラーが発生しました。");
+      showError("通信エラーが発生しました。");
       console.error(error);
-    }finally{
+    } finally {
       setIsSubmitting(false);
     }
   };
-
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-100 p-6 space-y-5 text-slate-800">

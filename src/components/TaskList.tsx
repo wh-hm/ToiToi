@@ -34,7 +34,7 @@ export default function TaskList({
   toggleComplete,
   onEdit,
   onDelete,
-  onDetail // ★追加: 詳細モーダルを開くためのハンドラー
+  onDetail 
 }: any) {
 
   // 1. 現在どちらのタブを表示するか管理するステート ('incomplete' または 'complete')
