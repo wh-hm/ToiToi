@@ -9,24 +9,24 @@ import { checkQuestionChat } from "@/services/QuestionChatService";
 import { checkQuestion } from "@/services/QuestionService";
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string; questionId: string }> }
+  { params }: { params: Promise<{ spaceId: string; questionId: string }> }
 ) {
-  const { questionId, id,  } = await params;
+  const { questionId, spaceId,  } = await params;
   
   // 1. 認証チェック
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
-    const spaceId = parseInt(id);
+    const spaceIdNum = parseInt(spaceId);
     const questionIdNum = parseInt(questionId);
 
     const { searchParams } = new URL(request.url);
-    const chatId = Number(searchParams.get("chat_id"));
+    const chatId = Number(searchParams.get("chatId"));
 
     const [isSpaceAlive, usQuestionAlive, isChatAlive] = await Promise.all([
-      getSpaceCheck(auth.user_id, spaceId), // ※関数名が推測ですが合わせる
-      checkQuestion(auth.user_id, spaceId, questionIdNum),
+      getSpaceCheck(auth.user_id, spaceIdNum), // ※関数名が推測ですが合わせる
+      checkQuestion(auth.user_id, spaceIdNum, questionIdNum),
       checkQuestionChat(chatId, questionIdNum, auth.user_id, )
     ]);
         
