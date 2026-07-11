@@ -3,7 +3,7 @@ import { Task } from "@prisma/client";
 
 export const getTaskCheck = async (user_id: string, space_id: number, task_id: number): Promise<boolean> => {
   try {
-    const  result = await prisma.chat.findFirst({
+    const  result = await prisma.task.findFirst({
       where: { 
         id: task_id,
         user_id: user_id, 

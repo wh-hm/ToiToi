@@ -60,7 +60,7 @@ export default function TaskPage() {
       setTimeout(() => {
         setShowCelebration(false);
       }, 500);
-    }, 2000);
+    }, 1500);
   };
 
   // 2. タスクデータの取得
@@ -238,6 +238,8 @@ export default function TaskPage() {
       });
     }
 
+    console.log("【デバッグ】関数内の space_id:", space_id);
+    console.log("【デバッグ】task オブジェクトの中身:", task);
     try {
       const res = await fetch(`/api/task/${task.id}/status`, {
         method: "PATCH",
@@ -346,14 +348,18 @@ export default function TaskPage() {
         {/*お祝い演出*/}
         {showCelebration && (
           <div
-            className={`fixed inset-0 flex items-center justify-center bg-black/20 z-50 pointer-events-none transition-opacity duration-500 ${celebrationOpacity ? "opacity-100" : "opacity-0"
+            className={`fixed inset-0 flex items-center justify-center z-50 pointer-events-none
+              transition-all duration-500 ease-out
+              ${celebrationOpacity
+                ? "opacity-100 translate-y-0"
+                : "opacity-0 -translate-y-8"
+              }
               }`}
           >
             <img
               src="/complete.png"
               alt="お祝い"
-              className={`max-w-[360px] w-full transform transition-all duration-500 ${celebrationOpacity ? "scale-100 animate-bounce" : "scale-75"
-                }`}
+              className={`max-w-[90vw] w-full transform transition-all duration-500 scale-100`}
             />
           </div>
         )}

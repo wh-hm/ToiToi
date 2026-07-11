@@ -17,6 +17,8 @@ type Space = {
   favorite: number;
   is_archived: number;
   count?: number;
+  task_count?: number;
+  question_count? : number;
 };
 
 type Goal = {
@@ -26,9 +28,9 @@ type Goal = {
 };
 
 type SpacesState = {
-  type1: Space[];
-  type2: Space[];
-  type3: Space[];
+  chat: Space[];
+  task: Space[];
+  question: Space[];
 };
 
 export default function Dashboard() {
@@ -36,9 +38,9 @@ export default function Dashboard() {
   const router = useRouter();
 
   const [spaces, setSpaces] = useState<SpacesState>({
-    type1: [],
-    type2: [],
-    type3: [],
+    chat: [],
+    task: [],
+    question: [],
   });
 
   const [isLoading, setIsLoading] = useState(true);
@@ -122,6 +124,8 @@ export default function Dashboard() {
         return null;
       }
       const data = await res.json();
+
+      console.log("ダッシュボードの最新データ：", data);
       // 1. 目標データのパース
       if (data.goal) {
         setGoal(Array.isArray(data.goal) ? (data.goal[0] || null) : data.goal);
@@ -159,13 +163,15 @@ export default function Dashboard() {
           space_type: Number(s.space_type),
           favorite: Number(s.favorite_flag),
           is_archived: Number(s.is_archived),
+          task_count: Number(s.task_count || 0),
+          question_count: Number(s.question_count || 0),
         }));
       };
 
       setSpaces({
-        type1: convertAndFilter(targetData.type1),
-        type2: convertAndFilter(targetData.type2),
-        type3: convertAndFilter(targetData.type3),
+        chat: convertAndFilter(targetData.chat),
+        task: convertAndFilter(targetData.task),
+        question: convertAndFilter(targetData.question),
       });
 
       return targetData;
@@ -277,9 +283,9 @@ export default function Dashboard() {
     return sorted.filter(s => s.is_archived === 0);
   };
 
-  const displayType1 = getDisplaySpaces(spaces.type1, showArchivedType1);
-  const displayType2 = getDisplaySpaces(spaces.type2, showArchivedType2);
-  const displayType3 = getDisplaySpaces(spaces.type3, showArchivedType3);
+  const displayType1 = getDisplaySpaces(spaces.chat, showArchivedType1);
+  const displayType2 = getDisplaySpaces(spaces.task, showArchivedType2);
+  const displayType3 = getDisplaySpaces(spaces.question, showArchivedType3);
 
   return (
     <>
