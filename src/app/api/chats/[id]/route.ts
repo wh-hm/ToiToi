@@ -9,18 +9,20 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const chatId = parseInt(id);
+  const spaceId = Number(id);
 
   // 1. 認証チェック
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
-    const { message, spaceId } = await request.json();
+    const { message, chatId } = await request.json();
+  const chatIdNum = Number(chatId);
+
 
     const [isSpaceAlive, isChatAlive] = await Promise.all([
         getSpaceCheck(auth.user_id, spaceId), // ※関数名が推測ですが合わせる
-        getChatCheck(auth.user_id, spaceId, chatId)
+        getChatCheck(auth.user_id, spaceId, chatIdNum)
     ]);
 
     // スペースチェックの判定
@@ -34,12 +36,11 @@ export async function PATCH(
     }
     
     // 2. 更新実行 (message をオブジェクトで渡す構成に統一)
-    const updatedChat = await updateChat(chatId, parseInt(spaceId), auth.user_id, message );
+    const updatedChat = await updateChat(chatIdNum, spaceId, auth.user_id, message );
 
     if (!updatedChat) {
       return NextResponse.json({ message: MESSAGES.E2002("チャット内容") }, { status: 403 });
     }
-
     return NextResponse.json({ 
         updatedChat: updatedChat, 
         message: MESSAGES.S1002("チャット内容") 
@@ -54,14 +55,15 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const chatId = parseInt(id);
+  const spaceId = Number(id);
+
 
   // 1. 認証チェックを先に済ませる
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   const { searchParams } = new URL(request.url);
-  const spaceId = parseInt(searchParams.get("spaceId") || "");
+  const chatId = Number(searchParams.get("chatId") || "");
 
   if (isNaN(chatId) || isNaN(spaceId)) {
     return NextResponse.json({ message: MESSAGES.E1008 }, { status: 400 });

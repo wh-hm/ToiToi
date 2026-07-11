@@ -48,9 +48,9 @@ export async function PATCH(
         return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
     }
 
-    const updated = await updateTask(taskId, auth.user_id, title, description, dueDate, spaceIdNum, tag, isAllday, priority, status);
+    const updatedTask = await updateTask(taskId, auth.user_id, title, description, dueDate, spaceIdNum, tag, isAllday, priority, status);
 
-    return NextResponse.json(updated);
+    return NextResponse.json({ updatedTask: updatedTask, message: MESSAGES.S1001("タスク") });
   } catch (error) {
     return NextResponse.json({ message: MESSAGES.E2002("タスク") }, { status: 500 });
   }
@@ -92,7 +92,7 @@ console.log("taskId", taskId, spaceIdNum, auth.user_id)
     const success = await deleteTask(taskId, auth.user_id, spaceIdNum);
     if (!success) return NextResponse.json({ message: MESSAGES.E2004("タスク") }, { status: 500 });
 
-    return NextResponse.json({ message: MESSAGES.S1003("タスク") });
+    return NextResponse.json({ success: true, message: MESSAGES.S1003("タスク") });
   } catch (error) {
     return NextResponse.json({ message: MESSAGES.E2004("タスク") }, { status: 500 });
   }

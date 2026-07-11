@@ -49,7 +49,7 @@ export async function PATCH(
     }
 
     return NextResponse.json({ 
-        task: updatedTask, 
+        updatedTask: updatedTask, 
         message: MESSAGES.S1002("タスクステータス") 
     }, { status: 200 });
   } catch (error) {

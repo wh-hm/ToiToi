@@ -180,6 +180,7 @@ export default function TaskModal({ task, onClose, onSuccess, onSave, spaceId, m
         throw new Error();
       }
       const data = await res.json();
+      console.log(data)
       ToiToiNotification.success(data.message)
     } catch (error) {
       console.error(error);

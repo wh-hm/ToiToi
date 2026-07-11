@@ -137,8 +137,8 @@ export default function Dashboard() {
       if (data.current_streak !== undefined) {
         streakDays = Number(data.current_streak);
         isStreakAchieved = data.is_streak_achieved ?? (streakDays > 0);
-      } else if (data.login_management) {
-        const mgmt = Array.isArray(data.login_management) ? data.login_management[0] : data.login_management;
+      } else if (data.loginManagement) {
+        const mgmt = Array.isArray(data.loginManagement) ? data.loginManagement[0] : data.loginManagement;
         if (mgmt) {
           streakDays = Number(mgmt.current_streak ?? mgmt.streak_days ?? mgmt.continuous_days ?? 0);
           isStreakAchieved = mgmt.is_streak_achieved ?? (streakDays > 0);

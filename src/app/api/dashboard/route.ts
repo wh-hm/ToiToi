@@ -16,7 +16,7 @@ export async function GET() {
 
   try {
     // 1. スペース一覧 と スペースごとのタスク数配列 を取得
-    const [allSpaces, tasksWithCounts, questionsWithCounts, goal, login_management] = await Promise.all([
+    const [allSpaces, tasksWithCounts, questionsWithCounts, goal, loginManagement] = await Promise.all([
       getSpaces(auth.user_id),
       getTasksCount(auth.user_id), // これが { space_id, space_name, task_count } の配列
       getQuestionsCount(auth.user_id),
@@ -60,7 +60,7 @@ export async function GET() {
         })),
       },
       goal: goal,             // 目標データ
-      login_management: login_management, // ログイン管理情報
+      loginManagement: loginManagement, // ログイン管理情報
     };
 
     return NextResponse.json({ 
