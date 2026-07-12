@@ -107,7 +107,7 @@ export async function deleteImages(userId: string) {
 /**
  * 画像をR2にアップロードして、ファイル名を返す関数
  */
-export async function uploadImages(images: File[], userId: string, spaceId: string | number) {
+export async function uploadImages(images: File[], userId: string, spaceId: number) {
   let currentCount = await getImageCount(userId);
   const uploadedFileNames: string[] = [];
 

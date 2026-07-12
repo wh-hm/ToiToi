@@ -130,7 +130,7 @@ export async function POST(
       }
     }
 
-    imageUrls = await uploadImages(files, auth.user_id, spaceId);
+    imageUrls = await uploadImages(files, auth.user_id, spaceIdNum);
   }
 
     // 2. DB登録処理
