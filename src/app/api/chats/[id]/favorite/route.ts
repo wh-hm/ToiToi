@@ -12,45 +12,36 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const spaceId = parseInt(id);
-
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
-    const body = await request.json();
-    // body に favorite_flag が含まれていることを前提にします
-    const { chatId, favoriteFlag } = body;
+    const { chatId, favoriteFlag } = await request.json();
 
+    // 1. バリデーション：お気に入りフラグが数値かチェック
+    if (typeof favoriteFlag !== 'number' || ![0, 1].includes(favoriteFlag)) {
+      return NextResponse.json({ message: MESSAGES.E1001("お気に入りフラグ") }, { status: 400 });
+    }
+
+    // 2. 存在確認
     const [isSpaceAlive, isChatAlive] = await Promise.all([
-        getSpaceCheck(auth.user_id, spaceId), // ※関数名が推測ですが合わせる
-        getChatCheck(auth.user_id, spaceId, chatId)
+      getSpaceCheck(auth.user_id, spaceId),
+      getChatCheck(auth.user_id, spaceId, chatId)
     ]);
 
-    // スペースチェックの判定
-    if (!isSpaceAlive) {
-        return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
-    }
+    if (!isSpaceAlive) return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+    if (!isChatAlive) return NextResponse.json({ message: MESSAGES.E2005("チャット") }, { status: 404 });
 
-    // チャットチェックの判定
-    if (!isChatAlive) {
-        return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
-    }
+    // 3. 更新実行
+    const updatedChat = await toggleFavorite(chatId, spaceId, auth.user_id, favoriteFlag);
 
+    return NextResponse.json({ 
+      updatedChat, 
+      message: MESSAGES.S1002("お気に入り") 
+    });
 
-    // ★修正：ここで実際に toggleFavorite を呼び出す
-    const updatedChat = await toggleFavorite(
-      chatId, 
-      spaceId, 
-      auth.user_id, 
-      favoriteFlag
-    );
-
-    if (!updatedChat) {
-      return NextResponse.json({ message: MESSAGES.E2001("お気に入り") }, { status: 403 });
-    }
-
-    return NextResponse.json({updatedChat: updatedChat, message: MESSAGES.S1002("お気に入り") });
   } catch (error) {
+    console.error("Favorite PATCH Error:", error);
     return NextResponse.json({ message: MESSAGES.E2001("お気に入り") }, { status: 500 });
   }
 }

@@ -3,7 +3,7 @@ import { getAuthContext } from "@/lib/auth-guard";
 import { registerQuestion, getQuestions } from "@/services/QuestionService";
 import { MESSAGES } from "@/constants/messages";
 import { getSpaceCheck } from "@/services/SpaceService";
-
+import { Prisma } from "@prisma/client";
 
 // 1. GET: 質問一覧取得
 export async function GET(request: NextRequest) {
@@ -45,8 +45,8 @@ export async function POST(request: NextRequest) {
 
         // --- 単体チェック ---
         // 1. 必須チェック (E1001)
-        if (!title) return NextResponse.json({ message: MESSAGES.E1001("質問タイトル") }, { status: 400 });
-        if (!question) return NextResponse.json({ message: MESSAGES.E1001("質問詳細") }, { status: 400 });
+        if (!title || title.trim() === "") return NextResponse.json({ message: MESSAGES.E1001("質問タイトル") }, { status: 400 });
+        if (question) return NextResponse.json({ message: MESSAGES.E1001("質問詳細") }, { status: 400 });
 
         // 2. 桁数チェック (E1002: タイトル50文字, 詳細100文字)
         if (title.length > 50) return NextResponse.json({ message: MESSAGES.E1002("質問タイトル", 50) }, { status: 400 });
@@ -73,6 +73,10 @@ export async function POST(request: NextRequest) {
             message: MESSAGES.S1001("質問") 
         }, { status: 201 });
     } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+            return NextResponse.json({ message: MESSAGES.E4009 }, { status: 409 });
+        }
+        console.error("Question POST Error:", error);
         return NextResponse.json({ message: MESSAGES.E2001("質問") }, { status: 500 });
     }
 }

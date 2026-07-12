@@ -34,22 +34,18 @@ export async function PATCH(
       return NextResponse.json({ message: MESSAGES.E1004 }, { status: 400 });
     }
 
-    const [isSpaceAlive, isTaslAlive] = await Promise.all([
+    const [isSpaceAlive, isTaskAlive] = await Promise.all([
         getSpaceCheck(auth.user_id, spaceIdNum), // ※関数名が推測ですが合わせる
         getTaskCheck(auth.user_id, spaceIdNum, taskId)
     ]);
-
     // スペースチェックの判定
     if (!isSpaceAlive) {
         return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
-
-    if (!isTaslAlive) {
+    if (!isTaskAlive) {
         return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
     }
-
     const updatedTask = await updateTask(taskId, auth.user_id, title, description, dueDate, spaceIdNum, tag, isAllday, priority, status);
-
     return NextResponse.json({ updatedTask: updatedTask, message: MESSAGES.S1001("タスク") });
   } catch (error) {
     return NextResponse.json({ message: MESSAGES.E2002("タスク") }, { status: 500 });
@@ -74,21 +70,17 @@ export async function DELETE(
     if (!spaceIdNum || isNaN(spaceIdNum)) return NextResponse.json({ message: MESSAGES.E1001("スペースID") }, { status: 400 });
 
     if (!taskId || isNaN(taskId)) return NextResponse.json({ message: MESSAGES.E1001("タスクID") }, { status: 400 });
-console.log("taskId", taskId, spaceIdNum, auth.user_id)
     const [isSpaceAlive, isTaskAlive] = await Promise.all([
         getSpaceCheck(auth.user_id, spaceIdNum), // ※関数名が推測ですが合わせる
         getTaskCheck(auth.user_id, spaceIdNum, taskId)
     ]);
-
     // スペースチェックの判定
     if (!isSpaceAlive) {
         return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
-
     if (!isTaskAlive) {
         return NextResponse.json({ message: MESSAGES.E1010("タスク") }, { status: 409 });
     }
-
     const success = await deleteTask(taskId, auth.user_id, spaceIdNum);
     if (!success) return NextResponse.json({ message: MESSAGES.E2004("タスク") }, { status: 500 });
 

@@ -7,17 +7,13 @@ export async function GET() {
     // 1. 認証チェックを共通化された関数で行う
     const auth = await getAuthContext();
     if ('error' in auth) {
-        return NextResponse.json({ error: auth.error }, { status: auth.status });
+        return NextResponse.json({ message: auth.error }, { status: auth.status });
     }
-
     try {
-        // 2. DB検索 (auth.user_id は getAuthContext で確定済み)
         const userName = await getUsername(auth.user_id);
-
         if (!userName) {
             return NextResponse.json({ hasUsername: false });
         }
-
         return NextResponse.json({ 
             hasUsername: true, 
             userName: userName, 
@@ -25,10 +21,9 @@ export async function GET() {
         }, { status: 200 });
 
     } catch (error) {
-        console.error("ユーザー確認エラー:", error);
-        // システムエラー (E2003: 取得失敗)
+        console.error("GET Username Error:", error);
         return NextResponse.json(
-            { error: MESSAGES.E2003("ユーザー名") }, 
+            { message: MESSAGES.E2003("ユーザー名") }, 
             { status: 500 }
         );
     }

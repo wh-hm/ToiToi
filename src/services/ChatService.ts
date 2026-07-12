@@ -1,156 +1,98 @@
 import { prisma } from "@/lib/prisma";
-import { Chat, Prisma } from "@prisma/client"; // PrismaClientは型としてはここには不要です
-import type { PrismaClient } from "@prisma/client"; // 型としてだけインポート
-import { deleteImage } from "./StorageService";
+import { Chat } from "@prisma/client";
+import { deleteImage, getImages } from "./StorageService";
 
-import { getImages } from "./StorageService";
+// 1. チャット取得＋画像URL付与
+export async function getChatsWithImages(userId: string, spaceId: number): Promise<(Chat & { signedImageUrl: string | null })[]> {
+  const chats = await getChats(userId, spaceId);
 
-// ここを修正：PrismaClientの型定義を正しく指定
-type PrismaClientOrTransaction = 
-  | Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">
-  | Prisma.TransactionClient;
-
-
-  export async function getChatsWithImages(user_id: string, space_id: number) {
-  // 1. チャットデータを取得
-  const chats = await getChats(user_id, space_id);
-
-  // 2. チャットデータから image_url があるものだけ抽出
   const imageUrls = chats
-    .map(chat => chat.image_url)
-    .filter((url): url is string => url !== null && url !== ""); // null や空文字を除去
+    .map(c => c.image_url)
+    .filter((url): url is string => !!url);
 
-  // 3. R2 から署名付きURLのリストを取得
-  const signedImageUrls = await getImages(imageUrls);
+  const signedImageUrls = imageUrls.length > 0 ? await getImages(imageUrls) : [];
+  const urlMap = new Map(imageUrls.map((url, i) => [url, signedImageUrls[i]]));
 
-  // 4. チャットデータにURLをマッピングして返す（必要に応じて）
-  return chats.map((chat, index) => ({
+  return chats.map((chat) => ({
     ...chat,
-    // 対応するURLをセット（画像がない場合は null になるように調整）
-    signedImageUrl: chat.image_url ? signedImageUrls[imageUrls.indexOf(chat.image_url)] : null
+    signedImageUrl: chat.image_url ? (urlMap.get(chat.image_url) || null) : null
   }));
 }
 
-
-export const getChatCheck = async (user_id: string, space_id: number, chat_id: number): Promise<boolean> => {
-  try {
-    const  result = await prisma.chat.findFirst({
-      where: { 
-        id: chat_id,
-        user_id: user_id, 
-        delete_flag: 0, 
-        space_id: space_id, 
-      }
-    });
-
-    if(!result){
-      return false;
-    }
-    return true;
-
-  } catch (error) {
-    throw error;
-  }
+// 2. 存在チェック（!! で boolean に変換）
+export const getChatCheck = async (userId: string, spaceId: number, chatId: number): Promise<boolean> => {
+  const result = await prisma.chat.findFirst({
+    where: { id: chatId, user_id: userId, delete_flag: 0, space_id: spaceId }
+  });
+  return !!result;
 };
 
-
-
-
-export const getChats = async (user_id: string, space_id: number): Promise<Chat[]> => {
-  try {
-    return await prisma.chat.findMany({
-      where: { user_id, delete_flag: 0, space_id },
-      orderBy: {
-        created_at: 'asc',
-      },
-    });
-  } catch (error) {
-    throw error;
-  }
+// 3. 一覧取得
+export const getChats = async (userId: string, spaceId: number): Promise<Chat[]> => {
+  return await prisma.chat.findMany({
+    where: { user_id: userId, delete_flag: 0, space_id: spaceId },
+    orderBy: { created_at: 'asc' },
+  });
 };
 
-export const registerChat = async (
-  data: {
-    user_id: string;
-    space_id: number;
-    message?: string;
-    image_url?: string;
-    stamp?: string;
-  },
-  tx:any
-) => {
-  const client = tx || prisma; // txがあればそれを使う
-  return await client.chat.create({
+// 4. チャット登録
+export const registerChat = async (data: {
+  userId: string; spaceId: number; message?: string; imageUrl?: string; stamp?: string;
+}): Promise<Chat> => {
+  return await prisma.chat.create({
     data: {
-      user_id: data.user_id,
-      message: data.message,
-      image_url: data.image_url || null,
-      stamp: data.stamp || null,
-      space: { connect: { id: data.space_id } },
+      user_id: data.userId,
+      message: data.message ?? null,
+      image_url: data.imageUrl ?? null,
+      stamp: data.stamp ?? null,
+      space: { connect: { id: data.spaceId } },
       delete_flag: 0,
       favorite_flag: 0,
       background: 0,
     },
   });
 };
-export const updateChat = async (
-  chatId: number,
-  space_id: number,
-  userId: string,
-  newMessage: string,
-  tx?: PrismaClientOrTransaction // ここも tx を渡せるようにしておく
-) => {
-  const client = tx || prisma;
-  return await client.chat.update({
-    where: { id: chatId, space_id: space_id, user_id: userId },
-    data: { 
-      message: newMessage,
-      updated_at: new Date()
-    },
+
+// 5. チャット削除（画像削除エラーはキャッチして個別にログ出力）
+export const deleteChat = async (chatId: number, userId: string, spaceId: number): Promise<Chat> => {
+  const chat = await prisma.chat.findUnique({ where: { id: chatId } });
+  if (!chat || chat.user_id !== userId) throw new Error("チャットが見つからないか、権限がありません");
+
+  const updatedChat = await prisma.chat.update({
+    where: { id: chatId, space_id: spaceId, user_id: userId },
+    data: { delete_flag: 1 },
   });
-}
 
-
-// 以下、削除やフラグ変更系はそのまま
-export const deleteChat = async (chatId: number, userId: string, space_id: number, tx?: any) => {
-  try {
-    const chat = await prisma.chat.findUnique({ where: { id: chatId } });
-    if (!chat) throw new Error("チャットが見つかりません");
-
-    if (chat.image_url) {
-      await deleteImage(chat.image_url);
+  if (updatedChat.image_url) {
+    try {
+      await deleteImage(updatedChat.image_url);
+    } catch (e) {
+      console.error(`画像削除に失敗しました: ${updatedChat.image_url}`, e);
     }
-    const db = tx || prisma;
-
-    return await db.chat.update({
-      where: { id: chatId, space_id: space_id, user_id: userId },
-      data: { delete_flag: 1 },
-    });
-  } catch (error) {
-    throw error;
   }
+
+  return updatedChat;
 };
 
-export const toggleFavorite = async (chatId: number, space_id: number, userId: string, newFlag: number) => {
-  try {
-    return await prisma.chat.update({
-      where: { id: chatId, space_id: space_id, user_id: userId },
-      data: { favorite_flag: newFlag },
-    });
-  } catch (error) {
-    throw error;
-  }
+// 6. 更新・トグル系（戻り値を Chat に統一）
+export const updateChat = async (chatId: number, spaceId: number, userId: string, newMessage: string): Promise<Chat> => {
+  return await prisma.chat.update({
+    where: { id: chatId, space_id: spaceId, user_id: userId },
+    data: { message: newMessage, updated_at: new Date() },
+  });
 };
 
-export const changeBackground = async (chatId: number, space_id: number, userId: string, background: number) => {
-  try {
+export const toggleFavorite = async (chatId: number, spaceId: number, userId: string, newFlag: number): Promise<Chat> => {
+  return await prisma.chat.update({
+    where: { id: chatId, space_id: spaceId, user_id: userId },
+    data: { favorite_flag: newFlag },
+  });
+};
+export const changeBackground = async (chatId: number, spaceId: number, userId: string, background: number) => {
     return await prisma.chat.update({
-      where: { id: chatId, space_id: space_id, user_id: userId },
+      where: { id: chatId, space_id: spaceId, user_id: userId },
       data: { background: background },
     });
-  } catch (error) {
-    throw error;
-  }
 };
 
 

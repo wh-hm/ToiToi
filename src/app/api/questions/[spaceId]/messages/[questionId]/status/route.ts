@@ -24,7 +24,7 @@ export async function PATCH(
     const { searchParams } = new URL(request.url);
     const chatId = Number(searchParams.get("chatId"));
 
-    const [isSpaceAlive, usQuestionAlive, isChatAlive] = await Promise.all([
+    const [isSpaceAlive, isQuestionAlive, isChatAlive] = await Promise.all([
       getSpaceCheck(auth.user_id, spaceIdNum), // ※関数名が推測ですが合わせる
       checkQuestion(auth.user_id, spaceIdNum, questionIdNum),
       checkQuestionChat(chatId, questionIdNum, auth.user_id, )
@@ -38,8 +38,8 @@ export async function PATCH(
         return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
     }
 
-    if (!usQuestionAlive) {
-        return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
+    if (!isQuestionAlive) {
+        return NextResponse.json({ message: MESSAGES.E2006 }, { status: 404 });
     }
     // 2. いいね状態の更新
     // status は boolean (true:いいね, false:解除) や 1/0 などで受け取る想定

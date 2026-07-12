@@ -7,7 +7,7 @@ export async function DELETE() {
     // 1. 認証チェック
     const auth = await getAuthContext();
     if ('error' in auth) {
-        return NextResponse.json({ error: auth.error }, { status: auth.status });
+        return NextResponse.json({ message: auth.error }, { status: auth.status });
     }
 
     try {
@@ -16,7 +16,7 @@ export async function DELETE() {
         
         if (!success) {
             return NextResponse.json(
-                { error: MESSAGES.E2004("タスクスペース全削除") }, 
+                { message: MESSAGES.E2004("タスクスペース全削除") }, 
                 { status: 500 }
             );
         }
@@ -26,9 +26,9 @@ export async function DELETE() {
             message: MESSAGES.S1003("タスクスペース全削除") 
         });
     } catch (error) {
-        console.error("【タスクスペース全削除エラー】", error);
+        console.error("DELETE TaskSpaces Error:", error);
         return NextResponse.json(
-            { error: MESSAGES.E2004("タスクスペース全削除") }, 
+            { message: MESSAGES.E2004("タスクスペース全削除") }, 
             { status: 500 }
         );
     }
