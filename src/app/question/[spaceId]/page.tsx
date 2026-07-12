@@ -29,7 +29,7 @@ export default function QuestionPage() {
   const [searchKnowledge, setSearchKnowledge] = useState<string>("");
 
   //お祝い演出
-  const { showCelebration, celebrationOpacity, triggerCelebration } = useCelebration();
+  const { showCelebration, celebrationOpacity, celebrationMessage, triggerCelebration } = useCelebration();
 
   // 1. 初期表示・セッション有効チェック
   useEffect(() => {
@@ -103,7 +103,7 @@ export default function QuestionPage() {
       );
 
       if (newStatus === 1) {
-        triggerCelebration();
+        triggerCelebration("解決おめでとう！");
       } else if (newStatus === 0) {
         toast("未解決に戻しました。");
       } fetchQuestions();
@@ -357,26 +357,7 @@ export default function QuestionPage() {
         </div>
       )}
 
-      {/*お祝い演出*/}
-      {showCelebration && (
-        <div
-          className={`fixed inset-0 flex items-center justify-center z-50 pointer-events-none
-              transition-all duration-500 ease-out
-              ${celebrationOpacity
-              ? "opacity-100 translate-y-0"
-              : "opacity-0 -translate-y-8"
-            }
-              }`}
-        >
-          <img
-            src="/complete.png"
-            alt="お祝い"
-            className={`max-w-[90vw] w-full transform transition-all duration-500 scale-100`}
-          />
-        </div>
-      )}
-
-      <Celebration show={showCelebration} opacity={celebrationOpacity} />
+      <Celebration show={showCelebration} opacity={celebrationOpacity} message={celebrationMessage} />
 
       {isModalOpen && (
         <TaskModal

@@ -35,7 +35,7 @@ export default function TaskPage() {
   const [searchKnowledge, setSearchKnowledge] = useState<string>("");
 
   //お祝い演出
-  const { showCelebration, celebrationOpacity, triggerCelebration } = useCelebration();
+  const { showCelebration, celebrationOpacity,celebrationMessage, triggerCelebration } = useCelebration();
 
   // 2. タスクデータの取得
   const fetchTasks = useCallback(async () => {
@@ -226,7 +226,7 @@ export default function TaskPage() {
       });
       if (res.ok) {
         if (newStatus === 1) {
-          triggerCelebration();
+          triggerCelebration("タスク完了おめでとう！");
         } else {
           toast("未完了に戻しました");
         }
@@ -319,26 +319,7 @@ export default function TaskPage() {
           </select>
         </div>
 
-        {/*お祝い演出*/}
-        {showCelebration && (
-          <div
-            className={`fixed inset-0 flex items-center justify-center z-50 pointer-events-none
-              transition-all duration-500 ease-out
-              ${celebrationOpacity
-                ? "opacity-100 translate-y-0"
-                : "opacity-0 -translate-y-8"
-              }
-              }`}
-          >
-            <img
-              src="/complete.png"
-              alt="お祝い"
-              className={`max-w-[90vw] w-full transform transition-all duration-500 scale-100`}
-            />
-          </div>
-        )}
-
-        <Celebration show={showCelebration} opacity={celebrationOpacity} />
+        <Celebration show={showCelebration} opacity={celebrationOpacity} message={celebrationMessage}/>
 
         {/* メインコンテンツ */}
         <main className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
