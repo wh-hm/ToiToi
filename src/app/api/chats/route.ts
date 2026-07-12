@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth-guard";
 import { getChatsWithImages, registerChat } from "@/services/ChatService";
-import { uploadImages, deleteImage } from "@/services/StorageService";
+import { uploadImages } from "@/services/StorageService";
 import { MESSAGES } from "@/constants/messages";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { getSpaceCheck, getSpaceName } from "@/services/SpaceService";
-
-
 
 // 1. GET: チャット一覧取得
 export async function GET(request: NextRequest) {
@@ -44,6 +42,7 @@ export async function GET(request: NextRequest) {
         },{ status: 200});
     } catch (error) {
         console.error("GET API Error:", error);
+        
         return NextResponse.json({ message: MESSAGES.E2003("チャット") }, { status: 500 });
     }
 }
@@ -81,8 +80,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: MESSAGES.E1002("チャット内容", 100) }, { status: 400 });
     }
 
-    console.log(files);
-
     if(files.length > 5){
         return NextResponse.json({ message: MESSAGES.E1006 }, { status: 400 });
     }
@@ -100,21 +97,18 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ message: MESSAGES.E1005(index + 1) }, { status: 400 });
         }
       }
-
-      
       imageUrls = await uploadImages(files, auth.user_id, spaceId);
     }
-
     // 4. DB登録 (ループで1枚ずつ登録)
     const newChat = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 画像がない場合
       if (!imageUrls || imageUrls.length === 0) {
         const res = await registerChat({
-          user_id: auth.user_id,
-          space_id: spaceId,
+          userId: auth.user_id,
+          spaceId: spaceId,
           message: message || undefined,
           stamp: stamp || undefined,
-        }, tx);
+        });
         return [res]; // ★単一の結果も必ず配列 [res] にして返す
       }
 
@@ -122,12 +116,12 @@ export async function POST(request: NextRequest) {
       const results = [];
       for (let i = 0; i < imageUrls.length; i++) {
         const res = await registerChat({
-          user_id: auth.user_id,
-          space_id: spaceId,
+          userId: auth.user_id,
+          spaceId: spaceId,
           message: message || undefined,
-          image_url: imageUrls[i],
+          imageUrl: imageUrls[i],
           stamp: i === 0 ? (stamp || undefined) : undefined,
-        }, tx);
+        });
         results.push(res);
       }
       return results; // これは元から配列
@@ -137,12 +131,28 @@ export async function POST(request: NextRequest) {
 
 
   } catch (error) {
-    // 5. エラー処理（配列対応）
-    if (imageUrls && imageUrls.length > 0) {
-      for (const url of imageUrls) {
-        await deleteImage(url).catch(e => console.error("削除失敗:", e));
-      }
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    switch (error.code) {
+      case 'P2002': // 既存データの重複 (Unique constraint)
+        return NextResponse.json({ message: MESSAGES.E4009 }, { status: 409 });
+        
+      case 'P2025': // 削除や更新対象のレコードがいない
+        return NextResponse.json({ message: MESSAGES.E2005("対象データ") }, { status: 404 });
+        
+      case 'P2003': // 外部キー制約 (削除しようとしたが紐づくデータがある等)
+        return NextResponse.json({ message: "このデータは他の機能で使用されているため削除できません。" }, { status: 400 });
+        
+      case 'P2011': // Null制約 (必須項目抜け)
+        return NextResponse.json({ message: MESSAGES.E1001("必須項目") }, { status: 400 });
+
+      default:
+        console.error("Prisma Error:", error.code, error.message);
+        return NextResponse.json({ message: MESSAGES.E2001("システム") }, { status: 500 });
     }
-    return NextResponse.json({ message: MESSAGES.E2001("チャット") }, { status: 500 });
   }
+    // return NextResponse.json({ message: MESSAGES.E2001("チャット") }, { status: 500 });
+
+  // Prisma以外の予期せぬエラー
+  return NextResponse.json({ message: MESSAGES.E2003("通信") }, { status: 500 });
+}
 }

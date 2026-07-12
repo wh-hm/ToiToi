@@ -16,21 +16,12 @@ export async function GET(request: Request) {
     if (!spaceId || isNaN(spaceId)) {
         return NextResponse.json({ message: MESSAGES.E1001("スペースID") }, { status: 400 });
     }
-
-    const isSpaceAlive = await getSpaceCheck(auth.user_id, spaceId);
-        
-    if (!isSpaceAlive) {
-        return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
-    }
-
     try {
-
         const isSpaceAlive = await getSpaceCheck(auth.user_id, spaceId);
         if (!isSpaceAlive) {
             return NextResponse.json({ message: MESSAGES.E1010("対象のスペース") }, { status: 404 });
         }
         const tasks = await getTasks(spaceId, auth.user_id);
-
         return NextResponse.json({
             incomplete: tasks.filter((t) => t.status === 0),
             complete: tasks.filter((t) => t.status === 1),
@@ -40,9 +31,6 @@ export async function GET(request: Request) {
         return NextResponse.json({ message: MESSAGES.E2003("タスク") }, { status: 500 });
     }
 }
-
-
-
 // 2. POST: タスク登録（単体チェック実装）
 export async function POST(request: Request) {
     const auth = await getAuthContext();
@@ -51,11 +39,9 @@ export async function POST(request: Request) {
     try {
         const { title, description, dueDate, spaceId, tag, isAllday, priority } = await request.json();
 
-        // --- 単体チェック ---
         // 1. 必須チェック (E1001)
-        if (!title) return NextResponse.json({ message: MESSAGES.E1001("タスク名") }, { status: 400 });
+        if (!title || title.trim() === "") return NextResponse.json({ message: MESSAGES.E1001("タスク名") }, { status: 400 });
         if (!dueDate) return NextResponse.json({ message: MESSAGES.E1001("期限") }, { status: 400 });
-        // if (!description) return NextResponse.json({ message: MESSAGES.E1001("詳細") }, { status: 400 });
 
         // 2. 桁数チェック (E1002)
         if (title.length > 20) return NextResponse.json({ message: MESSAGES.E1002("タスク名", 20) }, { status: 400 });

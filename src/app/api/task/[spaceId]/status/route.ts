@@ -9,33 +9,25 @@ export async function PATCH(
 ) {
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
   try {
     const { spaceId } = await params;
     const spaceIdNum = Number(spaceId);
-    
-    // ボディからの値取得
     const body = await request.json();
     const { status, taskId } = body;
-
     if (status === undefined || !spaceId) {
       return NextResponse.json({ message: MESSAGES.E1001("ステータスまたはスペースID") }, { status: 400 });
     }
-
-    const [isSpaceAlive, isTaslAlive] = await Promise.all([
+    const [isSpaceAlive, isTaskAlive] = await Promise.all([
       getSpaceCheck(auth.user_id, spaceIdNum), // ※関数名が推測ですが合わせる
       getTaskCheck(auth.user_id, spaceIdNum, taskId)
     ]);
-
     // スペースチェックの判定
     if (!isSpaceAlive) {
         return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
-
-    if (!isTaslAlive) {
+    if (!isTaskAlive) {
         return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
     }
-
     // 更新処理
     const updatedTask = await updateStatusTask(
       taskId,
@@ -43,11 +35,9 @@ export async function PATCH(
       auth.user_id,
       status
     );
-
     if (!updatedTask) {
       return NextResponse.json({ message: MESSAGES.E2002("タスクステータス") }, { status: 500 });
     }
-
     return NextResponse.json({ 
         updatedTask: updatedTask, 
         message: MESSAGES.S1002("タスクステータス") 

@@ -10,20 +10,15 @@ export async function GET() {
     if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
     try {
-        // あなたのサービスの取得関数を呼び出す（例: getSpacesByUserId など）
-        // getSpaces などの関数は SpaceService に定義されている前提です
         const spaces = await getSpaces(auth.user_id); 
-
-        // 2. 認証済みID (auth.user_id) を使ってスペースを取得
 
         // 3. 型ごとのフィルタリング
         const result = {
-        chat: spaces.filter(s => s.space_type === 1),
-        task: spaces.filter(s => s.space_type === 2),
-        question: spaces.filter(s => s.space_type === 3),
+            chat: spaces.filter(s => s.space_type === 1),
+            task: spaces.filter(s => s.space_type === 2),
+            question: spaces.filter(s => s.space_type === 3),
         };
         
-        // データが空でも [] を返すことで、JSONパースエラーを防げます
         return NextResponse.json({ 
             spaces: result, 
             message: MESSAGES.S2001("スペース一覧") 
@@ -33,7 +28,6 @@ export async function GET() {
         return NextResponse.json({ message: MESSAGES.E2001("スペース一覧") }, { status: 500 });
     }
 }
-
 
 // 2. POST: スペース登録（単体チェックを追加）
 export async function POST(request: Request) {
@@ -45,8 +39,9 @@ export async function POST(request: Request) {
         
         // --- 単体チェック ---
         // 1. 必須チェック (E1001)
-        if (!name) return NextResponse.json({ message: MESSAGES.E1001("スペース名") }, { status: 400 });
-
+        if (!name || name.trim() === "") {
+            return NextResponse.json({ message: MESSAGES.E1001("スペース名") }, { status: 400 });
+        }        
         // 2. 桁数チェック (E1002: 20文字)
         if (name.length > 20) return NextResponse.json({ message: MESSAGES.E1002("スペース名", 20) }, { status: 400 });
 
@@ -75,8 +70,6 @@ export async function DELETE() {
     if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
     try {
-
-
         const success = await deleteSpaces(auth.user_id, "ALL", );
         if (!success) return NextResponse.json({ message: MESSAGES.E2004("スペース") }, { status: 500 });
         

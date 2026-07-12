@@ -21,7 +21,11 @@ export async function PATCH(
     const questionIdNum = Number(questionId);
 
     // バリデーションチェック
-    if (isNaN(questionId) || isNaN(spaceIdNum) || isNaN(isResolved)) {
+    if (
+      isNaN(questionIdNum) || 
+      isNaN(spaceIdNum) || 
+      ![0, 1].includes(Number(isResolved))
+    ) {
       return NextResponse.json(
         { message: MESSAGES.E1001("必須パラメータ") }, 
         { status: 400 }

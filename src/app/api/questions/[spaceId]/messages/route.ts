@@ -137,7 +137,7 @@ export async function POST(
     const newChats = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 画像がない場合
       if (imageUrls.length === 0) {
-        return [await registerQuestionChat(questionId, auth.user_id, message || undefined, undefined, stamp || undefined, tx)];
+        return [await registerQuestionChat(questionId, auth.user_id, message || undefined, undefined, stamp || undefined)];
       }
 
       // 画像がある場合はループして個別に登録
@@ -149,7 +149,6 @@ export async function POST(
           i === 0 ? (message || undefined) : undefined, // 1枚目にメッセージ/スタンプ付与
           imageUrls[i],
           i === 0 ? (stamp || undefined) : undefined,
-          tx
         );
         results.push(res);
       }

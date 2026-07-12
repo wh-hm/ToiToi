@@ -10,23 +10,18 @@ export async function PATCH(request: Request) {
     if ('error' in auth) {
         return NextResponse.json({ message: auth.error }, { status: auth.status });
     }
-
     try {
         const userCheck = await checkUser(auth.user_id);
         if (!userCheck) {
-            // 404 Not Found を返す
             return NextResponse.json(
                 { message: MESSAGES.E2005("ユーザー") }, 
                 { status: 404 }
             );
         }
         const { username } = await request.json();
-
-        // 2. 単体チェック（バリデーション）
-        if (!username) {
+        if (!username || username.trim() === "") {
             return NextResponse.json({ message: MESSAGES.E1001("ユーザー名") }, { status: 400 });
         }
-
         if (username.length > 10) {
             return NextResponse.json({ message: MESSAGES.E1002("ユーザー名", 10) }, { status: 400 });
         }
@@ -37,10 +32,7 @@ export async function PATCH(request: Request) {
                 { status: 400 }
             );
         }
-
-        // 3. ユーザー名を更新
         const updatedUser = await updateUsername(auth.user_id, username);
-        
         if (!updatedUser) {
             return NextResponse.json({ message: MESSAGES.E2002("ユーザー名") }, { status: 500 });
         }
