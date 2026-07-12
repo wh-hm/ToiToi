@@ -28,6 +28,13 @@ export async function PATCH(request: NextRequest) {
       Number(status)
     );
 
+    if (!updatedGoal) {
+      return NextResponse.json(
+        { message: MESSAGES.E2005("目標") }, 
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json({ 
         updatedGoal: updatedGoal, 
         message: MESSAGES.S1002("目標ステータス") 

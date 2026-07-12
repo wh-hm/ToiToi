@@ -6,29 +6,28 @@ import { getSpaceCheck } from "@/services/SpaceService";
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id?: string; spaceId?: string }> }
 ) {
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+  
   try {
-    const { id } = await params;
-    const taskId = Number(id);
-    
-    // ボディからの値取得 (💡設計書に合わせて spaceId に変更)
+    const resolvedParams = await params;
     const body = await request.json();
-    const { status, spaceId } = body;
+    
+    // 💡 キャメルケースに統一。paramsとbodyのどちらから送られてきても取得できるように安全にフォールバックを設定
+    const taskId = Number(resolvedParams.id || body.taskId || body.task_id);
+    const spaceIdNum = Number(resolvedParams.spaceId || body.spaceId || body.space_id);
+    const { status } = body;
 
-    const spaceIdNum = Number(spaceId);
-
-    // 必須チェック (💡 0が送られてきても弾かれないように修正)
-    if (status === undefined || !spaceId || isNaN(spaceIdNum)) {
-      return NextResponse.json({ message: MESSAGES.E1001("ステータスまたはスペースID") }, { status: 400 });
+    // 必須チェック (💡 0が送られてきても弾かれないロジックを維持)
+    if (status === undefined || !spaceIdNum || isNaN(spaceIdNum) || !taskId || isNaN(taskId)) {
+      return NextResponse.json({ message: MESSAGES.E1001("ステータス、スペースID、またはタスクID") }, { status: 400 });
     }
 
     const [isSpaceAlive, isTaskAlive] = await Promise.all([
       getSpaceCheck(auth.user_id, spaceIdNum), 
-      getTaskCheck(auth.user_id, spaceIdNum, taskId) // 💡 Number(id)をtaskIdに変えてスッキリ
+      getTaskCheck(auth.user_id, spaceIdNum, taskId)
     ]);
 
     // スペースチェックの判定
@@ -40,19 +39,24 @@ export async function PATCH(
         return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
     }
 
-    // 更新処理 (💡 サービス層の引数の順番が spaceIdNum かどうか確認してください)
-    const updated = await updateStatusTask(
+    // 更新処理 (キャメルケースの変数で実行)
+    const updatedTask = await updateStatusTask(
       taskId,
-      spaceIdNum, // 💡 サービスに渡す
+      spaceIdNum,
       auth.user_id,
       status
     );
 
-    if (!updated) {
+    if (!updatedTask) {
       return NextResponse.json({ message: MESSAGES.E2002("タスクステータス") }, { status: 500 });
     }
 
-    return NextResponse.json(updated);
+    // 💡 mainブランチで追加された「成功メッセージ付きレスポンス（キャメルケース）」を反映
+    return NextResponse.json({ 
+        updatedTask: updatedTask, 
+        message: MESSAGES.S1002("タスクステータス") 
+    }, { status: 200 });
+
   } catch (error) {
     return NextResponse.json({ message: MESSAGES.E2002("タスクステータス") }, { status: 500 });
   }

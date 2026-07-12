@@ -7,13 +7,9 @@ import { getSpaces } from "@/services/SpaceService";
 import { getImageCount } from "@/services/StorageService";
 
 export async function GET() {
-  // 1. 認証チェック
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
   try {
-    // 2. 複数のサービスを並列実行して効率化
-    // Promise.allを使うことで、各処理を待ち合わせる時間を短縮します
     const [user, spaces, imageCount] = await Promise.all([
       getUser(auth.user_id),
       getSpaces(auth.user_id),
@@ -25,23 +21,16 @@ export async function GET() {
       task: spaces.filter(s => s.space_type === 2),
       question: spaces.filter(s => s.space_type === 3),
     };
-    
-    // 3. ユーザー存在チェック
     if (!user) {
       return NextResponse.json({ message: MESSAGES.E1010("ユーザー") }, { status: 404 });
     }
-
-    // 4. 全データをまとめてレスポンス
-    // フロント側で「データが空かどうか」を判定できるように全て返します
     return NextResponse.json({ 
       user: user, 
       spaces: result, 
       imageCount: imageCount,
       message: MESSAGES.S2001("アカウント情報")
     }, { status: 200 });
-
   } catch (error) {
-    // 各サービス内で発生したエラーをキャッチ
     console.error("【マイページデータ取得エラー】", error);
     return NextResponse.json(
       { message: MESSAGES.E2003("アカウント情報") },
@@ -51,16 +40,12 @@ export async function GET() {
 }
 
 export async function DELETE() {
-  // 1. 認証とユーザーID取得を共通化
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
   try {
-    // 2. ユーザー削除（論理削除）の実行
     const success = await deleteUser(auth.user_id);
     
     if (!success) {
-      // 削除対象が見つからない、または権限がない場合
       return NextResponse.json(
         { message: MESSAGES.E1010("ユーザー") },
         { status: 404 }

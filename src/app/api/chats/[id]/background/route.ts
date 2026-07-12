@@ -11,39 +11,31 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const spaceId = parseInt(id);
-
-
   // 1. 認証とユーザーID取得を共通化
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
   try {
     const { background, chatId } = await request.json();
-
     const [isSpaceAlive, isChatAlive] = await Promise.all([
         getSpaceCheck(auth.user_id, spaceId), // ※関数名が推測ですが合わせる
         getChatCheck(auth.user_id, spaceId, chatId)
     ]);
-
     // スペースチェックの判定
     if (!isSpaceAlive) {
         return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
-
     // チャットチェックの判定
     if (!isChatAlive) {
         return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
     }
     // 2. 背景変更を実行
     const updatedChat = await changeBackground(chatId, spaceId, auth.user_id, background);
-
     if (!updatedChat) {
       return NextResponse.json({ message: MESSAGES.E2001("背景色") }, { status: 403 });
     }
-
     return NextResponse.json({ 
         updatedChat: updatedChat, 
-        message: MESSAGES.S1002("背景職設定") 
+        message: MESSAGES.S1002("背景色設定")
     }, { status: 200 });
   } catch (error) {
     return NextResponse.json({ message: MESSAGES.E2001("背景色") }, { status: 500 });

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { ToiToiNotification } from "@/components/Toast";
 
 export default function TaskModal(props: any): React.JSX.Element {
   const { task, onClose, onSuccess, spaceId, mode = 'create', type = 'task', onError, onSubmit } = props; 
@@ -133,8 +134,8 @@ export default function TaskModal(props: any): React.JSX.Element {
         ? {
           title: titleText,
           question: descText,
-          is_resolved: isEditMode ? Number(formData.status) : 0,
-          space_id: numericSpaceId,
+          isResolved: isEditMode ? Number(formData.status) : 0, 
+          spaceId: numericSpaceId,                            
           tag: Number(formData.tag) || 0,
         }
         : {
@@ -146,8 +147,7 @@ export default function TaskModal(props: any): React.JSX.Element {
           isAllday: Number(formData.isAllday),
           status: Number(formData.status),
           description: descText,
-          dueDate: parsedDate.toISOString(),
-          due_date: parsedDate.toISOString(),
+          dueDate: parsedDate.toISOString(), 
         };
 
       if (onSubmit) {
@@ -168,6 +168,12 @@ export default function TaskModal(props: any): React.JSX.Element {
       });
 
       if (res.ok) {
+        const data = await res.json();
+        console.log(data);
+        if (data.message) {
+          ToiToiNotification.success(data.message);
+        }
+        
         setTimeout(() => onSuccess(Number(formData.status)), 100);
       } else {
         const resData = await res.json();

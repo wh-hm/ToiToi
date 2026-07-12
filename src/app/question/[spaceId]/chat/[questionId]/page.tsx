@@ -13,6 +13,7 @@ import { MESSAGES } from "@/constants/messages";
 import { Switch } from "@nextui-org/react";
 import { fetchWithTimeout } from "@/lib/api";
 import { handleApiResponse } from "@/lib/api-utils";
+import { Celebration } from "@/components/CelebrationModal";
 
 export default function ChatPage({ params }: { params: Promise<{ questionId: string, spaceId: string }> }) {
   const [inputText, setInputText] = useState("");
@@ -32,6 +33,7 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
   // 質問の解決状態を管理する（0:未解決, 1:解決済み）
   const [isResolved, setIsResolved] = useState(0);
   const [isError, setIsError] = useState(false);
+  const [ celebration, setCelebration] = useState(false);
 
   // useEffect で質問データを取得した際に、初期状態をセットする
   useEffect(() => {
@@ -293,7 +295,7 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
     );
 
     try {
-      const res = await fetchWithTimeout(`/api/questions/${questionId}/messages/${chatId}/status`, { 
+      const res = await fetchWithTimeout(`/api/questions/${spaceId}/messages/${questionId}/status?chatId=${chatId}`, { 
         method: "PATCH" 
       });
       const data = await res.json();
@@ -301,6 +303,7 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
         await handleApiResponse(res); // 内部のthrowを待つ
         throw new Error(); // 明示的にエラーを投げる
       }
+      setCelebration(true);
       
     } catch (e: any) {
       // 3. 失敗したら元の状態に戻す
@@ -389,15 +392,16 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
       ToiToiNotification.info("質問ステータスを「未解決」に変更しました。", "status-toggle-toast");
     }else{
       // お祝い演出します！
+      Celebration("質問解決おめでとう！")
     }
 
     try {
-      const res = await fetchWithTimeout(`/api/questions/${questionId}/status`, {
+      const res = await fetchWithTimeout(`/api/questions/${spaceId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           isResolved: newStatus,
-          spaceId: spaceId 
+          questionId: questionId 
         }),
       });
       const data = await res.json();
@@ -450,6 +454,7 @@ return (
     <ChevronDown className="w-5 h-5 text-gray-500 transition-transform duration-300 group-open:rotate-180" />
   </div>
 </summary>
+
 
 {/* 詳細テキストエリア：タイトルの開始位置と揃えるためのパディング調整 */}
 <div className="bg-white border-b border-gray-200 shadow-xl opacity-0 group-open:opacity-100 max-h-0 group-open:max-h-[50vh] overflow-hidden transition-all duration-300">

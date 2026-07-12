@@ -1,82 +1,66 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { getAuthContext } from "@/lib/auth-guard";
 import { updateChat, deleteChat, getChatCheck } from "@/services/ChatService";
 import { MESSAGES } from "@/constants/messages";
 import { getSpaceCheck } from "@/services/SpaceService";
+import { Prisma } from "@prisma/client";
 
 export async function PATCH(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const chatId = parseInt(id);
-
-  // 1. 認証チェック
+  const spaceId = Number(id);
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
-    const { message, spaceId } = await request.json();
+    const { message, chatId } = await request.json();
+    const chatIdNum = Number(chatId);
 
+    // スペースとチャットの存在確認を並列実行
     const [isSpaceAlive, isChatAlive] = await Promise.all([
-        getSpaceCheck(auth.user_id, spaceId), // ※関数名が推測ですが合わせる
-        getChatCheck(auth.user_id, spaceId, chatId)
+      getSpaceCheck(auth.user_id, spaceId),
+      getChatCheck(auth.user_id, spaceId, chatIdNum)
     ]);
 
-    // スペースチェックの判定
-    if (!isSpaceAlive) {
-        return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
-    }
+    if (!isSpaceAlive) return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+    if (!isChatAlive) return NextResponse.json({ message: MESSAGES.E2005("チャット") }, { status: 404 });
 
-    // チャットチェックの判定
-    if (!isChatAlive) {
-        return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
-    }
+    const updatedChat = await updateChat(chatIdNum, spaceId, auth.user_id, message);
+    return NextResponse.json({ updatedChat, message: MESSAGES.S1002("チャット内容") });
     
-    // 2. 更新実行 (message をオブジェクトで渡す構成に統一)
-    const updatedChat = await updateChat(chatId, parseInt(spaceId), auth.user_id, message );
-
-    if (!updatedChat) {
-      return NextResponse.json({ message: MESSAGES.E2002("チャット内容") }, { status: 403 });
-    }
-
-    return NextResponse.json({ 
-        updatedChat: updatedChat, 
-        message: MESSAGES.S1002("チャット内容") 
-    }, { status: 200 });
   } catch (error) {
+    console.error("PATCH Error:", error);
     return NextResponse.json({ message: MESSAGES.E2002("チャット内容") }, { status: 500 });
   }
 }
 
 export async function DELETE(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const chatId = parseInt(id);
-
-  // 1. 認証チェックを先に済ませる
+  const spaceId = Number(id);
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
-  const { searchParams } = new URL(request.url);
-  const spaceId = parseInt(searchParams.get("spaceId") || "");
-
-  if (isNaN(chatId) || isNaN(spaceId)) {
-    return NextResponse.json({ message: MESSAGES.E1008 }, { status: 400 });
-  }
+  const chatId = Number(request.nextUrl.searchParams.get("chatId"));
+  if (isNaN(chatId) || isNaN(spaceId)) return NextResponse.json({ message: MESSAGES.E1008 }, { status: 400 });
 
   try {
-    
-    // 3. 削除実行
+    // 削除前に存在チェック（既に削除済みなら404を返してあげるのが親切）
+    const isAlive = await getChatCheck(auth.user_id, spaceId, chatId);
+    if (!isAlive) return NextResponse.json({ message: MESSAGES.E2005("チャット") }, { status: 404 });
+
     await deleteChat(chatId, auth.user_id, spaceId);
-    return NextResponse.json({ 
-        success: true, 
-        message: MESSAGES.S1003("チャット") 
-    }, { status: 200 });
+    return NextResponse.json({ message: MESSAGES.S1003("チャット") });
+    
   } catch (error) {
-    console.log(error);
-    return NextResponse.json({ message: MESSAGES.E2001("チャット") }, { status: 500 });
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+       return NextResponse.json({ message: MESSAGES.E2005("チャット") }, { status: 404 });
+    }
+    console.error("DELETE Error:", error);
+    return NextResponse.json({ message: MESSAGES.E2004("チャット") }, { status: 500 });
   }
 }

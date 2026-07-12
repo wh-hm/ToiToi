@@ -36,19 +36,26 @@ export async function GET(request: NextRequest) {
     }
 }
 
-// 2. POST: タスク登録
+// 2. POST: タスク登録（単体チェック実装）
 export async function POST(request: NextRequest) {
     const auth = await getAuthContext();
     if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
     try {
         const body = await request.json();
-        const spaceId = body.spaceId || body.space_id;
-        const { title, description, due_date, tag, is_allday, priority } = body;
+        
+        // 💡 キャメルケースに統一（どちらで送られてきても受け取れるようにフォールバックを設定）
+        const spaceId = Number(body.spaceId || body.space_id);
+        const title = body.title;
+        const description = body.description;
+        const dueDate = body.dueDate || body.due_date;
+        const tag = body.tag;
+        const isAllDay = body.isAllDay ?? body.is_allday;
+        const priority = body.priority;
 
-        // --- 単体チェック ---
-        if (!title) return NextResponse.json({ message: MESSAGES.E1001("タスク名") }, { status: 400 });
-        if (!due_date) return NextResponse.json({ message: MESSAGES.E1001("期限") }, { status: 400 });
+        // 1. 必須チェック (E1001)
+        if (!title || title.trim() === "") return NextResponse.json({ message: MESSAGES.E1001("タスク名") }, { status: 400 });
+        if (!dueDate) return NextResponse.json({ message: MESSAGES.E1001("期限") }, { status: 400 });
 
         if (title.length > 20) return NextResponse.json({ message: MESSAGES.E1002("タスク名", 20) }, { status: 400 });
         if (description && description.length > 100) return NextResponse.json({ message: MESSAGES.E1002("詳細", 100) }, { status: 400 });
@@ -57,7 +64,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ message: MESSAGES.E1003("タスク名または詳細", "記号") }, { status: 400 });
         }
 
-        const inputDate = new Date(due_date);
+        const inputDate = new Date(dueDate);
         if (isNaN(inputDate.getTime())) {
             return NextResponse.json({ message: MESSAGES.E1004 }, { status: 400 });
         }
@@ -73,9 +80,9 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
         }
 
-        // データベース保存
+        // データベース保存（引数もキャメルケースの変数に修正）
         const newTask = await registerTask(
-            auth.user_id, title, description, due_date, spaceId, tag || 0, is_allday, priority
+            auth.user_id, title, description, dueDate, spaceId, tag || 0, isAllDay, priority
         );
 
         return NextResponse.json(newTask, { status: 201 });

@@ -1,7 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { Question } from "@prisma/client";
-import { deleteQuestionChats } from "./QuestionChatService";
 import sanitizeHtml from "sanitize-html"; // サニタイズ用ライブラリ
+import { deleteQuestionChats } from "./QuestionChatService";
+import { Prisma } from "@prisma/client";
+
+export type Tx = Omit<Prisma.TransactionClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
 // 共通設定：HTMLタグを全除去してテキストとして保持する
 const sanitizeOptions = {
@@ -9,353 +12,142 @@ const sanitizeOptions = {
   allowedAttributes: {},
 };
 
-export async function checkQuestion(
-  user_id: string,
-  space_id: number,
-  question_id: number,
-  tx?: any
-) {
+export async function checkQuestion(userId: string, spaceId: number, questionId: number, tx?: Tx): Promise<boolean> {
   const db = tx || prisma;
-
-  // Promise.all で2つのクエリを同時に実行
-  const [questionExists, spaceExists] = await Promise.all([
-    db.question.findFirst({
-      where: { id: question_id, delete_flag: 0, user_id: user_id },
-    }),
-    db.space.findFirst({
-      where: { id: space_id, delete_flag: 0, user_id: user_id },
-    }),
+  const [question, space] = await Promise.all([
+    db.question.findFirst({ where: { id: questionId, delete_flag: 0, user_id: userId } }),
+    db.space.findFirst({ where: { id: spaceId, delete_flag: 0, user_id: userId } }),
   ]);
-
-  // 🔍 ターミナルでどっちが null になっているか確認する
-  console.log("=== checkQuestion デバッグ ===");
-  console.log("検索条件:", { user_id, space_id, question_id });
-  console.log("質問の検索結果:", questionExists ? "存在します" : "❌ null (存在しない)");
-  console.log("スペースの検索結果:", spaceExists ? "存在します" : "❌ null (存在しない)");
-  if (!questionExists || !spaceExists) {
-    return false;
-  }
-  return true;
+  return !!question && !!space;
 }
 
 /**
  * 質問の新規登録（サニタイズ実施版）
  */
 export async function registerQuestion(
-  space_id: number,
-  user_id: string,
-  title: string,
-  question: string,
-  tag: number | null,
-  tx?: any,
-): Promise<any> {
-  try {
-    const db = tx || prisma;
+  spaceId: number, userId: string, title: string, question: string, tag: number | null
+): Promise<Question> {
+  const cleanTitle = sanitizeHtml(title, sanitizeOptions);
+  const cleanQuestion = sanitizeHtml(question, sanitizeOptions);
 
-    if (typeof space_id !== 'number' || Number.isNaN(space_id)) {
-      throw new Error("space_idが数値ではありません");
-    }
-
-    // 1. サニタイズ実施
-    const cleanTitle = sanitizeHtml(title, sanitizeOptions);
-    const cleanQuestion = sanitizeHtml(question, sanitizeOptions);
-
-    // 2. レコード登録
-    const newQuestion = await db.question.create({
-      data: {
-        space_id,
-        user_id,
-        title: cleanTitle,
-        question: cleanQuestion,
-        is_resolved: 0,
-        delete_flag: 0,
-        tag,
-        created_at: new Date(),
-      },
-    });
-
-    return newQuestion;
-  } catch (error) {
-    console.error("質問の新規登録中にエラーが発生しました:", error);
-    throw error;
-  }
+  return await prisma.question.create({
+    data: {
+      space_id: spaceId,
+      user_id: userId,
+      title: cleanTitle,
+      question: cleanQuestion,
+      is_resolved: 0,
+      delete_flag: 0,
+      tag,
+    },
+  });
 }
 
 /**
  * 質問の編集更新（サニタイズ実施版）
  */
 export async function updateQuestion(
-  id: number,
-  space_id: number,
-  user_id: string,
-  title: string,
-  question: string,
-  is_resolved: number,
-  tag: number | null,
-  tx?: any
-): Promise<any> {
-  try {
-    const db = tx || prisma;
+  id: number, spaceId: number, userId: string, title: string, question: string, isResolved: number, tag: number | null, tx?: Tx
+): Promise<Question> {
+  const db = tx || prisma;
+  const cleanTitle = sanitizeHtml(title, sanitizeOptions);
+  const cleanQuestion = sanitizeHtml(question, sanitizeOptions);
 
-    // 1. サニタイズ実施
-    const cleanTitle = sanitizeHtml(title, sanitizeOptions);
-    const cleanQuestion = sanitizeHtml(question, sanitizeOptions);
+  const result = await db.question.updateMany({
+    where: { id, space_id: spaceId, user_id: userId, delete_flag: 0 },
+    data: { title: cleanTitle, question: cleanQuestion, is_resolved: isResolved, tag },
+  });
 
-    const result = await db.question.updateMany({
-      where: { id, space_id, user_id, delete_flag: 0 },
-      data: {
-        title: cleanTitle,
-        question: cleanQuestion,
-        is_resolved,
-        tag,
-      },
-    });
-
-    if (result.count === 0) {
-      throw new Error("対象の質問が存在しないか、編集権限がありません。");
-    }
-
-    return await db.question.findUnique({ where: { id } });
-  } catch (error) {
-    console.error(`question_id: ${id} の更新中にエラーが発生しました:`, error);
-    throw error;
-  }
+  if (result.count === 0) throw new Error("更新権限がないか、質問が存在しません。");
+  return (await db.question.findUnique({ where: { id } }))!;
 }
 
 // 概要：スペースに紐づく有効な質問一覧を取得する
-export async function getQuestions(
-    space_id: number, // 引数: int
-    user_id: string,  // 引数: string
-    tx?: any
-    ): Promise<any[]> { // 戻り値: Question[]
-    try {
-        const db = tx || prisma;
-
-        // 1. 質問一覧の検索 (findMany)
-        const questions = await db.question.findMany({
-        where: {
-            space_id: space_id, // space_id=引数のspace_id
-            user_id: user_id,   // user_id=引数のuser_id
-            delete_flag: 0,     // delete_flag=0 (削除されていない、有効な質問のみ)
-        },
-        // 3. ソート条件：登録日時 (created_at) の降順（新しい順）
-        orderBy: {
-            created_at: 'desc',
-        },
-        });
-
-        // 4. 戻り値の返却：条件に一致した質問レコードの配列
-        return questions;
-    } catch (error) {
-        // 例外処理：データベース接続エラー等の例外発生時は、エラーをそのまま返し、画面側でのエラー表示処理に委ねる。
-        console.error(`space_id: ${space_id} の質問一覧取得中にエラーが発生しました:`, error);
-        throw error;
-    }
+export async function getQuestions(spaceId: number, userId: string): Promise<Question[]> {
+  return await prisma.question.findMany({
+    where: { space_id: spaceId, user_id: userId, delete_flag: 0 },
+    orderBy: { created_at: 'desc' },
+  });
 }
 
-export async function getQuestion(
-    question_id: number, // 引数: int
-    user_id: string,  // 引数: string
-    tx?: any
-    ): Promise<any[]> { // 戻り値: Question[]
-    try {
-        const db = tx || prisma;
-
-        // 1. 質問一覧の検索 (findMany)
-        const question = await db.question.findFirst({
-        where: {
-            id: question_id,
-            user_id: user_id,   // user_id=引数のuser_id
-            delete_flag: 0,     // delete_flag=0 (削除されていない、有効な質問のみ)
-        }
-        });
-
-        // 4. 戻り値の返却：条件に一致した質問レコードの配列
-        return question;
-    } catch (error) {
-        // 例外処理：データベース接続エラー等の例外発生時は、エラーをそのまま返し、画面側でのエラー表示処理に委ねる。
-        console.error(`space_id: ${question_id} の質問一覧取得中にエラーが発生しました:`, error);
-        throw error;
-    }
+export async function getQuestion(questionId: number, userId: string): Promise<Question | null> {
+  return await prisma.question.findFirst({
+    where: { id: questionId, user_id: userId, delete_flag: 0 },
+  });
 }
 
 // 概要：質問情報の削除
-export async function deleteQuestion(
-    id: number,
-    space_id: number,
-    user_id: string,
-    tx?: any
-): Promise<any> {
-  try {
-    const db = tx || prisma;
+export async function deleteQuestion(questionId: number, spaceId: number, userId: string, tx?: Tx): Promise<Question> {
+  const db = tx || prisma;
+  const updatedQuestion = await db.question.update({
+    where: { id: questionId },
+    data: { delete_flag: 1 },
+  });
 
-    // 1. 質問レコードの論理削除（update）：
-    // 質問マスタ（question）から条件に一致するレコードの delete_flag を 1 に更新する。
-    const updatedQuestion = await db.question.update({
-      where: {
-        id: id,
-        space_id: space_id,
-        user_id: user_id,
-        delete_flag: 0, // 有効なレコードのみ対象
-      },
-      data: {
-        delete_flag: 1, // 論理削除フラグを立てる
-      },
-    });
+  const activeChats = await db.questionChats.findMany({
+    where: { question_id: questionId, delete_flag: 0 },
+    select: { id: true },
+  });
 
-    // 2. 関連するチャットメッセージの一括連動削除：
-    // 該当質問（id）に紐づいている有効なチャットメッセージのIDをすべて取得する。
-    const activeChats = await db.questionChats.findMany({
-      where: {
-        question_id: id,
-        delete_flag: 0,
-      },
-      select: { id: true },
-    });
-
-    if (activeChats.length > 0) {
-      const chatIds = activeChats.map((c: any) => c.id);
-      // 質問チャット一括削除サービスを呼び出す
-      await deleteQuestionChats(chatIds, id, user_id, db);
-    }
-
-    // 3. 戻り値の返却：論理削除が完了した最新の質問レコード1件分を返却
-    return updatedQuestion;
-
-  } catch (error) {
-    // 例外処理：エラー時は例外をそのまま投げ、画面側（コントローラー側）に処理を委ねる
-    console.error(`question_id: ${id} の論理削除中にエラーが発生しました:`, error);
-    throw error;
+  if (activeChats.length > 0) {
+    await deleteQuestionChats(activeChats.map(c => c.id), questionId, userId, db);
   }
+  return updatedQuestion;
 }
 
 // 概要：質問情報の一括削除
-export async function deleteQuestions(
-  ids: number[] | null, // 引数: int[] ids
-  space_id: number,     // 引数: int spacce_id
-  user_id: string,      // 引数: string user_id
-  tx?: any              // トランザクション引き継ぎ用（任意）
-): Promise<boolean> {   // 戻り値: bool
-  try {
-    const db = tx || prisma;
+export async function deleteQuestions(ids: number[], spaceId: number, userId: string, tx?: Tx): Promise<boolean> {
+  const db = tx || prisma;
+  if (!ids.length) return false;
 
-    // 処理ステップ 1. 局所化バリデーション：
-    // 引数の ids 配列が空、または null の場合は、処理を行わず呼び出し元に false を返却する。
-    if (!ids || ids.length === 0) {
-      return false;
-    }
-
-    // 処理ステップ 2 & 3 & 4. ループによる単体削除の実行：
-    // 渡された配列の要素数分だけループ処理を行い、単一の質問ID（id）に対して deleteQuestion を引き渡して実行する。
-    for (const id of ids) {
-      await deleteQuestion(
-        id,
-        space_id,
-        user_id,
-        db, // 同一トランザクションで実行させて安全性を担保
-      );
-    }
-
-    // すべての質問IDに対するループ処理がエラーなく正常に終了した場合、呼び出し元へ true を返却する。
-    return true;
-
-  } catch (error) {
-    // 例外処理：データベース更新中やチャット削除ループの実行中にエラー（例外）が発生した場合、
-    // 処理を中断して呼び出し元（呼出元）にエラーをそのまま返却し、画面側でのエラーハンドリングに委ねる。
-    console.error(`space_id: ${space_id} の質問一括削除中に例外が発生しました:`, error);
-    throw error;
-  }
+  await db.question.updateMany({
+    where: { id: { in: ids }, space_id: spaceId, user_id: userId, delete_flag: 0 },
+    data: { delete_flag: 1 },
+  });
+  
+  await db.questionChats.updateMany({
+    where: { question_id: { in: ids }, delete_flag: 0 },
+    data: { delete_flag: 1 },
+  });
+  
+  return true;
 }
-
-
 
 /**
  * メソッド名称：updateQuestionStatus
  * 概要：質問の解決ステータス（解決済/未解決）を更新する
  */
 export async function updateQuestionStatus(
-    id: number,
-    space_id: number,
-    user_id: string,
-    is_resolved: number,
-    tx?: any,
-): Promise<any> { // 戻り値: Question
-  try {
-    const db = tx || prisma;
+  questionId: number, spaceId: number, userId: string, isResolved: number, tx?: Tx
+): Promise<Question> {
+  const db = tx || prisma;
+  const result = await db.question.updateMany({
+    where: { id: questionId, space_id: spaceId, user_id: userId, delete_flag: 0 },
+    data: { is_resolved: isResolved },
+  });
 
-    // 1. 引数の id、space_id、user_id をキーとして対象の質問レコードを特定し、解決済みフラグ（is_resolved）のみをピンポイントで更新（update）する。
-    // 検索・更新条件（where句）: id=引数のid, space_id=引数のspace_id, user_id=引数のuser_id, delete_flag=0
-    const result = await db.question.updateMany({
-      where: {
-        id: id,
-        space_id: space_id,
-        user_id: user_id,
-        delete_flag: 0,
-      },
-      // 更新データ（data）: is_resolved = 引数の is_resolved
-      data: {
-        is_resolved: is_resolved,
-      },
-    });
-
-    // 例外処理：該当する質問が存在しない場合のハンドリング
-    if (result.count === 0) {
-      throw new Error("対象の質問が存在しないか、ステータスを変更する権限がありません。");
-    }
-
-    // 2. 引数で渡された新しい is_resolved（0または1）を該当レコードの is_resolved カラムに反映（update）する。
-    // 更新完了後、解決ステータスの変更が反映された最新の質問レコード1件分のデータを呼び出し元へ返却する。
-    const updatedRecord = await db.question.findUnique({
-      where: { id: id },
-    });
-
-    return updatedRecord;
-  } catch (error) {
-    // 例外処理：該当する質問が存在しない（他人の質問である、または既に削除済等）、あるいはデータベース接続エラー等の例外発生時は、呼び出し元（呼出元）にエラーをそのまま返し、画面側でのエラー表示処理に委ねる。
-    console.error(`question_id: ${id} の解決ステータス更新中にエラーが発生しました:`, error);
-    throw error;
-  }
+  if (result.count === 0) throw new Error("ステータス更新失敗");
+  return (await db.question.findUnique({ where: { id: questionId } }))!;
 }
-
 
 /**
  * メソッド名称：getQuestionsCount
  * 概要：未解決の質問の個数を取得
  */
 
-export async function getQuestionsCount(user_id: string) {
-  // 1. まずユーザーの全スペースを取得
-  const spaces = await prisma.space.findMany({
-    where: {
-      user_id: user_id,
-      delete_flag: 0,
-    },
-    select: {
-      id: true,
-      name: true, // スペース名も取れるようにしておくのがおすすめ
-    },
-  });
+export async function getQuestionsCount(userId: string) {
+  const [counts, spaces] = await Promise.all([
+    prisma.question.groupBy({
+      by: ['space_id'],
+      where: { user_id: userId, is_resolved: 0, delete_flag: 0 },
+      _count: { id: true },
+    }),
+    prisma.space.findMany({ where: { user_id: userId, delete_flag: 0 } }),
+  ]);
 
-  // 2. 各スペースについてタスクをカウント（並列処理で高速化）
-  const result = await Promise.all(
-    spaces.map(async (space) => {
-      const count = await prisma.question.count({
-        where: {
-          user_id: user_id,
-          space_id: space.id,
-          is_resolved: 0,
-          delete_flag: 0,
-        },
-      });
-      
-      return {
-        space_id: space.id,
-        space_name: space.name,
-        question_count: count,
-      };
-    })
-  );
-
-  return result; // これが「配列」になります
+  return spaces.map(space => ({
+    space_id: space.id,
+    space_name: space.name,
+    question_count: counts.find(c => c.space_id === space.id)?._count.id || 0,
+  }));
 }
-
