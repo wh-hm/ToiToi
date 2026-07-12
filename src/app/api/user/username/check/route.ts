@@ -18,7 +18,11 @@ export async function GET() {
             return NextResponse.json({ hasUsername: false });
         }
 
-        return NextResponse.json({ hasUsername: true, userName });
+        return NextResponse.json({ 
+            hasUsername: true, 
+            userName: userName, 
+            message: MESSAGES.S2001("ユーザー名") 
+        }, { status: 200 });
 
     } catch (error) {
         console.error("ユーザー確認エラー:", error);

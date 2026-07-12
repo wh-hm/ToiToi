@@ -21,7 +21,10 @@ export async function DELETE() {
             );
         }
         
-        return NextResponse.json({ message: MESSAGES.S1003("タスクスペース全削除") });
+        return NextResponse.json({ 
+            success: true, 
+            message: MESSAGES.S1003("タスクスペース全削除") 
+        });
     } catch (error) {
         console.error("【タスクスペース全削除エラー】", error);
         return NextResponse.json(

@@ -1,5 +1,5 @@
 "use client";
-
+//修正中
 import { useRouter } from "next/navigation";
 import SpaceModal from "@/components/SpaceModal";
 import { useState, useEffect } from "react";
@@ -8,6 +8,7 @@ import { useSession } from "next-auth/react";
 import SpaceList from "@/components/SpaceList";
 import { fetchWithTimeout } from "@/lib/api";
 import { Loading } from "@/components/LoadingSpinner";
+import { handleApiResponse } from "@/lib/api-utils";
 
 // 型定義
 type Space = {
@@ -18,7 +19,7 @@ type Space = {
   is_archived: number;
   count?: number;
   task_count?: number;
-  question_count? : number;
+  question_count?: number;
 };
 
 type Goal = {
@@ -114,24 +115,20 @@ export default function Dashboard() {
 
     try {
       // ログイン状況の更新
-      await fetchWithTimeout("/api/user/login-update", { method: "PATCH" });
+      const loginRes = await fetchWithTimeout("/api/user/loginUpdate", { method: "PATCH" });
+      if (!loginRes.ok) {
+        handleApiResponse(loginRes);
+      }
 
       // ダッシュボードデータの取得
-      const res = await fetchWithTimeout("/api/dashboard/");
+      const res = await fetchWithTimeout("/api/dashboard");
       if (!res.ok) {
-        const errorResult = await res.json().catch(() => ({}));
-        toast.error(errorResult.error || "データベースからのデータ取得に失敗しました。");
+        handleApiResponse(res);
         return null;
       }
       const data = await res.json();
-
       console.log("ダッシュボードの最新データ：", data);
       // 1. 目標データのパース
-      if (data.goal) {
-        setGoal(Array.isArray(data.goal) ? (data.goal[0] || null) : data.goal);
-      } else {
-        setGoal(null);
-      }
 
       let streakDays = 0;
       let isStreakAchieved = false;
@@ -149,36 +146,36 @@ export default function Dashboard() {
         streakDays = Number(data.streak_days ?? data.continuous_days ?? 0);
         isStreakAchieved = data.is_streak_achieved ?? (streakDays > 0);
       }
+      setGoal(data.goal)
       setConsecutiveLoginDays(streakDays);
       setLoginError(false);
       updateLoginMessage(streakDays, isStreakAchieved ? 1 : 0);
 
       const targetData = data.spaces || data;
 
-      const convertAndFilter = (list: any[]): Space[] => {
+      const convertSpaces = (list: any[]): Space[] => {
         if (!Array.isArray(list)) return [];
         return list.map((s) => ({
           id: String(s.id),
           name: String(s.name),
-          space_type: Number(s.space_type),
-          favorite: Number(s.favorite_flag),
-          is_archived: Number(s.is_archived),
-          task_count: Number(s.task_count || 0),
-          question_count: Number(s.question_count || 0),
+          space_type: Number(s.space_type ?? s.spaceType),
+          favorite: Number(s.favorite_flag ?? s.favoriteFlag ?? 0),
+          is_archived: Number(s.is_archived ?? s.isArchived ?? 0),
+          task_count: Number(s.task_count ?? s.taskCount ?? 0),
+          question_count: Number(s.question_count ?? s.questionCount ?? 0),
         }));
       };
 
       setSpaces({
-        chat: convertAndFilter(targetData.chat),
-        task: convertAndFilter(targetData.task),
-        question: convertAndFilter(targetData.question),
+        chat: convertSpaces(targetData.chat),
+        task: convertSpaces(targetData.task),
+        question: convertSpaces(targetData.question),
       });
 
       return targetData;
+
     } catch (error) {
       console.error("取得失敗:", error);
-      toast.error("サーバーとの通信に失敗しました。DBが不安定な可能性があります。");
-      return null;
     } finally {
       setIsLoading(false);
     }
@@ -199,20 +196,25 @@ export default function Dashboard() {
   const handleToggleGoalStatus = async () => {
     if (!goal) return;
     const newStatus = goal.status === 1 ? 0 : 1;
+    setGoal(prev => prev ? { ...prev, status: newStatus } : null);
+
     try {
-      const res = await fetch("/api/goal/status", {
+      const res = await fetchWithTimeout("/api/goal/status", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus })
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        handleApiResponse(res);
+        throw new Error();
+      }
+      const data = await res.json();
+      setGoal(data.updatedGoal);
 
       // クライアント側のステートも即座に更新して fetchSpaces の無駄な通信を削減
-      setGoal(prev => prev ? { ...prev, status: newStatus } : null);
-      toast.success("目標ステータスを更新しました。");
+      toast.success(data.message);
     } catch (error: any) {
       console.error(error);
-      toast.error(error.message || "目標ステータスの更新に失敗しました。");
     }
   };
   // 削除処理（トースト確認付き）
@@ -223,28 +225,42 @@ export default function Dashboard() {
           本当に削除しますか？
         </span>
         <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
+          {/* Cancelボタンを先に配置 */}
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            style={{ padding: "6px 12px", fontSize: "12px", background: "#f1f5f9", color: "#64748b", border: "1px solid #cbd5e1", borderRadius: "6px", cursor: "pointer", fontWeight: "500" }}
+          >
+            Cancel
+          </button>
+          {/* ボタンを配置 */}
           <button
             onClick={async () => {
               toast.dismiss(t.id);
               try {
-                const res = await fetch(`/api/spaces/${id}?space_type=${spaceType}`, { method: "DELETE" });
-                const result = await res.json().catch(() => ({}));
-                if (!res.ok) throw new Error(result.error || "操作に失敗しました");
+                const res = await fetchWithTimeout(`/api/spaces/${id}?spaceType=${spaceType}`, { method: "DELETE" });
+                if (!res.ok) {
+                  handleApiResponse(res);
+                  throw new Error();
+                }
+                const data = await res.json();
+                setSpaces((prev) => {
+                  const key = spaceType === "1" ? "chat" : spaceType === "2" ? "task" : "question";
 
-                toast.success(result.message || "スペースを削除しました。");
-                await fetchSpaces();
+                  return {
+                    ...prev,
+                    [key]: prev[key].filter((space) => space.id !== id)
+                  };
+                });
+                toast.success(data.message || "スペースを削除しました。");
               } catch (e: any) {
-                toast.error(e.message || "削除に失敗しました");
+                console.log(e);
               }
             }}
             style={{ padding: "4px 10px", fontSize: "12px", background: "#ef4444", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" }}
-          >OK</button>
-          <button
-            onClick={() => toast.dismiss(t.id)}
-            style={{ padding: "6px 12px", fontSize: "12px", background: "#f1f5f9", color: "#64748b", border: "1px solid #cbd5e1", borderRadius: "6px", cursor: "pointer", fontWeight: "500" }}
-          >Cancel</button>
-        </div>
-      </div>
+          >
+            OK
+          </button>
+        </div>      </div>
     ), {
       duration: Infinity,
       position: "top-center",
@@ -400,36 +416,94 @@ export default function Dashboard() {
               return;
             }
           }
-          const isEditingExistingSpace = editingSpace && editingSpace.id !== "new_goal" && editingSpace.id !== "edit_goal";
+          const isEditingExistingSpace = editingSpace && editingSpace.id;
           const url = isGoal
             ? "/api/goal"
             : (isEditingExistingSpace ? `/api/spaces/${editingSpace.id}` : "/api/spaces");
 
           const bodyData = isGoal
             ? { content: name }
-            : { name: name.trim(), space_type: Number(selectedType), favorite_flag, is_archived };
+            : { name: name.trim(), favoriteFlag: favorite_flag, isArchived: is_archived };
 
           const method = isEditingExistingSpace ? "PATCH" : "POST";
-
+          console.log(bodyData);
           try {
-            const res = await fetch(url, {
+            const res = await fetchWithTimeout(url, {
               method: method,
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(bodyData),
             });
 
             if (!res.ok) {
-              const errorResult = await res.json().catch(() => ({}));
-              throw new Error(errorResult.error || (isGoal ? "目標の保存に失敗しました。" : "スペースの保存に失敗しました。"));
+              handleApiResponse(res);
+              throw new Error();
             }
+            const data = await res.json();
             toast.success(isGoal ? "目標を保存しました！" : "スペースを保存しました！");
             setIsModalOpen(false);
             setEditingSpace(null);
-            await fetchSpaces();
             window.dispatchEvent(new Event("refresh-header"));
+            if (isGoal) {
+              // 目標の場合
+              if (data.updatedGoal) setGoal(data.updatedGoal);
+            } else {
+              // スペースの更新（編集）の場合
+              if (isEditingExistingSpace) {
+                setSpaces((prev) => {
+                  const selectedNum = Number(selectedType);
+                  const key = selectedNum === 1 ? "chat" : selectedNum === 2 ? "task" : "question";
+
+                  return {
+                    ...prev,
+                    [key]: prev[key].map((s) => {
+                      if (s.id === editingSpace.id) {
+                        const updated = data.updatedSpace || {};
+                        return {
+                          ...s,
+                          name: updated.name ?? s.name,
+                          // 💡 APIから返ってくる favoriteFlag（またはfavorite_flag）を favorite に確実マッピング
+                          favorite: Number(updated.favoriteFlag ?? updated.favorite_flag ?? updated.favorite ?? s.favorite),
+                          // 💡 APIのキャメルケース（isArchived）をフロントのスネークケース（is_archived）に確実に変換
+                          is_archived: Number(
+                            updated.isArchived !== undefined ? updated.isArchived :
+                              updated.is_archived !== undefined ? updated.is_archived : s.is_archived
+                          ),
+                          task_count: Number(updated.taskCount ?? updated.task_count ?? s.task_count),
+                          question_count: Number(updated.questionCount ?? updated.question_count ?? s.question_count),
+                        };
+                      }
+                      return s;
+                    })
+                  };
+                });
+              } else {
+                // 新規作成：該当する配列にデータを追加
+                setSpaces((prev) => {
+                  const newSpace = data.space || {};
+                  const currentSpaceType = Number(newSpace.spaceType ?? selectedType);
+                  const key = currentSpaceType === 1 ? "chat" : currentSpaceType === 2 ? "task" : "question";
+
+                  const formattedNewSpace = {
+                    id: String(newSpace.id),
+                    name: String(newSpace.name ?? name),
+                    space_type: currentSpaceType,
+                    favorite: Number(newSpace.favoriteFlag ?? 0),
+                    is_archived: Number(is_archived ?? newSpace.isArchived ?? 0),
+                    task_count: 0,
+                    question_count: 0,
+                  };
+
+                  console.log("【画面に追加するデータ検証（修正完了版）】", formattedNewSpace);
+
+                  return {
+                    ...prev,
+                    [key]: [...prev[key], formattedNewSpace]
+                  };
+                });
+              }
+            }
           } catch (error: any) {
             console.error(error);
-            toast.error(error.message || "通信エラーが発生しました。");
           }
         }}
       />

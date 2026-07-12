@@ -17,7 +17,10 @@ export async function DELETE(
         
         if (!success) return NextResponse.json({ error: MESSAGES.E2004("スペース") }, { status: 500 });
         
-        return NextResponse.json({ message: MESSAGES.S1003("スペース") });
+         return NextResponse.json({ 
+            success: true, 
+            message: MESSAGES.S1003("アーカイブされたスペース全削除") 
+        });
     } catch (error) {
         return NextResponse.json({ error: MESSAGES.E2004("スペース") }, { status: 500 });
     }

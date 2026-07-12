@@ -51,9 +51,10 @@ export default function MyPage() {
           await handleApiResponse(res); // 内部のthrowを待つ
           throw new Error(); // 明示的にエラーを投げる
       }
-      const json = await res.json();
+      const data = await res.json();
+      console.log(data);
       
-      const rawSpaces = json.spaces || { chat: [], task: [], question: [] };
+      const rawSpaces = data.spaces || { chat: [], task: [], question: [] };
       const allItems = [
         ...(rawSpaces.chat || []),
         ...(rawSpaces.task || []),
@@ -69,10 +70,10 @@ export default function MyPage() {
         question: rawSpaces.question || [],
       });
 
-      setUsername(json.user?.username);
-      setImageCount(json.imageCount || 0);
+      setUsername(data.user?.username);
+      setImageCount(data.imageCount || 0);
     } catch (e) {
-      ToiToiNotification.error("データ取得に失敗しました");
+      console.log(e)
     } finally {
       setLoading(false);
     }
@@ -113,14 +114,16 @@ export default function MyPage() {
         await handleApiResponse(res); // 内部のthrowを待つ
         throw new Error(); // 明示的にエラーを投げる
       }
+      const data = await res.json();
       
       if (action === "user/account") {
         await signOut({ callbackUrl: "/" });
         return;
       }
       await fetchData();
+      ToiToiNotification.success(data.message);
     } catch (e: any) {
-      ToiToiNotification.error(e.message || "処理に失敗しました");
+      console.log(e);
     } finally {
       setIsDeleting(false);
     }
@@ -139,13 +142,12 @@ export default function MyPage() {
         await handleApiResponse(res); // 内部のthrowを待つ
         throw new Error(); // 明示的にエラーを投げる
       }
-      const result = await res.json();
-      
-      ToiToiNotification.success("ユーザー名を変更しました");
+      const data = await res.json();
+      ToiToiNotification.success(data.message);
       setUsername(newName);
       onClose();
     } catch (e: any) {
-      ToiToiNotification.error(e.message);
+      console.log(e);
     } finally {
       setIsSaving(false);
     }

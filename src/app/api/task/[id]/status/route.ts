@@ -3,6 +3,7 @@ import { getTaskCheck, updateStatusTask } from "@/services/TaskService";
 import { getAuthContext } from "@/lib/auth-guard";
 import { MESSAGES } from "@/constants/messages";
 import { getSpaceCheck } from "@/services/SpaceService";
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -14,18 +15,20 @@ export async function PATCH(
     const { id } = await params;
     const taskId = Number(id);
     
-    // ボディからの値取得
+    // ボディからの値取得 (💡設計書に合わせて spaceId に変更)
     const body = await request.json();
-    const { status, space_id } = body;
+    const { status, spaceId } = body;
 
-    // 必須チェック (statusとspace_idは更新に必須とする)
-    if (status === undefined || !space_id) {
+    const spaceIdNum = Number(spaceId);
+
+    // 必須チェック (💡 0が送られてきても弾かれないように修正)
+    if (status === undefined || !spaceId || isNaN(spaceIdNum)) {
       return NextResponse.json({ message: MESSAGES.E1001("ステータスまたはスペースID") }, { status: 400 });
     }
 
-    const [isSpaceAlive, isTaslAlive] = await Promise.all([
-      getSpaceCheck(auth.user_id, space_id), // ※関数名が推測ですが合わせる
-      getTaskCheck(auth.user_id, space_id, Number(id))
+    const [isSpaceAlive, isTaskAlive] = await Promise.all([
+      getSpaceCheck(auth.user_id, spaceIdNum), 
+      getTaskCheck(auth.user_id, spaceIdNum, taskId) // 💡 Number(id)をtaskIdに変えてスッキリ
     ]);
 
     // スペースチェックの判定
@@ -33,14 +36,14 @@ export async function PATCH(
         return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
 
-    if (!isTaslAlive) {
+    if (!isTaskAlive) {
         return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
     }
 
-    // 更新処理
+    // 更新処理 (💡 サービス層の引数の順番が spaceIdNum かどうか確認してください)
     const updated = await updateStatusTask(
       taskId,
-      space_id,
+      spaceIdNum, // 💡 サービスに渡す
       auth.user_id,
       status
     );

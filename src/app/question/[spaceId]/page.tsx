@@ -1,19 +1,21 @@
 "use client";
-
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import toast, { Toaster } from "react-hot-toast";
-import { MESSAGES } from "@/constants/messages";
 import { useRouter, useParams } from "next/navigation";
 import TaskModal from "@/components/TaskModal";
+import { fetchWithTimeout } from "@/lib/api";
+import { handleApiResponse } from "@/lib/api-utils";
+import { ToiToiNotification } from "@/components/Toast";
 import { Loading } from "@/components/LoadingSpinner";
+import { useCelebration, Celebration } from "@/components/Celebration";
 
 export default function QuestionPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const params = useParams();
-
-  const space_id = params?.space_id;
+  const space_id = params?.spaceId;
+  console.log(space_id)
 
   // 状態管理
   const [questions, setQuestions] = useState<any[]>([]);
@@ -26,10 +28,9 @@ export default function QuestionPage() {
   const [searchTag, setSearchTag] = useState<string>("");
   const [searchKnowledge, setSearchKnowledge] = useState<string>("");
 
-   //お祝い演出
-    const [showCelebration, setShowCelebration] = useState(false);
-    const [celebrationOpacity, setCelebrationOpacity] = useState(false);
-  
+  //お祝い演出
+  const { showCelebration, celebrationOpacity, triggerCelebration } = useCelebration();
+
   // 1. 初期表示・セッション有効チェック
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -39,18 +40,22 @@ export default function QuestionPage() {
 
   // 2. 質問サービス：getQuestions の実行
   const fetchQuestions = useCallback(async () => {
+
     if (!space_id) return;
     try {
       setIsLoading(true);
-      const res = await fetch(`/api/questions?space_id=${space_id}&space_id=${space_id}`, {
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error("質問データの取得に失敗しました。");
+      const res = await fetchWithTimeout(`/api/questions?spaceId=${space_id}`);
+      if (!res.ok) {
+        handleApiResponse(res);
+        throw new Error();
+      }
       const data = await res.json();
-      const list = Array.isArray(data) ? data : (data.questions || []);
-      setQuestions(list);
+      console.log(data);
+      setQuestions(data.questions || []);
+      setIsLoading(false);
+      // ToiToiNotification.success(data.message);
     } catch (error: any) {
-      toast.error(error.message || "通信エラーが発生しました。");
+      console.log(error);
     } finally {
       setIsLoading(false);
     }
@@ -64,7 +69,9 @@ export default function QuestionPage() {
 
   // 3. チェックマーク押下・ステータス更新
   const handleStatusToggle = async (question: any) => {
+    console.log(question);
     const currentStatus = Number(question.is_resolved ?? question.status);
+    const targetId = question.id;
     const newStatus = currentStatus === 1 ? 0 : 1;
     const previousQuestions = [...questions];
     setQuestions(
@@ -74,55 +81,38 @@ export default function QuestionPage() {
           : q
       )
     );
-
     try {
-      const res = await fetch(`/api/questions/${question.id}`, {
+      const res = await fetchWithTimeout(`/api/questions/${space_id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...question,
           status: newStatus,
-          is_resolved: newStatus,
-          space_id: Number(space_id),
+          isResolved: newStatus,
+          questionId: targetId,
         }),
       });
-
-      if (res.ok) {
-        if (newStatus === 1) {
-          triggerCelebration();
-        } else {
-          toast("未解決に戻しました。");
-        }
-
-        const refreshRes = await fetch(`/api/questions?space_id=${space_id}&space_id=${space_id}`);
-        if (refreshRes.ok) {
-          const data = await refreshRes.json();
-          const list = Array.isArray(data) ? data : (data.questions || []);
-          setQuestions(list);
-        }
-      } else {
-        toast.error("更新に失敗しました。元に戻します。");
-        setQuestions(previousQuestions);
+      if (!res.ok) {
+        handleApiResponse(res);
+        throw new Error();
       }
+      const data = await res.json();
+
+      setQuestions((prev) =>
+        prev.map((q) => (q.id === question.id ? { ...q, ...data.updatedQuestion } : q))
+      );
+
+      if (newStatus === 1) {
+        triggerCelebration();
+      } else if (newStatus === 0) {
+        toast("未解決に戻しました。");
+      } fetchQuestions();
     } catch (error) {
       console.error(error);
-      toast.error("通信エラーが発生したため、元に戻します。");
       setQuestions(previousQuestions);
     }
   };
 
-  const triggerCelebration = () => {
-    toast.success("質問解決おめでとうございます！", {
-      style: {
-        border: '2px solid #10B981',
-        padding: '16px',
-        color: '#065F46',
-        fontWeight: 'bold',
-        background: '#ECFDF5',
-      },
-      duration: 4000,
-    });
-  };
 
   // 4. 削除処理
   const handleDelete = async (id: number) => {
@@ -143,28 +133,19 @@ export default function QuestionPage() {
               toast.dismiss(t.id);
               const previousQuestions = [...questions];
               setQuestions(questions.filter((q) => q.id !== id));
-
               try {
-                const res = await fetch(`/api/questions/${id}?space_id=${space_id}`, {
+                const res = await fetchWithTimeout(`/api/questions/${space_id}?questionId=${id}`, {
                   method: "DELETE",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ space_id: Number(space_id) }),
                 });
-                const data = await res.json();
-                if (res.ok) {
-                  toast.success(data.message || "削除しました。");
-                  const refreshRes = await fetch(`/api/questions?space_id=${space_id}&space_id=${space_id}`);
-                  if (refreshRes.ok) {
-                    const data = await refreshRes.json();
-                    setQuestions(Array.isArray(data) ? data : (data.questions || []));
-                  }
-                } else {
-                  toast.error(MESSAGES.E2004("質問") + " 元に戻します。");
-                  setQuestions(previousQuestions);
+                if (!res.ok) {
+                  handleApiResponse(res);
+                  throw new Error();
                 }
+                const data = await res.json();
+                ToiToiNotification.success(data.message);
               } catch (error) {
                 console.error(error);
-                toast.error("通信エラーが発生したため、元に戻します。");
                 setQuestions(previousQuestions);
               }
             }}
@@ -182,20 +163,30 @@ export default function QuestionPage() {
 
   const handleModalSubmit = async (payload: any) => {
     const isEdit = modalMode === "edit";
-    const url = isEdit ? `/api/questions/${selectedQuestion.id}` : `/api/questions`;
+    const url = isEdit ? `/api/questions/${space_id}` : `/api/questions`;
     const method = isEdit ? "PATCH" : "POST";
+
+    const formattedPayload = {
+      ...payload,
+      space_id: Number(space_id),
+      is_resolved: isEdit ? Number(payload.status ?? selectedQuestion.is_resolved) : 0
+
+    };
 
     try {
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(formattedPayload),
       });
 
       if (res.ok) {
         toast.success(isEdit ? "質問を更新しました" : "質問を作成しました");
         setIsModalOpen(false);
-        fetchQuestions(); // リスト再取得
+        fetchQuestions();
+        if (isEdit && formattedPayload.is_resolved === 1) {
+          triggerCelebration();
+        }
       } else {
         toast.error(isEdit ? "更新に失敗しました" : "作成に失敗しました");
       }
@@ -366,35 +357,40 @@ export default function QuestionPage() {
         </div>
       )}
 
-       {/*お祝い演出*/}
-        {showCelebration && (
-          <div
-            className={`fixed inset-0 flex items-center justify-center z-50 pointer-events-none
+      {/*お祝い演出*/}
+      {showCelebration && (
+        <div
+          className={`fixed inset-0 flex items-center justify-center z-50 pointer-events-none
               transition-all duration-500 ease-out
               ${celebrationOpacity
-                ? "opacity-100 translate-y-0"
-                : "opacity-0 -translate-y-8"
-              }
+              ? "opacity-100 translate-y-0"
+              : "opacity-0 -translate-y-8"
+            }
               }`}
-          >
-            <img
-              src="/complete.png"
-              alt="お祝い"
-              className={`max-w-[90vw] w-full transform transition-all duration-500 scale-100`}
-            />
-          </div>
-        )}
+        >
+          <img
+            src="/complete.png"
+            alt="お祝い"
+            className={`max-w-[90vw] w-full transform transition-all duration-500 scale-100`}
+          />
+        </div>
+      )}
 
-      {/* 5. 共通モーダル*/}
+      <Celebration show={showCelebration} opacity={celebrationOpacity} />
+
       {isModalOpen && (
         <TaskModal
           task={selectedQuestion}
           mode={modalMode}
-          space_id={space_id}
+          spaceId={Number(space_id)}
           type="question"
           onClose={() => setIsModalOpen(false)}
-          onSubmit={handleModalSubmit}
           onError={(msg: string) => toast.error(msg)}
+          onSubmit={handleModalSubmit}
+          onSuccess={() => {
+            setIsModalOpen(false);
+            fetchQuestions();
+          }}
         />
       )}
     </div>

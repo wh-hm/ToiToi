@@ -1,4 +1,5 @@
 "use client";
+
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -7,6 +8,7 @@ import { MESSAGES } from "@/constants/messages";
 import TaskList from "@/components/TaskList";
 import TaskModal from "@/components/TaskModal";
 import { Loading } from "@/components/LoadingSpinner";
+import { useCelebration, Celebration } from "@/components/Celebration";
 
 export default function TaskPage() {
   const { data: session, status } = useSession();
@@ -33,42 +35,15 @@ export default function TaskPage() {
   const [searchKnowledge, setSearchKnowledge] = useState<string>("");
 
   //お祝い演出
-  const [showCelebration, setShowCelebration] = useState(false);
-  const [celebrationOpacity, setCelebrationOpacity] = useState(false);
-
-  const triggerCelebration = () => {
-    /*
-    toast.success("タスク完了！お疲れ様でした！ ", {
-      style: {
-        border: '2px solid #10B981',
-        padding: '16px',
-        color: '#065F46',
-        fontWeight: 'bold',
-        background: '#ECFDF5',
-        fontSize: '15px',
-      },
-        duration: 4000,
-      });
-     }; */
-    setShowCelebration(true);
-
-    setTimeout(() => {
-      setCelebrationOpacity(true);
-    }, 50);
-    setTimeout(() => {
-      setCelebrationOpacity(false);
-      setTimeout(() => {
-        setShowCelebration(false);
-      }, 500);
-    }, 1500);
-  };
+  const { showCelebration, celebrationOpacity, triggerCelebration } = useCelebration();
 
   // 2. タスクデータの取得
   const fetchTasks = useCallback(async () => {
     if (!space_id) return;
 
     try {
-      const res = await fetch(`/api/task?space_id=${space_id}`, {
+      // API側の仕様に合わせて spaceId に変更
+      const res = await fetch(`/api/task?spaceId=${space_id}`, {
         cache: "no-store",
       });
       if (!res.ok) throw new Error("API error");
@@ -181,16 +156,16 @@ export default function TaskPage() {
               });
 
               try {
-                // パラメータ重複を修正
-                const res = await fetch(`/api/task/${id}?space_id=${space_id}`, {
+                // API側の仕様に合わせて spaceId に変更
+                const res = await fetch(`/api/task/${id}?spaceId=${space_id}`, {
                   method: "DELETE",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ space_id: Number(space_id) }),
+                  body: JSON.stringify({ spaceId: Number(space_id) }),
                 });
                 const data = await res.json();
                 if (res.ok) {
                   toast.success(data.message || "削除しました");
-                  const refreshRes = await fetch(`/api/task?space_id=${space_id}`);
+                  const refreshRes = await fetch(`/api/task?spaceId=${space_id}`);
                   if (refreshRes.ok) {
                     const data = await refreshRes.json();
                     setTaskData({
@@ -246,7 +221,7 @@ export default function TaskPage() {
         body: JSON.stringify({
           ...task,
           status: newStatus,
-          space_id: Number(space_id),
+          spaceId: Number(space_id), // API側の仕様に合わせて変更
         }),
       });
       if (res.ok) {
@@ -255,8 +230,8 @@ export default function TaskPage() {
         } else {
           toast("未完了に戻しました");
         }
-        // パラメータ重複を修正
-        const refreshRes = await fetch(`/api/task?space_id=${space_id}`);
+        // リフレッシュ処理も spaceId に変更
+        const refreshRes = await fetch(`/api/task?spaceId=${space_id}`);
         if (refreshRes.ok) {
           const data = await refreshRes.json();
           setTaskData({
@@ -363,6 +338,8 @@ export default function TaskPage() {
           </div>
         )}
 
+        <Celebration show={showCelebration} opacity={celebrationOpacity} />
+
         {/* メインコンテンツ */}
         <main className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
           <TaskList
@@ -375,65 +352,26 @@ export default function TaskPage() {
         </main>
       </div>
 
-      {/* 5. 共通モーダル*/}
       {isModalOpen && (
         <TaskModal
           mode={modalMode}
           task={editingTask}
-          space_id={space_id}
+          spaceId={space_id}
           type="task"
           onClose={() => setIsModalOpen(false)}
           onError={(msg: string) => toast.error(msg)}
-          onSave={async (title: string, description: string, dueDateString?: string) => {
-            if (!title.trim()) {
-              toast.error("タスク名を入力してください。");
-              return false;
-            }
-            if (!description || !description.trim()) {
-              toast.error("詳細を入力してください。");
-              return false;
-            }
-            if (dueDateString) {
-              const selectedDate = new Date(dueDateString);
-              const now = new Date();
-
-              if (selectedDate < now) {
-                toast.error("過去の日時は期限に設定できません。");
-                return false;
-              }
-            }
-            if (title.length > 20) {
-              toast.error("タスク名は20文字以内で入力してください。");
-              return false;
-            }
-            if (description && description.length > 100) {
-              toast.error("詳細は100文字以内で入力してください。");
-              return false;
-            }
-            const safeRegex = /[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uFF01-\uFF5E]/;
-            const titleNoSpace = title.replace(/\s+/g, '');
-            const descNoSpace = description.replace(/\s+/g, '');
-
-            if (safeRegex.test(titleNoSpace)) {
-              toast.error("タスク名に記号は使用できません。");
-              return false;
-            }
-            if (safeRegex.test(descNoSpace)) {
-              toast.error("詳細に記号は使用できません。");
-              return false;
-            }
-            return true;
-          }}
-          onSuccess={async () => {
+          onSuccess={async (newStatus: number) => {
             setIsModalOpen(false);
             if (modalMode === "edit") {
               toast.success(MESSAGES.S1002("タスク"));
+            if (newStatus === 1) {
+                triggerCelebration();
+              }
             } else {
               toast.success(MESSAGES.S1001("タスク"));
             }
             try {
-              // パラメータ重複を修正
-              const res = await fetch(`/api/task?space_id=${space_id}`);
+              const res = await fetch(`/api/task?spaceId=${space_id}`);
               if (res.ok) {
                 const data = await res.json();
                 setTaskData({

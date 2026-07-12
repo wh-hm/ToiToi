@@ -62,7 +62,10 @@ export async function PATCH(request: Request) {
         deleted_at: deletedAt,
       },
     });
-    return NextResponse.json(goal);
+    return NextResponse.json({ 
+        goal: goal, 
+        message: MESSAGES.S1002("目標") 
+    }, { status: 200 });
   } catch (error) {
     console.error("目標更新エラー:", error);
 

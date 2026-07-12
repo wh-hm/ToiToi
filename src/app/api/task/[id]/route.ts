@@ -5,7 +5,7 @@ import { MESSAGES } from "@/constants/messages";
 import { getSpaceCheck } from "@/services/SpaceService";
 const safeRegex = /[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uFF01-\uFF5E]/;
 
-// 1. PATCH: タスク更新
+//  PATCH 関数
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -14,14 +14,25 @@ export async function PATCH(
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
+    // 1. URLパス（/api/task/[id]）から確実にタスクIDを取得
     const { id } = await params;
-    const taskId = Number(id);
-    const { title, description, due_date, space_id, tag, is_allday, priority, status } = await request.json();
+    const taskId = Number(id); 
+
+    // 2. リクエストボディからデータを取得（※ここから taskId は除外します！）
+    const { title, description, dueDate, tag, isAllday, priority, status, spaceId } = await request.json();
+    const spaceIdNum = Number(spaceId);
+
+    // ログで値が正常か確認（「result null」の前の数値が正しいかチェック用）
+    console.log("【デバッグ】", auth.user_id, "Space:", spaceIdNum, "Task:", taskId);
 
     // --- 単体チェック ---
     if (!title) return NextResponse.json({ message: MESSAGES.E1001("タスク名") }, { status: 400 });
-    if (!due_date) return NextResponse.json({ message: MESSAGES.E1001("期限") }, { status: 400 });
+    if (!dueDate) return NextResponse.json({ message: MESSAGES.E1001("期限") }, { status: 400 });
     if (!description) return NextResponse.json({ message: MESSAGES.E1001("詳細") }, { status: 400 });
+
+    if (isNaN(spaceIdNum) || isNaN(taskId)) {
+      return NextResponse.json({ message: "不正なスペースIDまたはタスクIDです。" }, { status: 400 });
+    }
 
     if (title.length > 20) return NextResponse.json({ message: MESSAGES.E1002("タスク名", 20) }, { status: 400 });
     if (description.length > 100) return NextResponse.json({ message: MESSAGES.E1002("詳細", 100) }, { status: 400 });
@@ -30,28 +41,33 @@ export async function PATCH(
       return NextResponse.json({ message: MESSAGES.E1003("タスク名または詳細", "記号") }, { status: 400 });
     }
 
-    if (isNaN(new Date(due_date).getTime())) {
+    if (isNaN(new Date(dueDate).getTime())) {
       return NextResponse.json({ message: MESSAGES.E1004 }, { status: 400 });
     }
-    console.log(taskId);
-    console.log(space_id);
-    const [isSpaceAlive, isTaslAlive] = await Promise.all([
-        getSpaceCheck(auth.user_id, space_id), // ※関数名が推測ですが合わせる
-        getTaskCheck(auth.user_id, space_id, taskId)
+
+    // 3. 存在チェック（URLから取得した taskId を確実に使用）
+    const [isSpaceAlive, isTaskAlive] = await Promise.all([
+        getSpaceCheck(auth.user_id, spaceIdNum),
+        getTaskCheck(auth.user_id, spaceIdNum, taskId) 
     ]);
 
-    // スペースチェックの判定
+    console.log("チェック結果 - Space:", isSpaceAlive, "Task:", isTaskAlive);
+
+    // 各種判定
     if (!isSpaceAlive) {
         return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
 
-    if (!isTaslAlive) {
+    if (!isTaskAlive) {
         return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
     }
 
-    const updated = await updateTask(taskId, auth.user_id, title, description, due_date, space_id, tag, is_allday, priority, status);
+    // 4. 更新処理の実行
+    const updated = await updateTask(taskId, auth.user_id, title, description, dueDate, spaceIdNum, tag, isAllday, priority, status);
+
     return NextResponse.json(updated);
   } catch (error) {
+    console.error("PATCHタスクエラー詳細:", error);
     return NextResponse.json({ message: MESSAGES.E2002("タスク") }, { status: 500 });
   }
 }
@@ -59,19 +75,37 @@ export async function PATCH(
 // 2. DELETE: タスク削除
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ spaceId: string }> }
 ) {
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
     
   try {
-    const { id } = await params;
+    const { spaceId } = await params;
     // DELETEメソッドではボディを読み取らないのが安全なため、クエリパラメータから取得を推奨します
     const { searchParams } = new URL(request.url);
-    const space_id = Number(searchParams.get("space_id"));
+    const taskId = Number(searchParams.get("taskId"));
+    
+    const spaceIdNum = Number(spaceId);
+    if (!spaceIdNum || isNaN(spaceIdNum)) return NextResponse.json({ message: MESSAGES.E1001("スペースID") }, { status: 400 });
 
+    if (!taskId || isNaN(taskId)) return NextResponse.json({ message: MESSAGES.E1001("タスクID") }, { status: 400 });
+console.log("taskId", taskId, spaceIdNum, auth.user_id)
+    const [isSpaceAlive, isTaskAlive] = await Promise.all([
+        getSpaceCheck(auth.user_id, spaceIdNum), // ※関数名が推測ですが合わせる
+        getTaskCheck(auth.user_id, spaceIdNum, taskId)
+    ]);
 
-    const success = await deleteTask(Number(id), auth.user_id, space_id);
+    // スペースチェックの判定
+    if (!isSpaceAlive) {
+        return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+    }
+
+    if (!isTaskAlive) {
+        return NextResponse.json({ message: MESSAGES.E1010("タスク") }, { status: 409 });
+    }
+
+    const success = await deleteTask(taskId, auth.user_id, spaceIdNum);
     if (!success) return NextResponse.json({ message: MESSAGES.E2004("タスク") }, { status: 500 });
 
     return NextResponse.json({ message: MESSAGES.S1003("タスク") });
