@@ -35,14 +35,6 @@ const ChatList = forwardRef<HTMLDivElement, ChatListProps>(({
     setShowScrollButton(scrollHeight - scrollTop - clientHeight > 200);
   };
 
-  useEffect(() => {
-  console.log("【状態変化】isErrorが変化しました:", isError);
-}, [isError]);
-
-useEffect(() => {
-  console.log("【状態変化】isSubmittingが変化しました:", isSubmitting);
-}, [isSubmitting]);
-
   return (
     <div className="relative w-full h-full">
       <ScrollShadow 
@@ -76,6 +68,7 @@ useEffect(() => {
           (chats.map((chat) => (
           // chats.map((chat) => (
             <div key={`msg-${chat.id}`}>
+            
               <ChatMessageItem
                 message={chat}
                 spaceId={spaceId}
@@ -88,7 +81,7 @@ useEffect(() => {
                 onBackgroundChange={onBackgroundChange}
                 setEditValue={setEditValue}
                 onNiceFlag={onNiceFlag}
-                onImageClick={(url) => setZoomData({ url, caption: chat.message || "",  msg: chat})}
+                onImageClick={(url) => setZoomData({ url, caption: chat.image?.caption || "",  msg: chat})}
                 onDownload={(url) => onDownload(url, String(chat.id))}
                 onScrollBottom={(force) => onScrollBottom(force)}
                 type={type}
@@ -115,10 +108,8 @@ useEffect(() => {
           c.id === currentZoomData.msg.id || 
           (c.signedImageUrl && c.signedImageUrl === currentZoomData.url)
         ) || currentZoomData.msg;
-
         return (
           <ImageZoomModal 
-          
             isOpen={!!currentZoomData} 
             onClose={() => setZoomData(null)} 
             imageUrl={currentZoomData.url} 

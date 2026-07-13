@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { Space } from "@prisma/client";
 import { Prisma } from "@prisma/client";
+import { deleteImages } from "./StorageService";
 
 export type Tx = Omit<Prisma.TransactionClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
@@ -112,21 +113,31 @@ export async function deleteSpaces(userId: string, spaceType: string, tx?: Tx): 
 // 概要：スペースチャット一括削除
 export async function deleteSpaceChat(spaceId: number, userId: string, tx?: Tx): Promise<boolean> {
   const db = tx || prisma;
+  
+  // 1. 削除対象の画像IDを先に特定
   const chats = await db.chat.findMany({
-    where: { spaceId, userId, delete_flag: 0 },
-    select: { id: true, image_url: true }
+    where: { space_id: spaceId, user_id: userId, delete_flag: 0 },
+    select: { id: true, image_id: true }
   });
 
   if (chats.length === 0) return true;
 
-  const chatIdList = chats.map(c => c.id);
+  const imageIds = chats.map(c => c.image_id).filter((id): id is number => id !== null);
+
+  // 2. 画像の物理削除を実行 (別関数を呼ぶ)
+  if (imageIds.length > 0) {
+    await deleteImages(imageIds); 
+  }
+
+  // 3. チャット本体を論理削除
   await db.chat.updateMany({
-    where: { id: { in: chatIdList } },
+    where: { id: { in: chats.map(c => c.id) } },
     data: { delete_flag: 1 }
   });
 
   return true;
 }
+
 
 export async function deleteSpaceTask(spaceId: number, userId: string, tx?: Tx): Promise<boolean> {
   const db = tx || prisma;
@@ -140,17 +151,27 @@ export async function deleteSpaceTask(spaceId: number, userId: string, tx?: Tx):
 
 export async function deleteSpaceQuestion(spaceId: number, userId: string, tx?: Tx): Promise<boolean> {
   const db = tx || prisma;
+  // 1. 質問を取得
   const questions = await db.question.findMany({
     where: { space_id: spaceId, user_id: userId, delete_flag: 0 },
     select: { id: true }
   });
-
   if (questions.length === 0) return true;
-  const ids = questions.map(q => q.id);
-
-  await db.question.updateMany({ where: { id: { in: ids } }, data: { delete_flag: 1 } });
-  await db.questionChats.updateMany({ where: { question_id: { in: ids } }, data: { delete_flag: 1 } });
-
+  const qIds = questions.map(q => q.id);
+  // 2. 紐付く画像IDを特定
+  const questionChats = await db.questionChats.findMany({
+    where: { question_id: { in: qIds } },
+    select: { image_id: true }
+  });
+  const imageIds = questionChats.map(c => c.image_id).filter((id): id is number => id !== null);
+  // 3. 【重要】画像を物理削除（R2削除 + DBレコード削除）
+  if (imageIds.length > 0) {
+    await deleteImages(imageIds); 
+  }
+  // 4. 本体を論理削除
+  await db.question.updateMany({ where: { id: { in: qIds } }, data: { delete_flag: 1 } });
+  await db.questionChats.updateMany({ where: { question_id: { in: qIds } }, data: { delete_flag: 1 } });
+  
   return true;
 }
 

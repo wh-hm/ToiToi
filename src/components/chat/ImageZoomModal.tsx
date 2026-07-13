@@ -1,4 +1,3 @@
-import { ChatMessage } from "@/types/chat";
 import { X, Download, Loader2 } from "lucide-react";
 import { ImageZoomModalProps } from "@/types/chat";
 
@@ -28,21 +27,19 @@ export const ImageZoomModal = ({
 
             {/* 💡 ツールチップのホバー検知用ラッパー */}
             <div className="relative group/tooltip">
+
               <button 
                 type="button"
                 onClick={() => {
-                  const targetUrl = msg.imageUrl || imageUrl;
-                  if (targetUrl && !isPending) {
-                    onDownload(targetUrl, chatId);
-                  }
+                  const storageKey = msg.image?.storage_key;
+                    if (storageKey && !isPending) {
+                      onDownload(storageKey, chatId);
+                    }
                 }}
-                // 💡 disabled の時は pointer-events-none をつけてボタン単体のイベントを切りつつ、
-                // カーソル自体は親の group/tooltip 側で制御します
                 className={`p-2 hover:bg-gray-100 rounded-full transition-colors ${
                   isDisabled ? 'opacity-50 pointer-events-none' : ''
                 }`}
                 disabled={isDisabled}
-                
               >
                 {/* 💡 isPending が true なら確実にぐるぐる回す */}
                 {isPending ? (

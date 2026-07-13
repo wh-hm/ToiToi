@@ -13,6 +13,12 @@ export interface ChatMessage {
   signedImageUrl?: string | null;
   previewImages?: string[] | null;
   isPending?: boolean;
+  image?: {
+    id: number;
+    storage_key: string;
+    caption: string
+    // 必要なら他のフィールドも追加
+  } | null;
 }
 
 export interface ChatInputProps {

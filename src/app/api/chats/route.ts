@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
     const files = formData.getAll("images") as File[];
     const spaceId = Number(formData.get("spaceId"));
     const stamp = formData.get("stamp") as string | null;
+    const caption = formData.get("caption") as string | null; // 追加
 
     const isSpaceAlive = await getSpaceCheck(auth.user_id, spaceId);
       
@@ -84,8 +85,10 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ message: MESSAGES.E1006 }, { status: 400 });
     }
 
+    console.log("受け取ったファイル数:", files.length);
     // 3. 画像アップロード
     if (files.length > 0) {
+    console.log("ファイル名:", files[0].name);
 
       const MAX_FILE_SIZE = 2 * 1024 * 1024;
       // 全ファイルのバリデーション
@@ -98,6 +101,7 @@ export async function POST(request: NextRequest) {
         }
       }
       imageUrls = await uploadImages(files, auth.user_id, spaceId);
+      console.log("uploadImagesの戻り値:", imageUrls);
     }
     // 4. DB登録 (ループで1枚ずつ登録)
     const newChat = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -108,10 +112,9 @@ export async function POST(request: NextRequest) {
           spaceId: spaceId,
           message: message || undefined,
           stamp: stamp || undefined,
-        });
+        }, tx);
         return [res]; // ★単一の結果も必ず配列 [res] にして返す
       }
-
       // 画像がある場合
       const results = [];
       for (let i = 0; i < imageUrls.length; i++) {
@@ -120,14 +123,17 @@ export async function POST(request: NextRequest) {
           spaceId: spaceId,
           message: message || undefined,
           imageUrl: imageUrls[i],
+          caption: caption || undefined, // キャプションを渡す
           stamp: i === 0 ? (stamp || undefined) : undefined,
-        });
+        }, tx); // tx を渡す
         results.push(res);
       }
       return results; // これは元から配列
     });
+    console.log("最終確認:", newChat);
+    const safeNewChat = JSON.parse(JSON.stringify(newChat));
     // ここで newChat は常に配列として返る。チャットのため成功時のメッセージは送らない
-    return NextResponse.json({ newChat: newChat, message: MESSAGES.S1001("チャット") }, { status: 201 });
+    return NextResponse.json({ newChat: safeNewChat , message: MESSAGES.S1001("チャット") }, { status: 201 });
 
 
   } catch (error) {
