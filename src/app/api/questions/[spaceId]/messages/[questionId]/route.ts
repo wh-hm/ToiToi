@@ -9,14 +9,14 @@ import { checkQuestion } from "@/services/QuestionService";
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string; questionId: string }> }
+  { params }: { params: Promise<{ spaceId: string; questionId: string }> }
 ) {
-  const { id, questionId } = await params;
+  const { spaceId, questionId } = await params;
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
-    const spaceId = Number(id);
+    const spaceIdNum = Number(spaceId);
     const questionIdNum = Number(questionId);
     // 1. 認証チェックを先に済ませる
     const { searchParams } = new URL(request.url);
@@ -27,25 +27,34 @@ export async function PATCH(
       return NextResponse.json({ message: MESSAGES.E1001("チャット内容") }, { status: 400 });
     }
 
+    console.log("データよ～",chatId, spaceIdNum, questionIdNum, auth.user_id, message);
+
+
     const [isSpaceAlive, usQuestionAlive, isChatAlive] = await Promise.all([
-      getSpaceCheck(auth.user_id, spaceId), // ※関数名が推測ですが合わせる
-      checkQuestion(auth.user_id, spaceId, questionIdNum),
+      getSpaceCheck(auth.user_id, spaceIdNum), // ※関数名が推測ですが合わせる
+      checkQuestion(auth.user_id, spaceIdNum, questionIdNum),
       checkQuestionChat(chatId, questionIdNum, auth.user_id)
     ]);
+    console.log("データよ～",chatId, questionIdNum, auth.user_id, message);
         
     // スペースチェックの判定
     if (!isSpaceAlive) {
         return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
+    console.log("データよ～",chatId, questionIdNum, auth.user_id, message);
+
     if (!isChatAlive) {
         return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
     }
+    console.log("データよ～",chatId, questionIdNum, auth.user_id, message);
 
     if (!usQuestionAlive) {
         return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
     }
+    console.log("データよ～",chatId, questionIdNum, auth.user_id, message);
 
-        const updatedChat = await updateQuestionChat(chatId, questionIdNum, auth.user_id, message);
+    
+    const updatedChat = await updateQuestionChat(chatId, questionIdNum, auth.user_id, message);
     
     if (!updatedChat) return NextResponse.json({ message: MESSAGES.E2001("チャット") }, { status: 404 });
     return NextResponse.json({ 

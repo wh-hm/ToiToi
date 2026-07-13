@@ -1,7 +1,7 @@
 import { X } from "lucide-react";
 import { PreviewModalProps } from "@/types/chat";
 
-export const PreviewModal = ({ isOpen, onClose, onConfirm, imageFiles, index }: PreviewModalProps) => {
+export const PreviewModal = ({ isOpen, onClose, imageFiles, index }: PreviewModalProps) => {
   if (!isOpen || index === null || !imageFiles || !imageFiles[index]) return null;
 
   const currentFile = imageFiles[index];

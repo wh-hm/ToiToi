@@ -61,13 +61,6 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
     }
   }, [status, router]);
 
-  // useEffect(() => {
-  //   if (messages.length > 0 && isInitialLoad.current) {
-  //     scrollToBottom(true);
-  //     isInitialLoad.current = false; // 初回だけ実行するようにフラグを折る
-  //   }
-  // }, [messages]); // messages が更新された（＝描画された）瞬間に実行される
-
   useEffect(() => {
       // Array.isArray(chats) で安全に配列かどうかを確認してから length を見る
     if (Array.isArray(messages) && messages.length > 0 && scrollRef.current && isInitialLoad.current) {
@@ -97,12 +90,12 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
       const { questionId, spaceId } = await params;
       const res = await fetchWithTimeout(`/api/questions/${spaceId}/messages?questionId=${questionId}`);
       const data = await res.json();
-
+        console.log("data", data);
       if (!res.ok) {
         await handleApiResponse(res); // 内部のthrowを待つ
         throw new Error(); // 明示的にエラーを投げる
       }
-      setMessages(data.messages || []);
+      setMessages(data.chats || []);
       setQuestion(data.question);
       
     } catch (error) {
@@ -130,18 +123,11 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
 
   const handleSend = async (stampId?: string) => {
     if (isSubmitting) return;
-    // 未入力時の空送信防止ガード句
     if (!stampId && !inputText.trim() && selectedFiles.length === 0) return;
-
-    // ★送信失敗時の復元用にバックアップ
     const backupInputText = inputText;
     const backupFiles = [...selectedFiles];
-
-    // 1. 仮メッセージ（pending）を作成
     const now = new Date().toISOString();
     const pendingMessages: ChatMessage[] = [];
-
-    
 
     if (stampId) {
       pendingMessages.push({ id: Date.now(), stamp: stampId, isPending: true, created_at: now } as ChatMessage);
@@ -150,17 +136,18 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
         selectedFiles.forEach((file, i) => {
           pendingMessages.push({
             id: Date.now() + i,
-            signedImageUrl: URL.createObjectURL(file), // 表示用ローカルURL
-            isPending: false,
-            created_at: now,
-            message: inputText, // 画像と一緒に送るメッセージ
+            signedImageUrl: URL.createObjectURL(file),
+            isPending: true,
+            created_at: new Date().toISOString(), // 必須項目
+            image: {
+              caption: inputText
+            }
           } as ChatMessage);
         });
       } else {
         pendingMessages.push({ id: Date.now(), message: inputText, isPending: true, created_at: now } as ChatMessage);
       }
     }
-
     // 2. 楽観的更新 (UIに即座に反映)
     setMessages((prev) => [...prev, ...pendingMessages]);
     scrollToBottom(false);
@@ -179,8 +166,14 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
     if (stampId) {
       formData.append("stamp", stampId);
     } else {
-      if (inputText.trim()) formData.append("message", inputText);
-      selectedFiles.forEach((file) => formData.append("images", file));
+      if (selectedFiles.length > 0) {
+        // ★修正: 画像がある場合は message ではなく caption として送信
+        if (inputText.trim()) formData.append("caption", inputText);
+        selectedFiles.forEach((file) => formData.append("images", file));
+      } else {
+        // 画像がない場合は通常通り message として送信
+        if (inputText.trim()) formData.append("message", inputText);
+      }
     }
 
     try {
@@ -190,39 +183,26 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
         await handleApiResponse(res); // 内部のthrowを待つ
         throw new Error(); // 明示的にエラーを投げる
       }
-
-      // 4. サーバーからのレスポンス(先ほど作成したAPIは { messages: newChats } を返す)で置き換え
-      // 4. サーバーからのレスポンスで置き換え (修正後)
-    // 4. サーバーからのレスポンスで置き換え
-  if (data.messages && data.messages.length > 0) {
-    const serverItems = [...data.messages];
-    
-    setMessages((prev) => prev.map((msg) => {
-      if (msg.isPending) {
-        const match = serverItems.shift();
-        
-        if (match) {
-          return { 
-            ...msg,         // 1. まず仮データをベースにする（これで signedImageUrl: "blob:..." が残る！）
-            ...match,       // 2. サーバーの本物データ（IDなど）で上書き
-            
-            // 💡 ここが超重要！
-            // 画面表示用の url は、送信時に作ったローカルの "blob:..." を意地でもキープする！
-            signedImageUrl: msg.signedImageUrl, 
-            
-            // 💡 ダウンロードや拡大用に、サーバーから届いた本物のキーを別名で保存しておく
-            storageKey: match.signedImageUrl || match.imageUrl, 
-            
-            isPending: true 
-          };
-        }
-        return msg;
-      }
-      return msg;
-    }));
-  }
-
-    } catch (e: any) {
+      const confirmedData = data.chats || [];
+    // ★サーバーから返ってきたデータが一つ以上ある場合
+    if (data.chats && Array.isArray(data.chats)) {
+    setMessages((prev) => {
+        return prev.map(msg => {
+          if (msg.isPending) {
+            const match = confirmedData.shift();
+            if (!match) return msg;
+            return { 
+              ...msg, 
+              ...match, 
+              isPending: false,
+              image: match.image || null 
+            };
+          }
+          return msg;
+        });
+      });
+    }
+  } catch (e: any) {
       console.error(e);
       // ★エラー時にバックアップから復元
       if (!stampId) {
@@ -240,7 +220,6 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
 
   const handleUpdate = async (chatId: number) => {
     if (isSubmitting || !editValue.trim()) return;
-
     // 1. 更新前の状態を保存
     const previousMessages = [...messages];
 
@@ -250,10 +229,8 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
         msg.id === chatId ? { ...msg, message: editValue } : msg
       )
     );
-    // 3. UIを即座に閉じる
     setEditingId(null);
     setEditValue("");
-
     setIsSubmitting(true);
     try {
       const res = await fetchWithTimeout(`/api/questions/${spaceId}/messages/${questionId}?chatId=${chatId}`, {
@@ -267,13 +244,8 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
         await handleApiResponse(res); // 内部のthrowを待つ
         throw new Error(); // 明示的にエラーを投げる
       }
-      // 成功したら、サーバーから返された正式なデータでリストを更新するのが理想的です
-      // API側が更新後のデータを返しているなら、以下の処理でより正確になります
-      setMessages((prev) => prev.map(m => m.id === chatId ? data : m));
-
+      setMessages((prev) => prev.map(m => m.id === chatId ? data.updatedChat : m));
     } catch (e: any) {
-
-      // 4. 失敗したら元の状態へロールバック
       setMessages(previousMessages);
     } finally {
       setIsSubmitting(false);
