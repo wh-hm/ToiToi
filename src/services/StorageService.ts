@@ -43,8 +43,7 @@ export async function getImageCount(userId: string): Promise<number> {
     user_id: userId,
     delete_flag: 0,
     AND: [
-      { image_url: { not: null } },
-      { image_url: { not: "" } }
+      { image: { not: null } },
     ]
   };
 
