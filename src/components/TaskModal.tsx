@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { ToiToiNotification } from "@/components/Toast";
+import { Loading } from "./LoadingSpinner";
 
 export default function TaskModal(props: any): React.JSX.Element {
   const { task, onClose, onSuccess, spaceId, mode = 'create', type = 'task', onError, onSubmit } = props; 
@@ -76,7 +77,6 @@ export default function TaskModal(props: any): React.JSX.Element {
   };
 
   const handleSubmit = async () => {
-    if (isSubmitting) return;
 
     const titleText = formData.title?.trim() || "";
     const descText = formData.description?.trim() || "";
@@ -413,13 +413,24 @@ export default function TaskModal(props: any): React.JSX.Element {
           </button>
           {!isDetailMode && (
             <button
+              disabled={isSubmitting}
               onClick={handleSubmit}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium shadow-sm"
-            >
+              className="
+                bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 rounded-xl shadow-sm transition-all text-sm flex items-center gap-1
+                disabled:bg-gray-400 disabled:cursor-not-allowed disabled:shadow-none
+              "           
+             >
               {isEditMode ? "更新する" : "作成する"}
             </button>
           )}
         </div>
+        {(isSubmitting) && (
+          <div className="fixed inset-0 bg-black/5 backdrop-blur-[1px] z-50 flex items-center justify-center">
+            <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-100 max-w-xs w-full text-center">
+              <Loading text={isEditMode ? "更新中..." : "作成中..."} />
+            </div>
+          </div>
+        )}
 
       </div>
     </div>

@@ -4,11 +4,13 @@ import { useState, useEffect } from "react";
 export default function QuestionModal({ 
   onSave, 
   initialData, 
-  onClose 
+  onClose ,
+  isSubmitting
 }: { 
   onSave: (title: string, detail: string, tag: number, id?: number) => void,
   initialData?: any,
-  onClose: () => void 
+  onClose: () => void ,
+  isSubmitting: boolean
 }) {
   const [title, setTitle] = useState("");
   const [detail, setDetail] = useState("");
@@ -41,7 +43,9 @@ export default function QuestionModal({
         style={{ display: "block", marginBottom: "10px", width: "100%" }}
       />
       
-      <button onClick={() => {
+      <button 
+        disabled={isSubmitting}
+        onClick={() => {
         onSave(title, detail, 1, initialData?.id);
         onClose();
       }}>

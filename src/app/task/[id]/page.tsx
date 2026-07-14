@@ -10,6 +10,7 @@ import TaskModal from "@/components/TaskModal";
 import { Loading } from "@/components/LoadingSpinner";
 import { useCelebration, Celebration } from "@/components/Celebration";
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
+import { handleApiResponse } from "@/lib/api-utils";
 
 export default function TaskPage() {
   const { data: session, status } = useSession();
@@ -23,6 +24,7 @@ export default function TaskPage() {
     complete: [],
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   // モーダル制御用の状態
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -79,13 +81,17 @@ export default function TaskPage() {
   // 2. タスクデータの取得
   const fetchTasks = useCallback(async () => {
     if (!space_id) return;
+    
 
     try {
       const res = await fetch(`/api/task?spaceId=${space_id}`, {
         cache: "no-store",
       });
-      if (!res.ok) throw new Error("API error");
-
+      if (!res.ok) {
+        setError(true)
+        await handleApiResponse(res);
+        throw new Error("API error");
+      }
       const data = await res.json();
       console.log("認証情報を含めた最新データ:", data);
 
@@ -243,7 +249,11 @@ export default function TaskPage() {
           </div>
           <button
             onClick={handleCreateOpen}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 rounded-xl shadow-sm transition-all text-sm flex items-center gap-1"
+            disabled={error}
+            className="
+              bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 rounded-xl shadow-sm transition-all text-sm flex items-center gap-1
+              disabled:bg-gray-400 disabled:cursor-not-allowed disabled:shadow-none
+            "
           >
             <span>＋</span> 新規作成
           </button>
