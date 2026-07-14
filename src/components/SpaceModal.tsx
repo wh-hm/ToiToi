@@ -9,26 +9,26 @@ type SpaceModalProps = {
   editingSpace: {
     id: string;
     name: string;
-    space_type: number;
-    favorite: number;
-    is_archived: number;
+    spaceType: number;
+    favoriteFlag: number;
+    isArchived: number;
   } | null;
-  onSave: (name: string, selectedType: number, favorite_flag: number, is_archived: number) => Promise<void>;
+  onSave: (name: string, selectedType: number, favoriteFlag: number, isArchived: number) => Promise<void>;
 };
 
 export default function SpaceModal({ isOpen, onClose, spaceType, editingSpace, onSave }: SpaceModalProps) {
   const [name, setName] = useState("");
   const [selectedType, setSelectedType] = useState(spaceType);
-  const [favorite_flag, setFavoriteFlag] = useState(0);
-  const [is_archived, setIsArchived] = useState(0);
+  const [favoriteFlag, setFavoriteFlag] = useState(0);
+  const [isArchived, setIsArchived] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setName(editingSpace ? editingSpace.name : "");
-      setSelectedType(editingSpace ? editingSpace.space_type : spaceType);
-      setFavoriteFlag(editingSpace ? editingSpace.favorite : 0);
-      setIsArchived(editingSpace ? editingSpace.is_archived ?? 0 : 0);
+      setSelectedType(editingSpace ? editingSpace.spaceType : spaceType);
+      setFavoriteFlag(editingSpace ? editingSpace.favoriteFlag : 0);
+      setIsArchived(editingSpace ? editingSpace.isArchived ?? 0 : 0);
     }
   }, [isOpen, editingSpace, spaceType]);
 
@@ -37,7 +37,7 @@ export default function SpaceModal({ isOpen, onClose, spaceType, editingSpace, o
   const handleSave = async () => {
     setIsSubmitting(true);
     try {
-      await onSave(name, selectedType, favorite_flag, is_archived);
+      await onSave(name, selectedType, favoriteFlag, isArchived);
     } catch (error) {
       console.error("保存失敗:", error);
     } finally {
@@ -104,7 +104,7 @@ export default function SpaceModal({ isOpen, onClose, spaceType, editingSpace, o
           {spaceType !== 99 && (
             <button
               type="button"
-              onClick={() => setFavoriteFlag(favorite_flag === 0 ? 1 : 0)}
+              onClick={() => setFavoriteFlag(favoriteFlag === 0 ? 1 : 0)}
               style={{
                 position: "absolute",
                 right: "12px",
@@ -112,7 +112,7 @@ export default function SpaceModal({ isOpen, onClose, spaceType, editingSpace, o
                 border: "none",
                 cursor: "pointer",
                 fontSize: "20px",
-                color: favorite_flag === 1 ? "#eab308" : "#94a3b8",
+                color: favoriteFlag === 1 ? "#eab308" : "#94a3b8",
                 padding: "4px",
                 display: "flex",
                 alignItems: "center",
@@ -120,7 +120,7 @@ export default function SpaceModal({ isOpen, onClose, spaceType, editingSpace, o
               }}
               title="お気に入り"
             >
-              {favorite_flag === 1 ? "★" : "☆"}
+              {favoriteFlag === 1 ? "★" : "☆"}
             </button>
           )}
         </div>
@@ -137,7 +137,7 @@ export default function SpaceModal({ isOpen, onClose, spaceType, editingSpace, o
           {spaceType !== 99 && (
             <button
               type="button"
-              onClick={() => setIsArchived(is_archived === 0 ? 1 : 0)}
+              onClick={() => setIsArchived(isArchived === 0 ? 1 : 0)}
               style={{
                 marginRight: "auto",
                 padding: "0 20px",
@@ -147,12 +147,12 @@ export default function SpaceModal({ isOpen, onClose, spaceType, editingSpace, o
                 fontWeight: "bold",
                 fontSize: "13px",
                 transition: "all 0.2s ease",
-                background: is_archived === 1 ? "#e2e8f0" : "#ffffff",
-                color: is_archived === 1 ? "#334155" : "#475569",
-                border: is_archived === 1 ? "1px solid #cbd5e1" : "1px solid #e4e4e7"
+                background: isArchived === 1 ? "#e2e8f0" : "#ffffff",
+                color: isArchived === 1 ? "#334155" : "#475569",
+                border: isArchived === 1 ? "1px solid #cbd5e1" : "1px solid #e4e4e7"
               }}
             >
-              {is_archived === 1 ? "アーカイブ済" : "アーカイブ"}
+              {isArchived === 1 ? "アーカイブ済" : "アーカイブ"}
             </button>
           )}
 

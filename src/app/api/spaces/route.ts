@@ -35,7 +35,8 @@ export async function POST(request: Request) {
     if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
     try {
-        const { name, space_type, favoriteFlag } = await request.json();
+        //const body = await request.json();
+        const { name, spaceType, favoriteFlag, isArchived } = await request.json();
         
         // --- 単体チェック ---
         // 1. 必須チェック (E1001)
@@ -52,9 +53,9 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: MESSAGES.E1003("スペース名", "記号") }, { status: 400 });
         }
 
-        const newSpace = await registerSpace(auth.user_id, name, space_type, favoriteFlag);
+        const newSpace = await registerSpace(auth.user_id, name, spaceType, favoriteFlag, isArchived);
         if (!newSpace) return NextResponse.json({ message: MESSAGES.E2001("スペース") }, { status: 500 });
-
+        
         return NextResponse.json({ 
             space: newSpace, 
             message: MESSAGES.S1001("スペース") 

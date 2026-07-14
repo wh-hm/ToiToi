@@ -49,10 +49,10 @@ export async function getSpaceName(userId: string, spaceId: number): Promise<str
 
 // 概要：スペースの登録
 export async function registerSpace(
-  userId: string, name: string, spaceType: number, favoriteFlag: number
+  userId: string, name: string, spaceType: number, favoriteFlag: number, isArchived: number
 ): Promise<Space> {
   return await prisma.space.create({
-    data: { user_id: userId, name, space_type: spaceType, delete_flag: 0, favorite_flag: favoriteFlag },
+    data: { user_id: userId, name, space_type: spaceType, delete_flag: 0, favorite_flag: favoriteFlag, is_archived: isArchived },
   });
 }
 
