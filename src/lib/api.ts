@@ -1,6 +1,6 @@
-import toast, { Toast } from "react-hot-toast";
+import { ToiToiNotification } from "@/components/Toast";
 // 💡 これを共通のユーティリティ（例: src/lib/api.ts）などに置いておく
-export async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 5000) {
+export async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 60000) {
   // 1. タイムアウトを制御するためのコントローラーを作成
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout); // 指定時間（5秒）が過ぎたら通信を強制遮断
@@ -14,6 +14,7 @@ export async function fetchWithTimeout(url: string, options: RequestInit = {}, t
   } catch (error: any) {
     // 3. タイムアウトで遮断された場合、名前が 'AbortError' になる
     if (error.name === 'AbortError') {
+      ToiToiNotification.error('通信がタイムアウトしました。電波の良い場所で再度お試しください。')
     // toast.error('通信がタイムアウトしました。電波の良い場所で再度お試しください。');
       throw new Error('通信がタイムアウトしました。電波の良い場所で再度お試しください。');
     }

@@ -28,7 +28,7 @@ export async function registerTask(
   return await prisma.task.create({
     data: {
       user_id: userId, title, description,
-      due_date: new Date(dueDate), // 文字列からDateへ確実に変換
+      due_date: new Date(dueDate), 
       status: 0, tag, is_allday: isAllday, priority, delete_flag: 0,
       space: { connect: { id: spaceId } }
     },

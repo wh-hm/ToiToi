@@ -16,22 +16,27 @@ const BUCKET_NAME = process.env.R2_BUCKET_NAME!;
 
 /**
  * 設計書の getImages メソッドの実装
- * @param image_urls R2のファイル名（Key）の配列
  */
-export async function getImages(imageUrls: string[]): Promise<string[]> {
-  if (!imageUrls || imageUrls.length === 0) return [];
+export async function getImages(imageIds: number[]): Promise<Map<number, string>> {
+  if (!imageIds || imageIds.length === 0) return new Map();
 
-  try {
-    return await Promise.all(
-      imageUrls.map(async (key) => {
-        const command = new GetObjectCommand({ Bucket: BUCKET_NAME, Key: key });
-        return await getSignedUrl(s3Client, command, { expiresIn: 3600 });
-      })
-    );
-  } catch (error) {
-    console.error("画像取得エラー:", error);
-    return [];
-  }
+  // 1. IDに基づいてDBから画像情報を取得
+  const images = await prisma.image.findMany({
+    where: { id: { in: imageIds }, delete_flag: 0 }
+  });
+
+  const urlMap = new Map<number, string>();
+  
+  // 2. 署名付きURLを生成して Map に格納
+  await Promise.all(images.map(async (img) => {
+    const command = new GetObjectCommand({ Bucket: BUCKET_NAME, Key: img.storage_key });
+    const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+    
+    // キーを number (ID) にする
+    urlMap.set(img.id, url);
+  }));
+
+  return urlMap;
 }
 
 /**
@@ -39,19 +44,11 @@ export async function getImages(imageUrls: string[]): Promise<string[]> {
  * 概要：画像がアップロードされている数を取得
  */
 export async function getImageCount(userId: string): Promise<number> {
-  const filter = {
-    user_id: userId,
-    delete_flag: 0,
-    AND: [
-      { image: { not: null } },
-    ]
-  };
-
+  // チャットと質問チャットの image_id が存在する件数を合計
   const [chatCount, questionChatCount] = await Promise.all([
-    prisma.chat.count({ where: filter }),
-    prisma.questionChats.count({ where: filter })
+    prisma.chat.count({ where: { user_id: userId, delete_flag: 0, image_id: { not: null } } }),
+    prisma.questionChats.count({ where: { user_id: userId, delete_flag: 0, image_id: { not: null } } })
   ]);
-
   return chatCount + questionChatCount;
 }
 
@@ -71,62 +68,91 @@ export async function deleteImage(imageKey: string): Promise<boolean> {
   }
 }
 
-export async function deleteImages(userId: string) {
-  try {
-    const listCommand = new ListObjectsV2Command({ Bucket: BUCKET_NAME, Prefix: userId });
-    const listedObjects = await s3Client.send(listCommand);
+export async function deleteImages(imageIds: number[]): Promise<boolean> {
+  // 1. DBから対象の storage_key を取得
+  const images = await prisma.image.findMany({
+    where: { id: { in: imageIds } },
+    select: { id: true, storage_key: true }
+  });
 
-    if (listedObjects.Contents?.length) {
-      await s3Client.send(new DeleteObjectsCommand({
-        Bucket: BUCKET_NAME,
-        Delete: { Objects: listedObjects.Contents.map(({ Key }) => ({ Key })) },
-      }));
+  if (images.length === 0) return true;
+
+  // 2. オブジェクトストレージから物理削除
+  await s3Client.send(new DeleteObjectsCommand({
+    Bucket: BUCKET_NAME,
+    Delete: { 
+      Objects: images.map(img => ({ Key: img.storage_key })) 
+    },
+  }));
+
+  // 3. DBからレコードを物理削除
+  await prisma.image.updateMany({
+    where: { id: { in: images.map(i => i.id) } },
+    data: {
+      delete_flag: 1
     }
+  });
 
-    const updateFilter = {
-      user_id: userId,
-      delete_flag: 0,
-      AND: [
-        { image_url: { not: null } },
-        { image_url: { not: "" } }
-      ]
-    };
-    await Promise.all([
-      prisma.chat.updateMany({ where: updateFilter, data: { delete_flag: 1 } }),
-      prisma.questionChats.updateMany({ where: updateFilter, data: { delete_flag: 1 } })
-    ]);
-    
-    return { count: listedObjects.Contents?.length || 0 };
-  } catch (error) {
-    console.error("一括削除処理エラー:", error);
-    throw error;
-  }
+  return true;
 }
 
 /**
  * 画像をR2にアップロードして、ファイル名を返す関数
  */
-export async function uploadImages(images: File[], userId: string, spaceId: string | number) {
+// StorageService.ts の修正
+export async function uploadImages(images: File[], userId: string, spaceId: number): Promise<string[]> {
   let currentCount = await getImageCount(userId);
-  const uploadedFileNames: string[] = [];
 
-  for (const image of images) {
-    currentCount += 1;
-    const fileName = `${userId}_${spaceId}_${currentCount.toString().padStart(3, '0')}.png`;
+  // 全画像を並列でアップロードするタスクを作成
+  const uploadTasks = images.map(async (image, index) => {
+    const fileName = `${userId}_${spaceId}_${(currentCount + index + 1).toString().padStart(3, '0')}.png`;
     
-    try {
-      await s3Client.send(new PutObjectCommand({
-        Bucket: BUCKET_NAME,
-        Key: fileName,
-        Body: Buffer.from(await image.arrayBuffer()),
-        ContentType: image.type,
-      }));
-      uploadedFileNames.push(fileName);
-    } catch (error) {
-      console.error("R2 Upload Error:", error);
-      throw new Error("画像のアップロードに失敗しました");
-    }
-  }
+    // R2アップロード
+    await s3Client.send(new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: fileName,
+      Body: Buffer.from(await image.arrayBuffer()),
+      ContentType: image.type,
+    }));
 
-  return uploadedFileNames;
+    // DB登録もここで済ませる
+    await prisma.image.create({
+      data: { storage_key: fileName, size_bytes: image.size, mime_type: image.type }
+    });
+
+    return fileName;
+  });
+
+  // すべての処理が完了するのを待つ
+  return await Promise.all(uploadTasks);
+}
+
+export async function getAuthorizedImageIds(userId: string): Promise<number[]> {
+  // 1. 全スペース取得
+  // 2. Imageテーブルを直接検索し、紐付いているチャット/質問チャットからスペースIDを逆引きする
+  const images = await prisma.image.findMany({
+    where: {
+      OR: [
+        {
+          chats: {
+            some: {
+              space: { user_id: userId, delete_flag: 0 }
+            }
+          }
+        },
+        {
+          questionChats: {
+            some: {
+              question: {
+                space: { user_id: userId, delete_flag: 0 }
+              }
+            }
+          }
+        }
+      ]
+    },
+    select: { id: true }
+  });
+
+  return images.map(img => img.id);
 }

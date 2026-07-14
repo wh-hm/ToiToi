@@ -67,18 +67,18 @@ export async function PATCH(
 // 2. DELETE: タスク削除
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ spaceId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
     
   try {
-    const { spaceId } = await params;
+    const { id } = await params;
     // DELETEメソッドではボディを読み取らないのが安全なため、クエリパラメータから取得を推奨します
     const { searchParams } = new URL(request.url);
     const taskId = Number(searchParams.get("taskId"));
     
-    const spaceIdNum = Number(spaceId);
+    const spaceIdNum = Number(id);
     if (!spaceIdNum || isNaN(spaceIdNum)) return NextResponse.json({ message: MESSAGES.E1001("スペースID") }, { status: 400 });
 
     if (!taskId || isNaN(taskId)) return NextResponse.json({ message: MESSAGES.E1001("タスクID") }, { status: 400 });

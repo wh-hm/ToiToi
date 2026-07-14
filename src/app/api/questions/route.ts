@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
         // --- 単体チェック ---
         // 1. 必須チェック (E1001)
         if (!title || title.trim() === "") return NextResponse.json({ message: MESSAGES.E1001("質問タイトル") }, { status: 400 });
-        if (question) return NextResponse.json({ message: MESSAGES.E1001("質問詳細") }, { status: 400 });
+        if (!question) return NextResponse.json({ message: MESSAGES.E1001("質問詳細") }, { status: 400 });
 
         // 2. 桁数チェック (E1002: タイトル50文字, 詳細100文字)
         if (title.length > 50) return NextResponse.json({ message: MESSAGES.E1002("質問タイトル", 50) }, { status: 400 });

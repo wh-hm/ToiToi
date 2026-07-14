@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
-import toast, { Toaster } from "react-hot-toast";
 import { useRouter, useParams } from "next/navigation";
 import TaskModal from "@/components/TaskModal";
 import { fetchWithTimeout } from "@/lib/api";
@@ -9,6 +8,7 @@ import { handleApiResponse } from "@/lib/api-utils";
 import { ToiToiNotification } from "@/components/Toast";
 import { Loading } from "@/components/LoadingSpinner";
 import { useCelebration, Celebration } from "@/components/Celebration";
+import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 
 export default function QuestionPage() {
   const { data: session, status } = useSession();
@@ -30,6 +30,43 @@ export default function QuestionPage() {
 
   //お祝い演出
   const { showCelebration, celebrationOpacity, celebrationMessage, triggerCelebration } = useCelebration();
+
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    onConfirm: () => { },
+  });
+
+
+  const openDeleteConfirm = (id: string) => {
+    setModalConfig({
+      isOpen: true,
+      title: "質問を削除する？",
+      onConfirm: async () => {
+        const toastId = "delete-space-toast";
+        try {
+          const res = await fetch(`/api/questions/${space_id}?questionId=${id}`, {
+            method: "DELETE"
+          });
+          if (!res.ok) throw new Error();
+          ToiToiNotification.success("質問を削除しました！", toastId);
+          const refreshRes = await fetch(`/api/questions?spaceId=${space_id}`);
+          if (refreshRes.ok) {
+            const data = await refreshRes.json();
+            console.log("【APIからのレスポンス】:", data);
+            setQuestions(Array.isArray(data.questions) ? data.questions : []);
+          }
+        } catch (error) {
+          console.error(error);
+          ToiToiNotification.error("削除に失敗しました。", toastId);
+        }
+      },
+    });
+  };
 
   // 1. 初期表示・セッション有効チェック
   useEffect(() => {
@@ -89,7 +126,7 @@ export default function QuestionPage() {
           ...question,
           status: newStatus,
           isResolved: newStatus,
-          questionId: targetId,
+          questionId: Number(question.Id),
         }),
       });
       if (!res.ok) {
@@ -105,60 +142,13 @@ export default function QuestionPage() {
       if (newStatus === 1) {
         triggerCelebration("解決おめでとう！");
       } else if (newStatus === 0) {
-        toast("未解決に戻しました。");
+        ToiToiNotification.info("未解決に戻しました。");
       } fetchQuestions();
     } catch (error) {
       console.error(error);
       setQuestions(previousQuestions);
     }
-  };
 
-
-  // 4. 削除処理
-  const handleDelete = async (id: number) => {
-    toast((t) => (
-      <div className="flex flex-col gap-3 p-1">
-        <p className="text-sm font-semibold text-slate-800">
-          本当にこの質問を削除しますか？
-        </p>
-        <div className="flex justify-end gap-2">
-          <button
-            onClick={() => toast.dismiss(t.id)}
-            className="px-2.5 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg font-medium transition-colors"
-          >
-            キャンセル
-          </button>
-          <button
-            onClick={async () => {
-              toast.dismiss(t.id);
-              const previousQuestions = [...questions];
-              setQuestions(questions.filter((q) => q.id !== id));
-              try {
-                const res = await fetchWithTimeout(`/api/questions/${space_id}?questionId=${id}`, {
-                  method: "DELETE",
-                  headers: { "Content-Type": "application/json" },
-                });
-                if (!res.ok) {
-                  handleApiResponse(res);
-                  throw new Error();
-                }
-                const data = await res.json();
-                ToiToiNotification.success(data.message);
-              } catch (error) {
-                console.error(error);
-                setQuestions(previousQuestions);
-              }
-            }}
-            className="px-2.5 py-1 text-xs bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-medium transition-colors"
-          >
-            削除する
-          </button>
-        </div>
-      </div>
-    ), {
-      duration: Infinity,
-      position: "top-center",
-    });
   };
 
   const handleModalSubmit = async (payload: any) => {
@@ -181,17 +171,17 @@ export default function QuestionPage() {
       });
 
       if (res.ok) {
-        toast.success(isEdit ? "質問を更新しました" : "質問を作成しました");
+        ToiToiNotification.success(isEdit ? "質問を更新しました" : "質問を作成しました");
         setIsModalOpen(false);
         fetchQuestions();
         if (isEdit && formattedPayload.is_resolved === 1) {
           triggerCelebration();
         }
       } else {
-        toast.error(isEdit ? "更新に失敗しました" : "作成に失敗しました");
+        ToiToiNotification.error(isEdit ? "更新に失敗しました" : "作成に失敗しました");
       }
     } catch (error) {
-      toast.error("通信エラーが発生しました");
+      ToiToiNotification.error("通信エラーが発生しました");
     }
   };
 
@@ -227,7 +217,6 @@ export default function QuestionPage() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6 text-slate-800">
-      <Toaster position="top-center" />
       {/* ヘッダーエリア */}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-slate-900">質問スペース</h1>
@@ -305,7 +294,7 @@ export default function QuestionPage() {
                     編集
                   </button>
                   <button
-                    onClick={() => handleDelete(q.id)}
+                    onClick={() => openDeleteConfirm(q.id)}
                     className="text-xs font-medium text-red-500 hover:text-red-700"
                   >
                     削除
@@ -330,7 +319,7 @@ export default function QuestionPage() {
                   className="cursor-pointer flex-1 pr-4"
                   onClick={() => { setSelectedQuestion(q); setModalMode('detail'); setIsModalOpen(true); }}
                 >
-                  <p className="font-semibold text-slate-500 line-through">{q.title}</p>
+                  <p className="font-semibold text-slate-500">{q.title}</p>
                   <p className="text-xs text-slate-400 mt-1">解決済み</p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -341,7 +330,7 @@ export default function QuestionPage() {
                     className="w-4 h-4 cursor-pointer rounded text-indigo-600 focus:ring-indigo-500"
                   />
                   <button
-                    onClick={() => handleDelete(q.id)}
+                    onClick={() => openDeleteConfirm(q.id)}
                     className="text-xs font-medium text-red-500 hover:text-red-700"
                   >
                     削除
@@ -359,6 +348,13 @@ export default function QuestionPage() {
 
       <Celebration show={showCelebration} opacity={celebrationOpacity} message={celebrationMessage} />
 
+      <DeleteConfirmModal
+        isOpen={modalConfig.isOpen}
+        title={modalConfig.title}
+        onClose={() => setModalConfig((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={modalConfig.onConfirm}
+      />
+
       {isModalOpen && (
         <TaskModal
           task={selectedQuestion}
@@ -366,7 +362,7 @@ export default function QuestionPage() {
           spaceId={Number(space_id)}
           type="question"
           onClose={() => setIsModalOpen(false)}
-          onError={(msg: string) => toast.error(msg)}
+          onError={(msg: string) => ToiToiNotification.error(msg)}
           onSubmit={handleModalSubmit}
           onSuccess={() => {
             setIsModalOpen(false);

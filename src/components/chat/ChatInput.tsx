@@ -36,8 +36,6 @@ export default function ChatInput({
     }, 100);
   };
 
-  console.log(disabled);
-
   return (
     <>
       <PreviewModal

@@ -12,7 +12,6 @@ export async function GET(request: NextRequest) {
     if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
     const { searchParams } = new URL(request.url);
-    // 💡 キャメルケース・スネークケースどちらのURLパラメータでも対応可能にする
     const spaceIdParam = searchParams.get("spaceId") || searchParams.get("space_id");
     const spaceId = Number(spaceIdParam);
 

@@ -3,7 +3,7 @@ import { getAuthContext } from "@/lib/auth-guard";
 import { getSpaces } from "@/services/SpaceService";
 import { getTasksCount } from "@/services/TaskService";
 import { MESSAGES } from "@/constants/messages";
-import { getGoal, updateGoal } from "@/services/GoalService";
+import { getGoal} from "@/services/GoalService";
 import { getLoginManagement } from "@/services/LoginManagementService";
 import { getQuestionsCount } from "@/services/QuestionService";
 
@@ -23,23 +23,48 @@ export async function GET() {
       getLoginManagement(auth.user_id)
     ]);
 
-    const result = {
-      spaces: {
-        chat: allSpaces.filter(s => s.space_type === 1),
-        task: allSpaces
-          .filter(s => s.space_type === 2)
-          .map(s => ({ ...s, taskCount: tasksWithCounts.find(t => t.space_id === s.id)?.task_count ?? 0 })),
-        question: allSpaces
-          .filter(s => s.space_type === 3)
-          .map(s => ({ ...s, questionCount: questionsWithCounts.find(q => q.space_id === s.id)?.question_count ?? 0 })),
-      },
-      goal,
-      loginManagement,
+    const formatSpace = (s: any, countKey?: string, countValue?: number) => {
+      return {
+        id: String(s.id),
+        name: s.name,
+        spaceType: Number(s.space_type),        
+        favoriteFlag: Number(s.favorite_flag ?? 0), 
+        isArchived: Number(s.is_archived ?? 0),    
+        ...(countKey ? { [countKey]: countValue ?? 0 } : {})
+      };
     };
 
-    return NextResponse.json({ 
-        ...result, 
-        message: MESSAGES.S2001("ダッシュボードデータ") 
+    const result = {
+      spaces: {
+        chat: allSpaces
+        .filter(s => s.space_type === 1)
+        .map(s => formatSpace(s)),
+        task: allSpaces
+          .filter(s => s.space_type === 2)
+          .map(s => {
+            const count = tasksWithCounts.find(t => t.space_id === s.id)?.task_count ?? 0;
+            return formatSpace(s, "taskCount", count);
+          }),
+        question: allSpaces
+          .filter(s => s.space_type === 3)
+          .map(s => {
+            const count = questionsWithCounts.find(q => q.space_id === s.id)?.question_count ?? 0;
+            return formatSpace(s, "questionCount", count);
+          }),
+      },
+      goal: goal ? {
+        id: goal.id,
+        content: goal.content,
+        status: Number(goal.status ?? 0),
+        createdAt: goal.created_at,
+        deletedAt: goal.deleted_at,
+        deleteFlag: goal.delete_flag
+        } : null,
+      loginManagement,
+    };
+      return NextResponse.json({
+      ...result,
+      message: MESSAGES.S2001("ダッシュボードデータ")
     }, { status: 200 });
 
   } catch (error) {

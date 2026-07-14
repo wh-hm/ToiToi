@@ -78,6 +78,8 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       const { id } = await params;
       const res = await fetchWithTimeout(`/api/chats?spaceId=${id}`);
       const data = await res.json();
+      console.log(data);
+
       if (!res.ok) {
         await handleApiResponse(res); // 内部のthrowを待つ
         throw new Error(); // 明示的にエラーを投げる
@@ -145,19 +147,20 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
     const backupInputText = inputText;
     const backupFiles = [...selectedFiles];
-
     const formData = new FormData();
     formData.append("spaceId", id);
-
     if (stampId) {
       formData.append("stamp", stampId);
     } else {
-      if (inputText.trim()) formData.append("message", inputText);
-      selectedFiles.forEach((file) => {
-        formData.append("images", file);
-      });
+      if (selectedFiles.length > 0) {
+        // 💡 画像がある時は「caption」として送る
+        if (inputText.trim()) formData.append("caption", inputText);
+        selectedFiles.forEach((file) => formData.append("images", file));
+      } else {
+        // 💡 画像がない時は「message」として送る
+        if (inputText.trim()) formData.append("message", inputText);
+      }
     }
-
     const pendingMessages: ChatMessage[] = [];
     const now = new Date().toISOString();
 
@@ -170,8 +173,10 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
             id: Date.now() + i,
             signedImageUrl: URL.createObjectURL(file),
             isPending: true,
-            created_at: now,
-            message: inputText,
+            created_at: new Date().toISOString(), // 必須項目
+            image: {
+              caption: inputText
+            }
           } as ChatMessage);
         });
       } else {
@@ -185,7 +190,6 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       return [...safePrev, ...pendingMessages];
     });
 
-    // setChats((prev) => [...prev, ...pendingMessages]);
     scrollToBottom(false);
 
     if (!stampId) {
@@ -195,25 +199,37 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     setIsSubmitting(true);
 
     try {
-      const res = await fetchWithTimeout(`/api/chats/`, { method: "POST", body: formData });
-      const data = await res.json();
-      console.log(data);
-      if (!res.ok) {
-        await handleApiResponse(res); // 内部のthrowを待つ
-        throw new Error(); // 明示的にエラーを投げる
-      }
+  const res = await fetchWithTimeout(`/api/chats/`, { method: "POST", body: formData });
+  const responseData = await res.json();
+  const data = JSON.parse(JSON.stringify(responseData));
 
-      if (data.newChat && data.newChat.length > 0){
-        const serverItems = [...data.newChat];
-        setChats((prev) => prev.map((msg) => {
+  if (!res.ok) {
+    await handleApiResponse(res);
+    throw new Error();
+  }
+  const confirmedData = data.newChat || [];
+    // ★サーバーから返ってきたデータが一つ以上ある場合
+    if (data.newChat && Array.isArray(data.newChat)) {
+    setChats((prev) => {
+        return prev.map(msg => {
           if (msg.isPending) {
-            const match = serverItems.shift();
-            return match ? { ...msg, ...match, isPending: false } : msg;
+            const match = confirmedData.shift();
+            if (!match) return msg;
+
+            // ★ここで match.image を明示的に保存する
+            // これにより、以降は msg.image.storage_key が使えるようになる
+            return { 
+              ...msg, 
+              ...match, 
+              isPending: false,
+              image: match.image || null 
+            };
           }
           return msg;
-        }));
-      }
-    } catch (e) {
+        });
+      });
+    }
+  } catch (e) {
       console.log(e);
       if (!stampId) {
         setInputText(backupInputText);
@@ -265,12 +281,12 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     }
   };
 
-  const handleDeleteClick = async (chatId: number, sId: number) => {
+  const handleDeleteClick = async (chatId: number) => {
     const previousMessages = [...chats];
     setChats((prev) => prev.filter((msg) => msg.id !== chatId));
 
     try {
-      const res = await fetchWithTimeout(`/api/chats/${chatId}?spaceId=${sId}`, { 
+      const res = await fetchWithTimeout(`/api/chats/${spaceId}?chatId=${chatId}`, { 
         method: "DELETE" 
       });
       if (!res.ok) {
@@ -361,22 +377,33 @@ const handleToggleFavorite = async (chatId: number) => {
     }
   };
 
-  const handleDownload = async (imageUrl: string, chatId: string) => {
-    try {
-      const res = await fetchWithTimeout("/api/images", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          targetUrl: imageUrl,
-          spaceId: spaceId,
-          type: "chat",
-          chatId: chatId 
-        })
-      });
-      if (!res.ok) {
-        await handleApiResponse(res); // 内部のthrowを待つ
-        throw new Error(); // 明示的にエラーを投げる
-      };
+const handleDownload = async (imageUrl: string, chatId: string) => {
+  // 念のため blob URL だったらエラーにする
+  console.log("ダウンロード開始 - 受け取った storageKey:", imageUrl);
+  
+  if (imageUrl.startsWith('blob:')) {
+    ToiToiNotification.error("画像アップロード完了までお待ちください。");
+    return;
+  }
+
+  try {
+    const res = await fetchWithTimeout("/api/images", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ 
+        storageKey: imageUrl, // ★ここをサーバーが期待する名前に変更する
+        spaceId: spaceId,
+        type: "chat",
+        chatId: chatId 
+      })
+    });
+
+    if (!res.ok) {
+      // 400エラーの原因を確認するためにレスポンスの中身をログに出す
+      const errorData = await res.json().catch(() => ({ message: "不明なエラー" }));
+      console.error("API Error Response:", errorData);
+      throw new Error(errorData.message || "ダウンロード失敗");
+    }
 
       // 💡 成功ならそのまま安全にBlob変換
       const blob = await res.blob();

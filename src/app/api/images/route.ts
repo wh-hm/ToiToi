@@ -2,11 +2,12 @@
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth-guard";
-import { deleteImages } from "@/services/StorageService"; // ストレージサービスと仮定
+import { deleteImages, getAuthorizedImageIds, getImages } from "@/services/StorageService"; // ストレージサービスと仮定
 import { MESSAGES } from "@/constants/messages";
 import { getSpaceCheck } from "@/services/SpaceService";
 import { checkQuestionChat } from "@/services/QuestionChatService";
 import { getChatCheck } from "@/services/ChatService";
+import { prisma } from "@/lib/prisma";
 
 
 export async function DELETE() {
@@ -15,11 +16,28 @@ export async function DELETE() {
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
-    await deleteImages(auth.user_id);
+    // 1. 物理削除すべき画像IDリストを取得
+    const imageIds = await getAuthorizedImageIds(auth.user_id);
+    if (imageIds.length > 0) {
+      // 2. 物理削除を実行 (R2ファイル削除 + Imageレコード削除)
+      await deleteImages(imageIds); 
+    }
+    // 3. 【重要】紐付いているチャット側のフラグも「削除」にする
+    // 画像だけでなく、チャットメッセージ自体を「見えない状態」にする
+    await prisma.$transaction([
+      prisma.chat.updateMany({
+        where: { user_id: auth.user_id, delete_flag: 0 },
+        data: { delete_flag: 1 }
+      }),
+      prisma.questionChats.updateMany({
+        where: { user_id: auth.user_id, delete_flag: 0 },
+        data: { delete_flag: 1 }
+      })
+    ]);
 
     return NextResponse.json({ 
         success: true, 
-        message: MESSAGES.S1004("画像") 
+        message: MESSAGES.S1004("画像とチャット") 
     }, { status: 200 });
   } catch (error) {
     return NextResponse.json({ message: MESSAGES.E2004("画像") }, { status: 500 });
@@ -39,99 +57,44 @@ const s3Client = new S3Client({
 const BUCKET_NAME = process.env.R2_BUCKET_NAME!;
 
 export async function POST(request: Request) {
-  // 💡 【修正点1】リクエストボディの読み込みは「絶対に最初の一回だけ」！
-  // question_id は入っていない可能性もあるので、デフォルト値を考慮するか省略可能にします
-  const body = await request.json();
-  const { targetUrl, spaceId, type, chatId, questionId } = body;
-
-  const auth = await getAuthContext();
-  if ('error' in auth) {
-    return NextResponse.json({ message: auth.error }, { status: auth.status });
-  }
-
-  // 💡 バリデーション用に数値をパース
-  const sId = parseInt(spaceId);
-  const cId = parseInt(chatId);
-  const qId = questionId ? parseInt(questionId) : null;
-
-  // ==========================================
-  // 1. 権限・生存チェック（並列化版）
-  // ==========================================
-
-  // チェック用のPromise配列を準備
-  const checkTasks = [];
-
-  if (type === "chat") {
-    // スペースとチャットのチェックを同時に飛ばす
-    checkTasks.push(getSpaceCheck(auth.user_id, sId));
-    checkTasks.push(getChatCheck(auth.user_id, sId, cId));
-  } else if (type === "question") {
-    // question_idのバリデーションは先に行う
-    if (!qId) {
-      return NextResponse.json({ message: MESSAGES.E1008 }, { status: 400 });
-    }
-    // スペースと質問チャットのチェックを同時に飛ばす
-    checkTasks.push(getSpaceCheck(auth.user_id, sId));
-    console.log(cId, qId, auth.user_id);
-    checkTasks.push(checkQuestionChat(cId, qId, auth.user_id));
-  }
-
-  // すべてのチェックを並列実行
-  const [isSpaceAlive, isChatAlive] = await Promise.all(checkTasks);
-
-  // 判定処理
-  if (!isSpaceAlive) {
-    return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
-  }
-  if (!isChatAlive) {
-    return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
-  }
-
-  // ==========================================
-  // 2. R2の Key を特定・お掃除するロジック
-  // ==========================================
-  let key = targetUrl;
-
-  // 💡 【修正点2】blob: が届いた場合、さっきの「_」区切りを使ってファイル名を救出する！
-  if (targetUrl.startsWith('blob:')) {
-    // 例: blob:http://localhost:3000/bf34f18c-79f7_26_004.png のような形を想定
-    // 一番最後のスラッシュ「/」で区切って、後ろ側のファイル名部分だけを抜き出す
-    const fileName = targetUrl.split("/").pop();
-    
-    if (fileName && fileName.includes("_")) {
-      key = fileName; // ➔ "bf34f18c-79f7_26_004.png" が無事救出される！
-    } else {
-      return NextResponse.json({ message: MESSAGES.E1009 }, { status: 400 });
-    }
-  }
-
-  // URLの形式（http...）になっている場合はドメインや先頭のスラッシュを削る
   try {
-    if (key.startsWith('http')) {
-      const url = new URL(key);
-      const decodedPath = decodeURIComponent(url.pathname); // デコードして日本語や記号のバグを防ぐ
-      
-      // 先頭のスラッシュを削る
-      key = decodedPath.startsWith('/') ? decodedPath.substring(1) : decodedPath;
+    const body = await request.json();
+    const { storageKey, spaceId, type, chatId, questionId } = body;
 
-      // 💡 もしURLのパスの中に、まだフルURLがネストして残っている場合の最終防衛策
-      if (key.includes("cloudflarestorage.com/")) {
-        key = key.split("cloudflarestorage.com/").pop() || key;
-      }
-      // クエリパラメータ（?以降）を確実にカット
-      key = key.split("?")[0];
+    // 1. 基本バリデーション：Blobは絶対に通さない（クライアント側で防ぐのが理想だがサーバーでも厳守）
+    if (!storageKey || typeof storageKey !== 'string' || storageKey.startsWith('blob:')) {
+      return NextResponse.json({ message: "不正な画像リクエストです" }, { status: 400 });
     }
-  } catch (e) {
-    console.warn("URLとしての解析はスキップされました:", targetUrl);
-  }
 
-  // デバッグで確認
-  console.log("R2に最終的に送る綺麗になったKey:", key);
+    // 2. 認証チェック
+    const auth = await getAuthContext();
+    if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
-  // ==========================================
-  // 3. R2からダウンロード実行
-  // ==========================================
-  try {
+    // 3. 権限・生存チェック（並列化）
+    const sId = parseInt(spaceId);
+    const cId = parseInt(chatId);
+    const qId = questionId ? parseInt(questionId) : null;
+    const checkTasks = [];
+
+    if (type === "chat") {
+      checkTasks.push(getSpaceCheck(auth.user_id, sId));
+      checkTasks.push(getChatCheck(auth.user_id, sId, cId));
+    } else if (type === "question") {
+      if (!qId) return NextResponse.json({ message: MESSAGES.E1008 }, { status: 400 });
+      checkTasks.push(getSpaceCheck(auth.user_id, sId));
+      checkTasks.push(checkQuestionChat(cId, qId, auth.user_id));
+    }
+
+    const [isSpaceAlive, isChatAlive] = await Promise.all(checkTasks);
+
+    if (!isSpaceAlive) return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+    if (!isChatAlive) return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
+
+    // 4. R2からダウンロード実行
+    // フロントから送られてきた storageKey をそのまま信頼してキーとして使用する
+    const key = decodeURIComponent(storageKey);
+    console.log("R2に送るKey:", key);
+
     const command = new GetObjectCommand({
       Bucket: BUCKET_NAME,
       Key: key,
@@ -139,17 +102,15 @@ export async function POST(request: Request) {
     
     const response = await s3Client.send(command);
     
-    // 元のファイル名をクエリなどから復元するか、なければkeyの後ろ側を使用
-    const downloadName = key.split("/").pop() || "download.png";
-    
+    // 5. レスポンス返却
     return new Response(response.Body as ReadableStream, {
       headers: {
-        "Content-Type": "application/octet-stream", 
-        "Content-Disposition": `attachment; filename="${encodeURIComponent(downloadName)}"`, // 💡ファイル名を動的に
+        "Content-Type": "application/octet-stream",
+        "Content-Disposition": `attachment; filename="${encodeURIComponent(key.split('/').pop() || "download.png")}"`,
       },
     });
   } catch (error) {
     console.error("R2ダウンロードエラー:", error);
-    return NextResponse.json({ message: MESSAGES.E3002 }, { status: 404 });
+    return NextResponse.json({ message: "画像が見つかりません" }, { status: 404 });
   }
 }

@@ -28,7 +28,7 @@ const formatTaskDueDate = (isoString: string | null, isAllDay: number) => {
   }).replace(/\//g, '/');
   return `${dateStr} ${timeOnly}`;
 }
-/// src/components/TaskList.tsx
+
 export default function TaskList({
   tasks,
   toggleComplete,
@@ -37,7 +37,7 @@ export default function TaskList({
   onDetail 
 }: any) {
 
-  // 1. 現在どちらのタブを表示するか管理するステート ('incomplete' または 'complete')
+  // 1. 現在どちらのタブを表示するか管理するステート 
   const [activeTab, setActiveTab] = useState<"incomplete" | "complete">("incomplete");
 
   // 安全策として、データが空の場合の初期値を設定
@@ -98,13 +98,11 @@ export default function TaskList({
                 {/* タスク名 */}
                 <span
                   onClick={() => onDetail(task)}
-                  className={`text-sm font-medium cursor-pointer truncate hover:text-indigo-600 transition-colors ${activeTab === "complete" ? "line-through text-slate-400" : "text-slate-700"
-                    }`}
+                  className={`text-sm font-medium cursor-pointer truncate hover:text-indigo-600 transition-colors `}
                 >
                   {task.title}
                 </span>
 
-                {/* 優先度バッジ（例） */}
                 {/* 優先度バッジ */}
                 {task.priority === 1 && (
                   <span className="text-[10px] bg-rose-50 text-rose-600 px-2 py-0.5 rounded-md font-semibold">高</span>

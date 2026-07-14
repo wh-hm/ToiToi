@@ -16,7 +16,12 @@ export async function PATCH(
   try {
     const { spaceId } = await params;
     const spaceIdNum = Number(spaceId);
-    const { title, question, tag, questionId, isResolved } = await request.json();
+    const { title, question, tag, questionId, id, isResolved } = await request.json();
+
+    const validQuestionId = Number(questionId || id);
+    if (!validQuestionId || isNaN(validQuestionId)) {
+      return NextResponse.json({ message: "質問IDが不足しています" }, { status: 400 });
+    }
 
     // 存在確認を先行
     const [isSpaceAlive, isQuestionAlive] = await Promise.all([

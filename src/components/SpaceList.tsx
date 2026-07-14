@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 type Space = {
   id: string;
   name: string;
-  space_type: number;
-  favorite: number;
-  is_archived: number;
+  spaceType: number;
+  favoriteFlag: number;
+  isArchived: number;
 };
 
 type SpaceListProps = {
@@ -113,14 +113,14 @@ export default function SpaceList(props: SpaceListProps) {
                   padding: "8px",
                   borderBottom: "1px solid #eee",
                   alignItems: "center",
-                  opacity: s.is_archived === 1 ? 0.5 : 1,
-                  background: s.is_archived === 1 ? "#fafafa" : "transparent",
+                  opacity: s.isArchived === 1 ? 0.5 : 1,
+                  background: s.isArchived === 1 ? "#fafafa" : "transparent",
                   transition: "all 0.2s ease"
                 }}
               >
                 {/* ★マークエリア */}
                 <div style={{ width: "36px", display: "flex", justifyContent: "center", flexShrink: 0 }}>
-                  {s.favorite === 1 ? (
+                  {s.favoriteFlag === 1 ? (
                     <span
                       style={{
                         fontSize: "18px",
@@ -138,7 +138,7 @@ export default function SpaceList(props: SpaceListProps) {
                 {/* リンクとテキストエリア */}
                 <div style={{ flexGrow: 1, display: "flex", alignItems: "center", gap: "8px" }}>
                   <a
-                    href={getLinkPath(s.space_type, s.id)}
+                    href={getLinkPath(s.spaceType, s.id)}
                     style={{
                       textDecoration: "none",
                       color: "#333",
@@ -148,7 +148,7 @@ export default function SpaceList(props: SpaceListProps) {
                     {s.name}
                   </a>
 
-                  {s.is_archived === 1 && (
+                  {s.isArchived === 1 && (
                     <span
                       style={{
                         padding: "2px 6px",
@@ -167,7 +167,7 @@ export default function SpaceList(props: SpaceListProps) {
 
                 {/* 操作ボタン */}
                 <button onClick={() => onEdit(s)} style={{ padding: "4px 8px", cursor: "pointer" }}>編集</button>
-                <button onClick={() => onDelete(s.id, s.space_type)} style={{ padding: "4px 8px", cursor: "pointer" }}>削除</button>
+                <button onClick={() => onDelete(s.id, s.spaceType)} style={{ padding: "4px 8px", cursor: "pointer" }}>削除</button>
               </li>
             ))
           ) : (

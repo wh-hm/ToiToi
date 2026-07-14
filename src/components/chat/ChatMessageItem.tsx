@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@nextui-org/react";
 import { Star, ThumbsUp } from "lucide-react";
-import { ChatMessage, CHAT_COLOR_PALETTE } from "@/types/chat";
+import { CHAT_COLOR_PALETTE } from "@/types/chat";
 import { formatDateTime } from "@/lib/formData";
 import { ChatMessageItemProps } from "@/types/chat";
 
@@ -14,12 +14,10 @@ export default function ChatMessageItem({
   const [isHovered, setIsHovered] = useState(false);
   const [placement, setPlacement] = useState<"top-end" | "bottom-end">("bottom-end");
   const [isStampError, setIsStampError] = useState(false);
-  const [imageErrors, setImageErrors] = useState(false);
+  const [errorIndices, setErrorIndices] = useState<number[]>([]);
 
   const targetRef = useRef<HTMLDivElement>(null);
-  
   const offsetValue = placement === "bottom-end" ? 100 : 10;
-  
   const isOnlyStamp = message.stamp && !message.message;
   const backgroundColor = CHAT_COLOR_PALETTE[message.background as keyof typeof CHAT_COLOR_PALETTE] || "white";
 
@@ -144,7 +142,7 @@ export default function ChatMessageItem({
             ${(isHovered || isOpen) && !isSubmitting ? "brightness-90" : "brightness-100"}
           `}
         >
-          {(!message.signedImageUrl && !(message as any).previewImages && !message.imageUrl && message.message) && (
+          {message.message && (
             <p className="text-lg text-gray-800 whitespace-pre-wrap select-none">{message.message}</p>
           )}         
           {message.stamp ? (
@@ -164,11 +162,9 @@ export default function ChatMessageItem({
           ) : null}
           
           {((message as any).previewImages || [message.signedImageUrl]).filter(Boolean).map((url: string, index: number) => {
-  
-            // 💡 サーバーから届いた本物のキーがある場合はそれを使う、無ければ url (blob) を使う
+            const isError = errorIndices.includes(index);
             const realStorageKey = (message as any).storageKey || url;
-
-            return !imageErrors ? (
+            return !isError ? (
               <img
                 key={`img-item-${index}`}
                 src={url} 
@@ -178,19 +174,19 @@ export default function ChatMessageItem({
                 onClick={() => onImageClick?.(realStorageKey)}
                 onError={() => {
                   if (!url.startsWith("blob:")) {
-                    setImageErrors(true);
+                    setErrorIndices(prev => [...prev, index]);
                   }
                 }}
               />
             ) : (
               <div 
-                              key={`img-error-${message.id}-${index}`} 
-                              className="w-32 h-32 flex flex-col items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-2 text-center"
-                            >
-                              <span className="text-gray-700 font-bold text-[11px] leading-tight select-none">
-                                画像が<br />見つかりません
-                              </span>
-                            </div>
+                key={`img-error-${message.id}-${index}`} 
+                className="w-32 h-32 flex flex-col items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-2 text-center"
+              >
+                <span className="text-gray-700 font-bold text-[11px] leading-tight select-none">
+                  画像が<br />見つかりません
+                </span>
+              </div>
             );
           })}
         </div>

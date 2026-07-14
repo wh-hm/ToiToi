@@ -3,12 +3,13 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import toast from "react-hot-toast";
+import { ToiToiNotification } from "@/components/Toast";
 import { MESSAGES } from "@/constants/messages";
 import TaskList from "@/components/TaskList";
 import TaskModal from "@/components/TaskModal";
 import { Loading } from "@/components/LoadingSpinner";
 import { useCelebration, Celebration } from "@/components/Celebration";
+import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 
 export default function TaskPage() {
   const { data: session, status } = useSession();
@@ -35,14 +36,51 @@ export default function TaskPage() {
   const [searchKnowledge, setSearchKnowledge] = useState<string>("");
 
   //お祝い演出
-  const { showCelebration, celebrationOpacity,celebrationMessage, triggerCelebration } = useCelebration();
+  const { showCelebration, celebrationOpacity, celebrationMessage, triggerCelebration } = useCelebration();
+
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    onConfirm: () => { },
+  });
+
+  const openDeleteConfirm = (id: string) => {
+    setModalConfig({
+      isOpen: true,
+      title: "タスクを削除する？",
+      onConfirm: async () => {
+        const toastId = "delete-space-toast";
+        try {
+          const res = await fetch(`/api/task/${space_id}?taskId=${id}`, {
+            method: "DELETE"
+          });
+          if (!res.ok) throw new Error();
+          ToiToiNotification.success("タスクを削除しました！", toastId);
+          const refreshRes = await fetch(`/api/task?spaceId=${space_id}`);
+        if (refreshRes.ok) {
+          const data = await refreshRes.json();
+          setTaskData({
+            incomplete: Array.isArray(data.incomplete) ? data.incomplete : [],
+            complete: Array.isArray(data.complete) ? data.complete : [],
+          });
+        }
+        } catch (error) {
+          console.error(error);
+          ToiToiNotification.error("削除に失敗しました。", toastId);
+        }
+      },
+    });
+  };
 
   // 2. タスクデータの取得
   const fetchTasks = useCallback(async () => {
     if (!space_id) return;
 
     try {
-      // API側の仕様に合わせて spaceId に変更
       const res = await fetch(`/api/task?spaceId=${space_id}`, {
         cache: "no-store",
       });
@@ -133,68 +171,6 @@ export default function TaskPage() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: number) => {
-    toast((t) => (
-      <div className="flex flex-col gap-3 p-1">
-        <p className="text-sm font-semibold text-slate-800">
-          本当にこのタスクを削除しますか？
-        </p>
-        <div className="flex justify-end gap-2">
-          <button
-            onClick={() => toast.dismiss(t.id)}
-            className="px-2.5 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg font-medium transition-colors"
-          >
-            キャンセル
-          </button>
-          <button
-            onClick={async () => {
-              toast.dismiss(t.id);
-              const previousTaskData = { ...taskData };
-              setTaskData({
-                incomplete: taskData.incomplete.filter((t) => t.id !== id),
-                complete: taskData.complete.filter((t) => t.id !== id),
-              });
-
-              try {
-                // API側の仕様に合わせて spaceId に変更
-                const res = await fetch(`/api/task/${id}?spaceId=${space_id}`, {
-                  method: "DELETE",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ spaceId: Number(space_id) }),
-                });
-                const data = await res.json();
-                if (res.ok) {
-                  toast.success(data.message || "削除しました");
-                  const refreshRes = await fetch(`/api/task?spaceId=${space_id}`);
-                  if (refreshRes.ok) {
-                    const data = await refreshRes.json();
-                    setTaskData({
-                      incomplete: Array.isArray(data.incomplete) ? data.incomplete : [],
-                      complete: Array.isArray(data.complete) ? data.complete : [],
-                    });
-                  }
-                } else {
-                  toast.error(MESSAGES.E2004("タスク") + " 元に戻します。");
-                  setTaskData(previousTaskData);
-                }
-              } catch (error) {
-                console.error(error);
-                toast.error("通信エラーが発生したため、元に戻します。");
-                setTaskData(previousTaskData);
-              }
-            }}
-            className="px-2.5 py-1 text-xs bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-medium transition-colors"
-          >
-            削除する
-          </button>
-        </div>
-      </div>
-    ), {
-      duration: Infinity,
-      position: "top-center",
-    });
-  };
-
   const toggleComplete = async (task: any) => {
     const newStatus = Number(task.status) === 0 ? 1 : 0;
     const previousTaskData = { ...taskData };
@@ -211,9 +187,6 @@ export default function TaskPage() {
         complete: taskData.complete.filter((t) => t.id !== task.id),
       });
     }
-
-    console.log("【デバッグ】関数内の space_id:", space_id);
-    console.log("【デバッグ】task オブジェクトの中身:", task);
     try {
       const res = await fetch(`/api/task/${task.id}/status`, {
         method: "PATCH",
@@ -221,14 +194,14 @@ export default function TaskPage() {
         body: JSON.stringify({
           ...task,
           status: newStatus,
-          spaceId: Number(space_id), // API側の仕様に合わせて変更
+          spaceId: Number(space_id),
         }),
       });
       if (res.ok) {
         if (newStatus === 1) {
           triggerCelebration("タスク完了おめでとう！");
         } else {
-          toast("未完了に戻しました");
+          ToiToiNotification.info("未完了に戻しました");
         }
         // リフレッシュ処理も spaceId に変更
         const refreshRes = await fetch(`/api/task?spaceId=${space_id}`);
@@ -240,11 +213,11 @@ export default function TaskPage() {
           });
         }
       } else {
-        toast.error("更新に失敗しました。元に戻します。");
+        ToiToiNotification.error("更新に失敗しました。元に戻します。");
         setTaskData(previousTaskData);
       }
     } catch (error) {
-      toast.error("通信エラーが発生したため、元に戻します。");
+      ToiToiNotification.error("通信エラーが発生したため、元に戻します。");
       setTaskData(previousTaskData);
     }
   };
@@ -317,9 +290,16 @@ export default function TaskPage() {
             <option value="date">日付順</option>
             <option value="priority">優先度順</option>
           </select>
+
+          <DeleteConfirmModal
+            isOpen={modalConfig.isOpen}
+            title={modalConfig.title}
+            onClose={() => setModalConfig((prev) => ({ ...prev, isOpen: false }))}
+            onConfirm={modalConfig.onConfirm}
+          />
         </div>
 
-        <Celebration show={showCelebration} opacity={celebrationOpacity} message={celebrationMessage}/>
+        <Celebration show={showCelebration} opacity={celebrationOpacity} message={celebrationMessage} />
 
         {/* メインコンテンツ */}
         <main className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
@@ -327,7 +307,7 @@ export default function TaskPage() {
             tasks={processedTasks}
             toggleComplete={toggleComplete}
             onEdit={handleEdit}
-            onDelete={handleDelete}
+            onDelete={openDeleteConfirm}
             onDetail={handleDetail}
           />
         </main>
@@ -340,16 +320,16 @@ export default function TaskPage() {
           spaceId={space_id}
           type="task"
           onClose={() => setIsModalOpen(false)}
-          onError={(msg: string) => toast.error(msg)}
+          onError={(msg: string) => ToiToiNotification.error(msg)}
           onSuccess={async (newStatus: number) => {
             setIsModalOpen(false);
             if (modalMode === "edit") {
-              toast.success(MESSAGES.S1002("タスク"));
-            if (newStatus === 1) {
+              ToiToiNotification.success(MESSAGES.S1002("タスク"));
+              if (newStatus === 1) {
                 triggerCelebration();
               }
             } else {
-              toast.success(MESSAGES.S1001("タスク"));
+              ToiToiNotification.success(MESSAGES.S1001("タスク"));
             }
             try {
               const res = await fetch(`/api/task?spaceId=${space_id}`);
