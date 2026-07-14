@@ -54,7 +54,23 @@ export default function Header() {
     finally { setIsLoading(false); }
   }, []);
 
-  useEffect(() => { refreshData(); }, [refreshData]);
+  // useEffect(() => { refreshData(); }, [refreshData]);
+
+  useEffect(() => {
+    // カスタムイベントを待ち受けて refreshData を実行する関数
+    const handleRefreshHeader = () => {
+      refreshData();
+    };
+
+    // イベントリスナーを登録
+    window.addEventListener("refresh-header", handleRefreshHeader);
+
+    // クリーンアップ処理：コンポーネントが破棄される時にイベントを解除
+    return () => {
+      window.removeEventListener("refresh-header", handleRefreshHeader);
+    };
+  }, [refreshData]);
+
 
   const menuConfig = [
     { key: 'chats', title: 'チャット', items: data.chat, path: 'chat' },
