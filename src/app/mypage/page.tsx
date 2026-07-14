@@ -6,7 +6,6 @@ import { signOut, useSession } from "next-auth/react";
 import { Trash2, User, Settings, Loader2 } from "lucide-react";
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, useDisclosure } from "@nextui-org/react";
 import { Loading } from "@/components/LoadingSpinner";
-// 💡 自作の可愛いコンポーネントたちを正しくインポート
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import { ToiToiNotification } from "@/components/Toast";
 import { fetchWithTimeout } from "@/lib/api";
@@ -122,6 +121,7 @@ export default function MyPage() {
       }
       await fetchData();
       ToiToiNotification.success(data.message);
+      window.dispatchEvent(new Event("refresh-header"));
     } catch (e: any) {
       console.log(e);
     } finally {
