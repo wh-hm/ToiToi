@@ -18,8 +18,7 @@ export async function PATCH(
     const spaceIdNum = Number(spaceId);
     const { title, question, tag, questionId, id, isResolved } = await request.json();
 
-    const validQuestionId = Number(questionId || id);
-    if (!validQuestionId || isNaN(validQuestionId)) {
+    if (!questionId || isNaN(questionId)) {
       return NextResponse.json({ message: "質問IDが不足しています" }, { status: 400 });
     }
 

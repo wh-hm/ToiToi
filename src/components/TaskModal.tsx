@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { ToiToiNotification } from "@/components/Toast";
 
 export default function TaskModal(props: any): React.JSX.Element {
-  const { task, onClose, onSuccess, spaceId, mode = 'create', type = 'task', onError, onSubmit } = props; 
-  
+  const { task, onClose, onSuccess, spaceId, mode = 'create', type = 'task', onError, onSubmit } = props;
+
   const getNowDateTime = () => {
     const now = new Date();
     const yyyy = now.getFullYear();
@@ -87,7 +87,7 @@ export default function TaskModal(props: any): React.JSX.Element {
     if (!descText) return showError("詳細を入力してください。");
     if (titleText.length > 20) return showError(`${itemName}は20文字以内で入力してください。`);
     if (descText.length > 100) return showError("詳細は100文字以内で入力してください。");
-    
+
     const safeRegex = /[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uFF01-\uFF5E]/;
     if (safeRegex.test(titleText.replace(/\s+/g, ''))) return showError(`${itemName}に記号は使用できません。`);
     if (safeRegex.test(descText.replace(/\s+/g, ''))) return showError("詳細に記号は使用できません。");
@@ -107,7 +107,7 @@ export default function TaskModal(props: any): React.JSX.Element {
     if (type === "task") {
       const now = new Date();
       const checkDate = new Date(parsedDate.getTime());
-      
+
       // 終日の場合は、その日の終わり（23:59:59）まで許容する
       if (formData.isAllday === 1) {
         checkDate.setHours(23, 59, 59, 999);
@@ -134,8 +134,8 @@ export default function TaskModal(props: any): React.JSX.Element {
         ? {
           title: titleText,
           question: descText,
-          isResolved: isEditMode ? Number(formData.status) : 0, 
-          spaceId: numericSpaceId,                            
+          isResolved: isEditMode ? Number(formData.status) : 0,
+          spaceId: numericSpaceId,
           tag: Number(formData.tag) || 0,
         }
         : {
@@ -147,7 +147,7 @@ export default function TaskModal(props: any): React.JSX.Element {
           isAllday: Number(formData.isAllday),
           status: Number(formData.status),
           description: descText,
-          dueDate: parsedDate.toISOString(), 
+          dueDate: parsedDate.toISOString(),
         };
 
       if (onSubmit) {
@@ -173,7 +173,7 @@ export default function TaskModal(props: any): React.JSX.Element {
         if (data.message) {
           ToiToiNotification.success(data.message);
         }
-        
+
         setTimeout(() => onSuccess(Number(formData.status)), 100);
       } else {
         const resData = await res.json();
@@ -408,12 +408,15 @@ export default function TaskModal(props: any): React.JSX.Element {
         </div>
         {/* ボタンエリア */}
         <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-          <button onClick={onClose} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-sm font-medium">
+          <button onClick={onClose}
+            disabled={isSubmitting}
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-sm font-medium">
             {isDetailMode ? "閉じる" : "キャンセル"}
           </button>
           {!isDetailMode && (
             <button
               onClick={handleSubmit}
+              disabled={isSubmitting}
               className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium shadow-sm"
             >
               {isEditMode ? "更新する" : "作成する"}
