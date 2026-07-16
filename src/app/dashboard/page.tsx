@@ -10,6 +10,7 @@ import { Loading } from "@/components/LoadingSpinner";
 import { handleApiResponse } from "@/lib/api-utils";
 import { ToiToiNotification } from "@/components/Toast";
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
+import { pre } from "framer-motion/client";
 
 // 型定義
 type Space = {
@@ -468,7 +469,11 @@ export default function Dashboard() {
             window.dispatchEvent(new Event("refresh-header"));
             if (isGoal) {
               // 目標の場合
-              if (data.updatedGoal) setGoal(data.updatedGoal);
+              setGoal((prev)=>{
+                return prev
+                  ?{...prev, content: name }
+                  :{id: "", status: 0,content: name};
+              });
             } else {
               // スペースの更新（編集）の場合
               if (isEditingExistingSpace) {
