@@ -49,7 +49,7 @@ export default function QuestionPage() {
       onConfirm: async () => {
         const toastId = "delete-space-toast";
         try {
-          const res = await fetch(`/api/questions/${space_id}?questionId=${id}`, {
+          const res = await fetch(`/api/questions/${space_id}`, {
             method: "DELETE"
           });
           if (!res.ok) throw new Error();
@@ -108,7 +108,6 @@ export default function QuestionPage() {
   const handleStatusToggle = async (question: any) => {
     console.log(question);
     const currentStatus = Number(question.is_resolved ?? question.status);
-    const targetId = question.id;
     const newStatus = currentStatus === 1 ? 0 : 1;
     const previousQuestions = [...questions];
     setQuestions(
@@ -126,7 +125,7 @@ export default function QuestionPage() {
           ...question,
           status: newStatus,
           isResolved: newStatus,
-          questionId: Number(question.Id),
+          questionId: Number(question.id),
         }),
       });
       if (!res.ok) {
@@ -148,19 +147,23 @@ export default function QuestionPage() {
       console.error(error);
       setQuestions(previousQuestions);
     }
-
   };
 
   const handleModalSubmit = async (payload: any) => {
     const isEdit = modalMode === "edit";
     const url = isEdit ? `/api/questions/${space_id}` : `/api/questions`;
     const method = isEdit ? "PATCH" : "POST";
-
+    const previousStatus = Number(selectedQuestion?.is_resolved ?? 0);
+    const newStatus = isEdit 
+      ? Number(payload.status ?? payload.isResolved ?? previousStatus) 
+      : 0;
     const formattedPayload = {
-      ...payload,
-      space_id: Number(space_id),
-      is_resolved: isEdit ? Number(payload.status ?? selectedQuestion.is_resolved) : 0
-
+      spaceId: Number(space_id),
+      questionId: isEdit ? Number(payload.id ?? selectedQuestion?.id) : undefined,
+      title: payload.title,
+      question: payload.content || payload.description || payload.question,
+      isResolved: newStatus,
+      tag: payload.tag ? Number(payload.tag) : null,
     };
 
     try {
@@ -174,8 +177,8 @@ export default function QuestionPage() {
         ToiToiNotification.success(isEdit ? "質問を更新しました" : "質問を作成しました");
         setIsModalOpen(false);
         fetchQuestions();
-        if (isEdit && formattedPayload.is_resolved === 1) {
-          triggerCelebration();
+        if (isEdit && previousStatus !== 1 && newStatus === 1) {
+          triggerCelebration("解決おめでとう！");
         }
       } else {
         ToiToiNotification.error(isEdit ? "更新に失敗しました" : "作成に失敗しました");
