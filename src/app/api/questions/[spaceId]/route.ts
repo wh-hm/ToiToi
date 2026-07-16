@@ -16,9 +16,10 @@ export async function PATCH(
   try {
     const { spaceId } = await params;
     const spaceIdNum = Number(spaceId);
-    const { title, question, tag, questionId, id, isResolved } = await request.json();
+    const { title, question, tag, questionId, isResolved } = await request.json();
 
-    if (!questionId || isNaN(questionId)) {
+    const questionIdNum = Number(questionId);
+    if (!questionIdNum) {
       return NextResponse.json({ message: "質問IDが不足しています" }, { status: 400 });
     }
 
@@ -43,7 +44,7 @@ export async function PATCH(
     }
     
     const updated = await updateQuestion(
-      questionId, spaceIdNum, auth.user_id, title, question, isResolved ?? 0, tag ? Number(tag) : null
+      questionIdNum, spaceIdNum, auth.user_id, title, question, isResolved ?? 0, tag ? Number(tag) : null
     );
 
     return NextResponse.json({ question: updated, message: MESSAGES.S1002("質問") });
