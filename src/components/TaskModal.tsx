@@ -1,8 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ToiToiNotification } from "@/components/Toast";
+import { Loading } from "./LoadingSpinner";
+import { handleApiResponse } from "@/lib/api-utils";
+import { fetchWithTimeout } from "@/lib/api";
 
 export default function TaskModal(props: any): React.JSX.Element {
-  const { task, onClose, onSuccess, spaceId, mode = 'create', type = 'task', onError, onSubmit } = props;
+  const { task, onClose, onSuccess, spaceId, mode = 'create', type = 'task', onError, onSubmit } = props; 
+  
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
+      onClose();
+    }
+  };
 
   const getNowDateTime = () => {
     const now = new Date();
@@ -75,8 +86,24 @@ export default function TaskModal(props: any): React.JSX.Element {
     else alert(msg);
   };
 
+  const prevDueTime = useRef(formData.dueTime);
+
+  // 終日状態が変わったことを検知
+  useEffect(() => {
+    if (formData.isAllday === 1) {
+      // 終日になったら今の値を記録
+      prevDueTime.current = formData.dueTime;
+      setFormData(prev => ({ ...prev, dueTime: "" }));
+    } else {
+      // 終日じゃなくなったら戻す（初回ロード時などは条件分岐が必要）
+      if (formData.dueTime === "") {
+        setFormData(prev => ({ ...prev, dueTime: prevDueTime.current }));
+      }
+    }
+  }, [formData.isAllday]);
+
+
   const handleSubmit = async () => {
-    if (isSubmitting) return;
 
     const titleText = formData.title?.trim() || "";
     const descText = formData.description?.trim() || "";
@@ -160,35 +187,37 @@ export default function TaskModal(props: any): React.JSX.Element {
       const baseApiRoute = type === "question" ? "questions" : "task";
       const url = isEditMode ? `/api/${baseApiRoute}/${task.id}` : `/api/${baseApiRoute}`;
 
-      const res = await fetch(url, {
+      const res = await fetchWithTimeout(url, {
         method,
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify(payload),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        console.log(data);
-        if (data.message) {
-          ToiToiNotification.success(data.message);
-        }
-
-        setTimeout(() => onSuccess(Number(formData.status)), 100);
-      } else {
-        const resData = await res.json();
-        showError(resData.message || resData.error || "登録に失敗しました。");
+      if(!res.ok){
+        await handleApiResponse(res);
+        throw new Error();
       }
+        const data = await res.json();
+        ToiToiNotification.success(data.message);
+        setTimeout(() => onSuccess(Number(formData.status)), 100);
     } catch (error) {
-      showError("通信エラーが発生しました。");
+      console.log("通信エラーが発生しました。");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-100 p-6 space-y-5 text-slate-800">
+    <div 
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      onClick={handleBackdropClick}
+    >
+      <div 
+        className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-100 p-6 space-y-5 text-slate-800"
+        ref={modalRef}
+        onClick={(e) => e.stopPropagation()}
+      >
 
         {/* ヘッダータイトル */}
         <h2 className="text-xl font-bold text-slate-900 border-b border-slate-100 pb-3">
@@ -202,6 +231,7 @@ export default function TaskModal(props: any): React.JSX.Element {
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold text-slate-500">
               {type === "question" ? "質問タイトル" : "タスク名"} (20文字以内・記号不可)
+              <span className="text-red-500 ml-1">*</span>
             </label>
             <input
               value={formData.title}
@@ -415,14 +445,24 @@ export default function TaskModal(props: any): React.JSX.Element {
           </button>
           {!isDetailMode && (
             <button
-              onClick={handleSubmit}
               disabled={isSubmitting}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium shadow-sm"
-            >
+              onClick={handleSubmit}
+              className="
+                bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 rounded-xl shadow-sm transition-all text-sm flex items-center gap-1
+                disabled:bg-gray-400 disabled:cursor-not-allowed disabled:shadow-none
+              "           
+             >
               {isEditMode ? "更新する" : "作成する"}
             </button>
           )}
         </div>
+        {(isSubmitting) && (
+          <div className="fixed inset-0 bg-black/5 backdrop-blur-[1px] z-50 flex items-center justify-center">
+            <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-100 max-w-xs w-full text-center">
+              <Loading text={isEditMode ? "更新中..." : "作成中..."} />
+            </div>
+          </div>
+        )}
 
       </div>
     </div>

@@ -26,6 +26,8 @@ export async function GET(request: NextRequest) {
         }
 
         const tasks = await getTasks(spaceId, auth.user_id);
+        // return NextResponse.json({ message: MESSAGES.E2003("タスク") }, { status: 500 });
+
         return NextResponse.json({
             incomplete: tasks.filter((t) => t.status === 0),
             complete: tasks.filter((t) => t.status === 1),
@@ -42,16 +44,15 @@ export async function POST(request: NextRequest) {
 
     try {
         const body = await request.json();
-        
-        // 💡 キャメルケースに統一（どちらで送られてきても受け取れるようにフォールバックを設定）
-        const spaceId = Number(body.spaceId || body.space_id);
-        const title = body.title;
-        const description = body.description;
-        const dueDate = body.dueDate || body.due_date;
-        const tag = body.tag;
-        const isAllDay = body.isAllDay ?? body.is_allday;
-        const priority = body.priority;
+        console.log("POST body:", body);
 
+        const spaceId = body.spaceId || body.space_id;
+        const { title, description, dueDate, tag, isAllday, priority } = body;
+
+        // --- 単体チェック ---
+        if (!title) return NextResponse.json({ message: MESSAGES.E1001("タスク名") }, { status: 400 });
+        if (!dueDate) return NextResponse.json({ message: MESSAGES.E1001("期限") }, { status: 400 });
+        
         // 1. 必須チェック (E1001)
         if (!title || title.trim() === "") return NextResponse.json({ message: MESSAGES.E1001("タスク名") }, { status: 400 });
         if (!dueDate) return NextResponse.json({ message: MESSAGES.E1001("期限") }, { status: 400 });
@@ -81,10 +82,10 @@ export async function POST(request: NextRequest) {
 
         // データベース保存（引数もキャメルケースの変数に修正）
         const newTask = await registerTask(
-            auth.user_id, title, description, dueDate, spaceId, tag || 0, isAllDay, priority
+            auth.user_id, title, description, dueDate, spaceId, tag || 0, isAllday, priority
         );
-
-        return NextResponse.json(newTask, { status: 201 });
+        
+        return NextResponse.json({task: newTask, message: MESSAGES.S1001("タスク")}, { status: 201 });
     } catch (error) {
         return NextResponse.json({ message: MESSAGES.E2001("タスク") }, { status: 500 });
     }
