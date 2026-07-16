@@ -58,7 +58,7 @@ export async function DELETE(
     
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-       return NextResponse.json({ message: MESSAGES.E2005("チャット") }, { status: 404 });
+      return NextResponse.json({ message: MESSAGES.E2005("チャット") }, { status: 404 });
     }
     console.error("DELETE Error:", error);
     return NextResponse.json({ message: MESSAGES.E2004("チャット") }, { status: 500 });

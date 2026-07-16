@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
             auth.user_id, title, description, dueDate, spaceId, tag || 0, isAllday, priority
         );
         
-        return NextResponse.json(newTask, { status: 201 });
+        return NextResponse.json({task: newTask, message: MESSAGES.S1001("タスク")}, { status: 201 });
     } catch (error) {
         return NextResponse.json({ message: MESSAGES.E2001("タスク") }, { status: 500 });
     }

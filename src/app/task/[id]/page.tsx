@@ -4,33 +4,31 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { ToiToiNotification } from "@/components/Toast";
-import { MESSAGES } from "@/constants/messages";
 import TaskList from "@/components/TaskList";
 import TaskModal from "@/components/TaskModal";
 import { Loading } from "@/components/LoadingSpinner";
 import { useCelebration, Celebration } from "@/components/Celebration";
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import { handleApiResponse } from "@/lib/api-utils";
+import { fetchWithTimeout } from "@/lib/api";
 
 export default function TaskPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const params = useParams();
   const space_id = params?.id;
-
   // 1. 状態管理（State）の設計
   const [taskData, setTaskData] = useState<{ incomplete: any[]; complete: any[] }>({
     incomplete: [],
     complete: [],
   });
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(false);
 
   // モーダル制御用の状態
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
   const [modalMode, setModalMode] = useState<"create" | "edit" | "detail">("create");
-
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [sortType, setSortType] = useState<"date" | "priority">("date");
 
   // タグ検索とナレッジ検索の状態
@@ -55,55 +53,47 @@ export default function TaskPage() {
       isOpen: true,
       title: "タスクを削除する？",
       onConfirm: async () => {
-        const toastId = "delete-space-toast";
+        setIsSubmitting(true);
         try {
-          const res = await fetch(`/api/task/${space_id}?taskId=${id}`, {
+          const res = await fetchWithTimeout(`/api/task/${space_id}?taskId=${id}`, {
             method: "DELETE"
           });
-          if (!res.ok) throw new Error();
-          ToiToiNotification.success("タスクを削除しました！", toastId);
-          const refreshRes = await fetch(`/api/task?spaceId=${space_id}`);
-        if (refreshRes.ok) {
-          const data = await refreshRes.json();
-          setTaskData({
-            incomplete: Array.isArray(data.incomplete) ? data.incomplete : [],
-            complete: Array.isArray(data.complete) ? data.complete : [],
-          });
-        }
+          if (!res.ok){
+            await handleApiResponse(res);
+            throw new Error();
+          }
+          const data = await res.json();
+          ToiToiNotification.success(data.message);
+          setTaskData((prev) => ({
+            incomplete: prev.incomplete.filter((task) => task.id !== id),
+            complete: prev.complete.filter((task) => task.id !== id),
+          }));
         } catch (error) {
           console.error(error);
-          ToiToiNotification.error("削除に失敗しました。", toastId);
+        }finally{
+          setIsSubmitting(false);
         }
       },
     });
   };
-
   // 2. タスクデータの取得
   const fetchTasks = useCallback(async () => {
     if (!space_id) return;
-    
-
     try {
-      const res = await fetch(`/api/task?spaceId=${space_id}`, {
-        cache: "no-store",
-      });
+      const res = await fetchWithTimeout(`/api/task?spaceId=${space_id}`);
       if (!res.ok) {
         setError(true)
         await handleApiResponse(res);
         throw new Error("API error");
       }
       const data = await res.json();
-      console.log("認証情報を含めた最新データ:", data);
-
       setTaskData({
         incomplete: Array.isArray(data.incomplete) ? data.incomplete : [],
         complete: Array.isArray(data.complete) ? data.complete : [],
       });
     } catch (error) {
       console.error("タスク取得失敗", error);
-    } finally {
-      setIsLoading(false);
-    }
+    } 
   }, [space_id]);
 
   // セッションチェックと自動フェッチ
@@ -180,21 +170,27 @@ export default function TaskPage() {
   const toggleComplete = async (task: any) => {
     const newStatus = Number(task.status) === 0 ? 1 : 0;
     const previousTaskData = { ...taskData };
+    setTaskData((prev) => {
+      const isComplete = newStatus === 1;
+      // 更新後のタスク状態を予測して作成
+      const newTask = { ...task, status: newStatus }; 
+      return {
+        incomplete: isComplete
+          ? prev.incomplete.filter((t) => t.id !== task.id)
+          : [newTask, ...prev.incomplete],
+        complete: isComplete
+          ? [newTask, ...prev.complete]
+          : prev.complete.filter((t) => t.id !== task.id),
+      };
+    });
     if (newStatus === 1) {
-      const updatedTask = { ...task, status: 1 };
-      setTaskData({
-        incomplete: taskData.incomplete.filter((t) => t.id !== task.id),
-        complete: [updatedTask, ...taskData.complete],
-      });
-    } else {
-      const updatedTask = { ...task, status: 0 };
-      setTaskData({
-        incomplete: [updatedTask, ...taskData.incomplete],
-        complete: taskData.complete.filter((t) => t.id !== task.id),
-      });
-    }
+        triggerCelebration("タスク完了おめでとう！");
+      } else {
+        ToiToiNotification.info("未完了に戻しました");
+      }
+
     try {
-      const res = await fetch(`/api/task/${task.id}/status`, {
+      const res = await fetchWithTimeout(`/api/task/${task.id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -203,31 +199,14 @@ export default function TaskPage() {
           spaceId: Number(space_id),
         }),
       });
-      if (res.ok) {
-        if (newStatus === 1) {
-          triggerCelebration("タスク完了おめでとう！");
-        } else {
-          ToiToiNotification.info("未完了に戻しました");
-        }
-        // リフレッシュ処理も spaceId に変更
-        const refreshRes = await fetch(`/api/task?spaceId=${space_id}`);
-        if (refreshRes.ok) {
-          const data = await refreshRes.json();
-          setTaskData({
-            incomplete: Array.isArray(data.incomplete) ? data.incomplete : [],
-            complete: Array.isArray(data.complete) ? data.complete : [],
-          });
-        }
-      } else {
-        ToiToiNotification.error("更新に失敗しました。元に戻します。");
-        setTaskData(previousTaskData);
+      if(!res.ok){
+        await handleApiResponse(res);
+        throw new Error();
       }
     } catch (error) {
-      ToiToiNotification.error("通信エラーが発生したため、元に戻します。");
       setTaskData(previousTaskData);
     }
   };
-
   if (status === "loading" || status === "unauthenticated") {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#f8fafc" }}>
@@ -322,7 +301,6 @@ export default function TaskPage() {
           />
         </main>
       </div>
-
       {isModalOpen && (
         <TaskModal
           mode={modalMode}
@@ -333,29 +311,34 @@ export default function TaskPage() {
           onError={(msg: string) => ToiToiNotification.error(msg)}
           onSuccess={async (newStatus: number) => {
             setIsModalOpen(false);
-            if (modalMode === "edit") {
-              ToiToiNotification.success(MESSAGES.S1002("タスク"));
-              if (newStatus === 1) {
-                triggerCelebration();
-              }
-            } else {
-              ToiToiNotification.success(MESSAGES.S1001("タスク"));
+            if (newStatus === 1) {
+              triggerCelebration();
             }
             try {
-              const res = await fetch(`/api/task?spaceId=${space_id}`);
-              if (res.ok) {
-                const data = await res.json();
-                setTaskData({
-                  incomplete: Array.isArray(data.incomplete) ? data.incomplete : [],
-                  complete: Array.isArray(data.complete) ? data.complete : [],
-                });
+              const res = await fetchWithTimeout(`/api/task?spaceId=${space_id}`);
+              if(!res.ok){
+                await handleApiResponse(res);
+                throw new Error();
               }
+              const data = await res.json();
+              setTaskData({
+                incomplete: Array.isArray(data.incomplete) ? data.incomplete : [],
+                complete: Array.isArray(data.complete) ? data.complete : [],
+              });
             } catch (error) {
               console.error(error);
             }
           }}
         />
       )}
+      {(isSubmitting) && (
+        <div className="fixed inset-0 bg-black/5 backdrop-blur-[1px] z-50 flex items-center justify-center">
+          <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-100 max-w-xs w-full text-center">
+            <Loading text="削除中..."/>
+          </div>
+        </div>
+      )}
     </div>
+    
   );
 }
