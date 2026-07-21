@@ -32,8 +32,6 @@ export default function SpaceModal({ isOpen, onClose, spaceType, editingSpace, o
     }
   }, [isOpen, editingSpace, spaceType]);
 
-  if (!isOpen) return null;
-
   const handleSave = async () => {
     setIsSubmitting(true);
     try {
@@ -46,22 +44,27 @@ export default function SpaceModal({ isOpen, onClose, spaceType, editingSpace, o
   };
 
   return (
-    <div style={{
+    <div
+    onClick={onClose}
+    style={{
+      display: isOpen ? "flex" : "none",
       position: "fixed",
       top: 0, left: 0, width: "100%", height: "100%",
       backgroundColor: "rgba(15, 23, 42, 0.3)",
       backdropFilter: "blur(6px)",
-      display: "flex", justifyContent: "center", alignItems: "center",
+      justifyContent: "center", alignItems: "center",
       zIndex: 1000
     }}>
-      <div style={{
-        backgroundColor: "#ffffff",
-        padding: "24px 28px",
-        borderRadius: "14px",
-        width: "100%",
-        maxWidth: "460px",
-        boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.03)"
-      }}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          backgroundColor: "#ffffff",
+          padding: "24px 28px",
+          borderRadius: "14px",
+          width: "100%",
+          maxWidth: "460px",
+          boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.03)"
+        }}>
 
         {/* 【1. ヘッダー】 */}
         <div style={{ marginBottom: "20px" }}>

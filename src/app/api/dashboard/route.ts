@@ -3,7 +3,7 @@ import { getAuthContext } from "@/lib/auth-guard";
 import { getSpaces } from "@/services/SpaceService";
 import { getTasksCount } from "@/services/TaskService";
 import { MESSAGES } from "@/constants/messages";
-import { getGoal} from "@/services/GoalService";
+import { getGoal, updateGoal } from "@/services/GoalService";
 import { getLoginManagement } from "@/services/LoginManagementService";
 import { getQuestionsCount } from "@/services/QuestionService";
 
@@ -15,60 +15,61 @@ export async function GET() {
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
   try {
-    const [allSpaces, tasksWithCounts, questionsWithCounts, goal, loginManagement] = await Promise.all([
+    // 1. スペース一覧 と スペースごとのタスク数配列 を取得
+    const [allSpaces, tasksWithCounts, questionsWithCounts, goal, login_management] = await Promise.all([
       getSpaces(auth.user_id),
-      getTasksCount(auth.user_id),
+      getTasksCount(auth.user_id), 
       getQuestionsCount(auth.user_id),
       getGoal(auth.user_id),
       getLoginManagement(auth.user_id)
     ]);
 
-    const formatSpace = (s: any, countKey?: string, countValue?: number) => {
+    // 2. スペースにタスク数を結合する（マージ処理）
+    const spacesWithTaskCount = allSpaces.map(space => {
+      const taskInfo = tasksWithCounts.find(t => t.space_id === space.id);
       return {
-        id: String(s.id),
-        name: s.name,
-        spaceType: Number(s.space_type),        
-        favoriteFlag: Number(s.favorite_flag ?? 0), 
-        isArchived: Number(s.is_archived ?? 0),    
-        ...(countKey ? { [countKey]: countValue ?? 0 } : {})
+        ...space,
+        taskCount: taskInfo ? taskInfo.task_count : 0 // 見つからなければ0
       };
-    };
+    });
 
+    const spacesWithQuestionCount = allSpaces.map(space => {
+      const questionInfo = questionsWithCounts.find(t => t.space_id === space.id);
+      return {
+        ...space,
+        questionCount: questionInfo ? questionInfo.question_count : 0 // 見つからなければ0
+      };
+    });
+
+    // 3. データの整形と統合
     const result = {
       spaces: {
-        chat: allSpaces
-        .filter(s => s.space_type === 1)
-        .map(s => formatSpace(s)),
-        task: allSpaces
+        chat: spacesWithTaskCount.filter(s => s.space_type === 1),
+        task: spacesWithTaskCount
           .filter(s => s.space_type === 2)
-          .map(s => {
-            const count = tasksWithCounts.find(t => t.space_id === s.id)?.task_count ?? 0;
-            return formatSpace(s, "taskCount", count);
-          }),
-        question: allSpaces
+          .map(s => ({
+            ...s, 
+            taskCount: s.taskCount 
+        })),
+        question: spacesWithQuestionCount
           .filter(s => s.space_type === 3)
-          .map(s => {
-            const count = questionsWithCounts.find(q => q.space_id === s.id)?.question_count ?? 0;
-            return formatSpace(s, "questionCount", count);
-          }),
+          .map(s => ({
+            ...s, 
+            questionCount: s.questionCount 
+        })),
       },
-      goal: goal ? {
-        id: goal.id,
-        content: goal.content,
-        status: Number(goal.status ?? 0),
-        createdAt: goal.created_at,
-        deletedAt: goal.deleted_at,
-        deleteFlag: goal.delete_flag
-        } : null,
-      loginManagement,
+      goal: goal,             // 目標データ
+      loginManagement: login_management, // ログイン管理情報
     };
-      return NextResponse.json({
-      ...result,
-      message: MESSAGES.S2001("ダッシュボードデータ")
-    }, { status: 200 });
 
+    return NextResponse.json({ 
+        ...result, 
+        message: MESSAGES.S2001("ダッシュボードデータ") 
+    }, { status: 200});
+    
   } catch (error) {
-    console.error("Dashboard API Error:", error);
-    return NextResponse.json({ message: MESSAGES.E2003("データ取得") }, { status: 500 });
+    console.error("データ取得エラー:", error);
+    return NextResponse.json({ message: MESSAGES.E2001("データ取得") }, { status: 500 });
   }
-}
+} 
+

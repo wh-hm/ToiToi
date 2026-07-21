@@ -12,8 +12,6 @@ import {ChevronDownIcon} from "lucide-react"
 import { fetchWithTimeout } from "@/lib/api";
 import { handleApiResponse } from "@/lib/api-utils";
 
-
-
 export default function Header() {
   const [data, setData] = useState<any>({ chat: [], task: [], question: [] });
   const [isLoading, setIsLoading] = useState(true);
@@ -29,7 +27,6 @@ export default function Header() {
       const target = e.target as HTMLElement;
       // メニュー本体のスクロールなら閉じない
       if (drawerRef.current && drawerRef.current.contains(target)) return;
-      
       setIsMobileMenuOpen(false);
     };
 
@@ -54,17 +51,15 @@ export default function Header() {
     finally { setIsLoading(false); }
   }, []);
 
-  // useEffect(() => { refreshData(); }, [refreshData]);
+  useEffect(() => { refreshData(); }, [refreshData]);
 
   useEffect(() => {
     // カスタムイベントを待ち受けて refreshData を実行する関数
     const handleRefreshHeader = () => {
       refreshData();
     };
-
     // イベントリスナーを登録
     window.addEventListener("refresh-header", handleRefreshHeader);
-
     // クリーンアップ処理：コンポーネントが破棄される時にイベントを解除
     return () => {
       window.removeEventListener("refresh-header", handleRefreshHeader);

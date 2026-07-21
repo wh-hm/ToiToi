@@ -9,7 +9,6 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { fetchWithTimeout } from "@/lib/api";
 import { handleApiResponse } from "@/lib/api-utils";
-import SpaceModal from "@/components/SpaceModal";
 
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const [chats, setChats] = useState<ChatMessage[]>([]);
