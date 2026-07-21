@@ -27,6 +27,7 @@ export async function getSpaces(
   });
 }
 
+
 //スペースが生きているかどうかの確認
 export async function getSpaceCheck(userId: string, spaceId: number): Promise<boolean> {
   const space = await prisma.space.findFirst({
@@ -34,6 +35,7 @@ export async function getSpaceCheck(userId: string, spaceId: number): Promise<bo
   });
   return !!space && space.delete_flag === 0;
 }
+
 
 //スペース名取得
 export async function getSpaceName(userId: string, spaceId: number): Promise<string> {
@@ -43,6 +45,7 @@ export async function getSpaceName(userId: string, spaceId: number): Promise<str
   if (!space) throw new Error("指定されたスペースが見つかりません。");
   return space.name;
 }
+
 
 // 概要：スペースの登録
 export async function registerSpace(
@@ -85,7 +88,8 @@ export async function deleteSpace(
 }
 
 // 概要：スペース一括削除、質問一括削除、チャット一括削除、タスク一括削除
-export async function deleteSpaces(userId: string, spaceType: string): Promise<boolean> {
+export async function deleteSpaces(userId: string, spaceType: string, tx?: Tx): Promise<boolean> {
+  const db = tx || prisma;
   const typeMapping: Record<string, number> = { "CHAT": 1, "TASK": 2, "QUESTION": 3 };
 
   const whereClause: Prisma.SpaceWhereInput = {
@@ -94,80 +98,17 @@ export async function deleteSpaces(userId: string, spaceType: string): Promise<b
     ...(spaceType !== "ALL" && { space_type: typeMapping[spaceType] }),
   };
 
-  const spaces = await prisma.space.findMany({ where: whereClause, select: { id: true, space_type: true } });
-  if (spaces.length === 0) {
+  const spaces = await db.space.findMany({ where: whereClause, select: { id: true, space_type: true } });
+  if(spaces.length === 0){
     return false;
   }
 
-  let allImageIds: number[] = [];
-
-  try {
-    allImageIds = await prisma.$transaction(async (tx) => {
-      let imageIdsCollector: number[] = [];
-
-      for (const space of spaces) {
-        const stringType = spaceType === "ALL" 
-          ? (Object.keys(typeMapping).find(k => typeMapping[k] === space.space_type) || "UNKNOWN")
-          : spaceType;
-
-        if (stringType === 'CHAT') {
-          const chats = await tx.chat.findMany({
-            where: { space_id: space.id, user_id: userId, delete_flag: 0 },
-            select: { id: true, image_id: true }
-          });
-          const imgIds = chats.map(c => c.image_id).filter((id): id is number => id !== null);
-          imageIdsCollector.push(...imgIds);
-
-          if (chats.length > 0) {
-            await tx.chat.updateMany({
-              where: { id: { in: chats.map(c => c.id) } },
-              data: { delete_flag: 1 }
-            });
-          }
-        } else if (stringType === 'TASK') {
-          await tx.task.updateMany({
-            where: { space_id: space.id, user_id: userId, delete_flag: 0 },
-            data: { delete_flag: 1 },
-          });
-        } else if (stringType === 'QUESTION') {
-          const questions = await tx.question.findMany({
-            where: { space_id: space.id, user_id: userId, delete_flag: 0 },
-            select: { id: true }
-          });
-          if (questions.length > 0) {
-            const qIds = questions.map(q => q.id);
-            const questionChats = await tx.questionChats.findMany({
-              where: { question_id: { in: qIds } },
-              select: { image_id: true }
-            });
-            const imgIds = questionChats.map(c => c.image_id).filter((id): id is number => id !== null);
-            imageIdsCollector.push(...imgIds);
-
-            await tx.question.updateMany({ where: { id: { in: qIds } }, data: { delete_flag: 1 } });
-            await tx.questionChats.updateMany({ where: { question_id: { in: qIds } }, data: { delete_flag: 1 } });
-          }
-        }
-
-        await tx.space.update({
-          where: { id: space.id },
-          data: { delete_flag: 1 },
-        });
-      }
-
-      return imageIdsCollector;
-    });
-  } catch (error) {
-    console.error("一括削除トランザクションエラー:", error);
-    return false;
-  }
-
-  if (allImageIds.length > 0) {
-    try {
-      await deleteImages(allImageIds);
-    } catch (storageError) {
-      console.error("ストレージ画像の削除に失敗しました:", storageError);
-    }
-  }
+  await Promise.all(spaces.map(space => {
+    const stringType = spaceType === "ALL" 
+      ? (Object.keys(typeMapping).find(k => typeMapping[k] === space.space_type) || "UNKNOWN")
+      : spaceType;
+    return deleteSpace(space.id, stringType, userId, db);
+  }));
 
   return true;
 }
@@ -176,20 +117,22 @@ export async function deleteSpaces(userId: string, spaceType: string): Promise<b
 export async function deleteSpaceChat(spaceId: number, userId: string, tx?: Tx): Promise<boolean> {
   const db = tx || prisma;
   
+  // 1. 削除対象の画像IDを先に特定
   const chats = await db.chat.findMany({
     where: { space_id: spaceId, user_id: userId, delete_flag: 0 },
     select: { id: true, image_id: true }
   });
 
-  if (chats.length === 0) return true;
+  if (chats.length === 0) return false;
 
   const imageIds = chats.map(c => c.image_id).filter((id): id is number => id !== null);
-  console.log("写真の枚数", imageIds);
 
+  // 2. 画像の物理削除を実行 (別関数を呼ぶ)
   if (imageIds.length > 0) {
     await deleteImages(imageIds); 
   }
 
+  // 3. チャット本体を論理削除
   await db.chat.updateMany({
     where: { id: { in: chats.map(c => c.id) } },
     data: { delete_flag: 1 }
@@ -198,36 +141,40 @@ export async function deleteSpaceChat(spaceId: number, userId: string, tx?: Tx):
   return true;
 }
 
+
 export async function deleteSpaceTask(spaceId: number, userId: string, tx?: Tx): Promise<boolean> {
   const db = tx || prisma;
-
-  await db.task.updateMany({
+  const result =  await db.task.updateMany({
     where: { space_id: spaceId, user_id: userId, delete_flag: 0 },
     data: { delete_flag: 1 },
   });
+  if(result.count === 0){
+    return false;
+  }
   return true;
 }
 
+
 export async function deleteSpaceQuestion(spaceId: number, userId: string, tx?: Tx): Promise<boolean> {
   const db = tx || prisma;
-  
+  // 1. 質問を取得
   const questions = await db.question.findMany({
     where: { space_id: spaceId, user_id: userId, delete_flag: 0 },
     select: { id: true }
   });
-  if (questions.length === 0) return true;
-
+  if (questions.length === 0) return false;
   const qIds = questions.map(q => q.id);
+  // 2. 紐付く画像IDを特定
   const questionChats = await db.questionChats.findMany({
     where: { question_id: { in: qIds } },
     select: { image_id: true }
   });
   const imageIds = questionChats.map(c => c.image_id).filter((id): id is number => id !== null);
-
+  // 3. 【重要】画像を物理削除（R2削除 + DBレコード削除）
   if (imageIds.length > 0) {
     await deleteImages(imageIds); 
   }
-
+  // 4. 本体を論理削除
   await db.question.updateMany({ where: { id: { in: qIds } }, data: { delete_flag: 1 } });
   await db.questionChats.updateMany({ where: { question_id: { in: qIds } }, data: { delete_flag: 1 } });
   
@@ -241,22 +188,13 @@ export async function deleteSpaceQuestion(spaceId: number, userId: string, tx?: 
 export async function deleteArchives(userId: string, tx?: Tx): Promise<boolean> {
   const db = tx || prisma;
   const archivedSpaces = await getSpaces(userId, 1, null);
-
-  if (archivedSpaces.length === 0) {
+  if(archivedSpaces.length === 0){
     return false;
   }
 
-  try {
-    await db.$transaction(async (innerTx) => {
-      for (const space of archivedSpaces) {
-        const typeString = SPACE_TYPE_MAP[space.space_type] || "UNKNOWN";
-        await deleteSpace(space.id, typeString, userId, innerTx);
-      }
-    });
-  } catch (error) {
-    console.error("アーカイブ一括削除トランザクションエラー:", error);
-    return false;
-  }
-
+  await Promise.all(archivedSpaces.map(space => {
+    const typeString = SPACE_TYPE_MAP[space.space_type] || "UNKNOWN";
+    return deleteSpace(space.id, typeString, userId, db);
+  }));
   return true;
 }
