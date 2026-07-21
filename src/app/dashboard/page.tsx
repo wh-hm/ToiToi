@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import SpaceModal from "@/components/SpaceModal";
 import { useState, useEffect, useRef } from "react";
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import SpaceList from "@/components/SpaceList";
 import { fetchWithTimeout } from "@/lib/api";
 import { Loading } from "@/components/LoadingSpinner";
@@ -100,6 +100,13 @@ export default function Dashboard() {
     try {
       // ログイン状況の更新
       const loginRes = await fetchWithTimeout("/api/user/loginUpdate", { method: "PATCH" });
+      if (loginRes.status === 404) {
+        try {
+          await signOut({ callbackUrl: '/' });
+        } catch (e) {
+          console.error(e);
+        } 
+      }
       if (!loginRes.ok) {
         await handleApiResponse(loginRes);
         throw new Error();
@@ -107,6 +114,13 @@ export default function Dashboard() {
 
       // ダッシュボードデータの取得
       const res = await fetchWithTimeout("/api/dashboard");
+      if (res.status === 404) {
+        try {
+          await signOut({ callbackUrl: '/' });
+        } catch (e) {
+          console.error(e);
+        } 
+      }
       if (!res.ok) {
         await handleApiResponse(res);
         throw new Error();
@@ -233,7 +247,7 @@ export default function Dashboard() {
           });
         } catch (error) {
           console.error(error);
-          ToiToiNotification.error("削除に失敗しました。", toastId);
+          // ToiToiNotification.error("削除に失敗しました。", toastId);
         }
       },
     });
@@ -273,11 +287,11 @@ export default function Dashboard() {
 
     const displayType1 = getDisplaySpaces(spaces.chat, showArchivedType1);
     const displayType2 = getDisplaySpaces(
-      spaces.task.map(s => ({ ...s, pendingCount: '未完了タスク： ' + s.taskCount })), 
+      spaces.task.map(s => ({ ...s, pendingCount: '未完了： ' + s.taskCount })), 
       showArchivedType2
     );
     const displayType3 = getDisplaySpaces(
-    spaces.question.map(s => ({ ...s, pendingCount: '未解決質問： ' + s.questionCount })), 
+    spaces.question.map(s => ({ ...s, pendingCount: '未解決： ' + s.questionCount })), 
     showArchivedType3
   );
 

@@ -12,7 +12,7 @@ export const handleApiResponse = async (res: Response) => {
     if (res.status === 403) {
         if (errorData.code === "USER_DELETED") {
             ToiToiNotification.error(errorData.message);
-            await signOut({ callbackUrl: '/login' });
+            await signOut({ callbackUrl: '/' });
             
         } else {
             ToiToiNotification.error(errorData.message || "権限がありません。");

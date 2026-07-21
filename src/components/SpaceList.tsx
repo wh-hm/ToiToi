@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { Archive, ArchiveRestore, ArchiveX, Package } from 'lucide-react';
 
 type Space = {
   id: string;
@@ -119,6 +120,10 @@ export default function SpaceList(props: SpaceListProps) {
                   minWidth: 0, // これが重要！truncateを効かせるため
                   gap: "8px" 
                 }}>
+
+                  {s.isArchived === 1 && (
+                      <Package size={18} />
+                    )}     
                   <a 
                     href={getLinkPath(s.spaceType, s.id)} 
                     title={s.name}
@@ -136,22 +141,9 @@ export default function SpaceList(props: SpaceListProps) {
                   </a>
                   {/* ラベルやバッジ */}
                   <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
-                    {s.isArchived === 1 && (
-                      <span style={{ 
-                        fontSize: "10px", 
-                        padding: "2px 6px",
-                        lineHeight: "1",
-                        background: "#e2e8f0", 
-                        color: "#64748b", 
-                        borderRadius: "4px" 
-                      }}>
-                        アーカイブ済
-                      </span>
-                    )}                    
                     <span style={{ 
-                      fontSize: "11px", 
-                      padding: "2px 8px",
-                      lineHeight: "1",
+                      fontSize: "13px", 
+                      padding: "3px 8px",
                       background: "#f1f5f9", 
                       color: "#475569", 
                       borderRadius: "999px" 
