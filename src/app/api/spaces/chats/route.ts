@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { deleteSpaces } from "@/services/SpaceService";
 import { getAuthContext } from "@/lib/auth-guard";
 import { MESSAGES } from "@/constants/messages";
+import { prisma } from "@/lib/prisma";
 
 export async function DELETE() {
     const auth = await getAuthContext();
@@ -10,13 +11,16 @@ export async function DELETE() {
     }
     try {
         const spaceType = "CHAT"; 
-        const success = await deleteSpaces(auth.user_id, spaceType); 
+        const success = await prisma.$transaction(async (tx) => {
+            return await deleteSpaces(auth.user_id,spaceType, tx );
+        });
         if (!success) {
             return NextResponse.json(
-                { message: MESSAGES.E2004("チャットスペース全削除") }, 
-                { status: 500 }
+                { message: MESSAGES.E2006 }, 
+                { status: 409 }
             );
         }
+        
         return NextResponse.json({ 
             success: true, 
             message: MESSAGES.S1003("チャットスペース全削除") 

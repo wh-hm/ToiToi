@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { registerSpace, deleteSpaces, getSpaces } from "@/services/SpaceService";
 import { getAuthContext } from "@/lib/auth-guard";
 import { MESSAGES } from "@/constants/messages";
+import { prisma } from "@/lib/prisma";
 
 
 // 1. GET: スペース一覧取得
@@ -71,9 +72,15 @@ export async function DELETE() {
     if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
     try {
-        const success = await deleteSpaces(auth.user_id, "ALL", );
-        if (!success) return NextResponse.json({ message: MESSAGES.E2004("スペース") }, { status: 500 });
-        
+        const success = await prisma.$transaction(async (tx) => {
+            return await deleteSpaces(auth.user_id, "ALL", tx );
+        });
+        if (!success) {
+            return NextResponse.json(
+                { message: MESSAGES.E2006 }, 
+                { status: 409 }
+            );
+        }
         return NextResponse.json({ 
             success: true, 
             message: MESSAGES.S1003("スペース") 
