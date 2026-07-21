@@ -2,7 +2,7 @@
 //修正中
 import { useRouter } from "next/navigation";
 import SpaceModal from "@/components/SpaceModal";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import SpaceList from "@/components/SpaceList";
 import { fetchWithTimeout } from "@/lib/api";
@@ -10,30 +10,9 @@ import { Loading } from "@/components/LoadingSpinner";
 import { handleApiResponse } from "@/lib/api-utils";
 import { ToiToiNotification } from "@/components/Toast";
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
-import { pre } from "framer-motion/client";
-
-// 型定義
-type Space = {
-  id: string;
-  name: string;
-  spaceType: number;
-  favoriteFlag: number;
-  isArchived: number;
-  taskCount?: number;
-  questionCount?: number;
-};
-
-type Goal = {
-  id: string;
-  content: string | null;
-  status: number;
-};
-
-type SpacesState = {
-  chat: Space[];
-  task: Space[];
-  question: Space[];
-};
+import { Space, SpacesState } from "@/types/space";
+import { Goal } from "@/types/goal";
+import { messageMaster } from "@/constants/greetings";
 
 export default function Dashboard() {
   const { data: session, status } = useSession();
@@ -52,19 +31,34 @@ export default function Dashboard() {
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
   const [consecutiveLoginDays, setConsecutiveLoginDays] = useState<number>(0);
 
-  // 異常系用のステート定義
-  const [loginError, setLoginError] = useState<boolean>(false);
 
   const [goal, setGoal] = useState<Goal | null>(null);
   const [showArchivedType1, setShowArchivedType1] = useState<number>(0);
   const [showArchivedType2, setShowArchivedType2] = useState<number>(0);
   const [showArchivedType3, setShowArchivedType3] = useState<number>(0);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const [currentLoginMessage, setCurrentLoginMessage] = useState<{ name: string; text: string; image: string }>({
     name: "",
     text: "",
     image: ""
   });
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsCreateMenuOpen(false);
+      }
+    };
+
+    if (isCreateMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isCreateMenuOpen]);
+
   // 連続ログインメッセージの更新
   const updateLoginMessage = (streakDays: number, isStreakAchieved: number) => {
     const now = new Date();
@@ -79,36 +73,25 @@ export default function Dashboard() {
       timeZone = "夜";
     }
 
-    const messageMaster = {
-      "朝": {
-        charName: "しきじー",
-        image: "/stamps/shikiji_default.png",
-        normal: ["おはよう よく来たな 共に頑張ろう", "Good Morning!", "勉強しに来るとは偉いぞ！"],
-        success: `おお！ 連続ログイン日数${streakDays}日が達成したぞ！`
-      },
-      "昼": {
-        charName: "といまる",
-        image: "/stamps/toimaru_default.png",
-        normal: ["こんにちは〜 今日も一緒に頑張ろうね〜", "ハロ〜 休憩してね〜", "お昼ご飯は食べた〜？"],
-        success: `わ〜 連続で${streakDays}日も来れて偉いね〜`
-      },
-      "夜": {
-        charName: "フクロウ",
-        image: "/stamps/hukurou_default.png",
-        normal: ["ホー(こんばんは)", "ホーホー(夕飯は食べましたか？)", "ホーホーホー(とても偉いです)"],
-        success: `ホー！（おめでとうございます。 連続ログイン日数${streakDays}日が達成されました。）`
-      }
-    };
-
     const selectedZone = messageMaster[timeZone];
-    const finalMessageText = isStreakAchieved ? selectedZone.success : selectedZone.normal[Math.floor(Math.random() * 3)];
-
+    // const finalMessageText = isStreakAchieved ? selectedZone.success : selectedZone.normal[Math.floor(Math.random() * 3)];
+    const text = isStreakAchieved 
+        ? selectedZone.success(streakDays) 
+        : selectedZone.normal[Math.floor(Math.random() * selectedZone.normal.length)];
     setCurrentLoginMessage({
       name: selectedZone.charName,
-      text: finalMessageText,
+      text: text,
       image: selectedZone.image
     });
   };
+
+  const closeModal = () => {
+  setIsModalOpen(false);
+  setEditingSpace(null);
+};
+
+
+
   // データのAPI取得処理
   const fetchSpaces = async () => {
     if (!session?.user?.id) return null;
@@ -118,16 +101,15 @@ export default function Dashboard() {
       // ログイン状況の更新
       const loginRes = await fetchWithTimeout("/api/user/loginUpdate", { method: "PATCH" });
       if (!loginRes.ok) {
-        handleApiResponse(loginRes);
+        await handleApiResponse(loginRes);
+        throw new Error();
       }
 
       // ダッシュボードデータの取得
-      const res = await fetchWithTimeout("/api/dashboard", {
-        cache: "no-store"
-      });
+      const res = await fetchWithTimeout("/api/dashboard");
       if (!res.ok) {
-        handleApiResponse(res);
-        return null;
+        await handleApiResponse(res);
+        throw new Error();
       }
       const data = await res.json();
       console.log("ダッシュボードの最新データ：", data);
@@ -151,7 +133,6 @@ export default function Dashboard() {
       }
       setGoal(data.goal)
       setConsecutiveLoginDays(streakDays);
-      setLoginError(false);
       updateLoginMessage(streakDays, isStreakAchieved ? 1 : 0);
 
       const targetData = data.spaces || data;
@@ -173,7 +154,6 @@ export default function Dashboard() {
         task: convertSpaces(targetData.task),
         question: convertSpaces(targetData.question),
       });
-
       return targetData;
     } catch (error) {
       console.error("取得失敗:", error);
@@ -206,7 +186,7 @@ export default function Dashboard() {
         body: JSON.stringify({ status: newStatus })
       });
       if (!res.ok) {
-        handleApiResponse(res);
+        await handleApiResponse(res);
         throw new Error();
       }
       const data = await res.json();
@@ -236,12 +216,11 @@ export default function Dashboard() {
       onConfirm: async () => {
         const toastId = "delete-space-toast";
         try {
-          const res = await fetch(`/api/spaces/${id}?spaceType=${spaceType}`, {
+          const res = await fetchWithTimeout(`/api/spaces/${id}?spaceType=${spaceType}`, {
             method: "DELETE"
           });
           if (!res.ok) {
-            const errorData = await res.json().catch(() => ({}));
-            console.error("【バックエンドからのエラー詳細】:", errorData);
+            await handleApiResponse(res);
             throw new Error();
           }
           ToiToiNotification.success("スペースを削除しました！", toastId);
@@ -292,9 +271,15 @@ export default function Dashboard() {
     return sorted.filter(s => s.isArchived === 0);
   };
 
-  const displayType1 = getDisplaySpaces(spaces.chat, showArchivedType1);
-  const displayType2 = getDisplaySpaces(spaces.task, showArchivedType2);
-  const displayType3 = getDisplaySpaces(spaces.question, showArchivedType3);
+    const displayType1 = getDisplaySpaces(spaces.chat, showArchivedType1);
+    const displayType2 = getDisplaySpaces(
+      spaces.task.map(s => ({ ...s, pendingCount: '未完了タスク： ' + s.taskCount })), 
+      showArchivedType2
+    );
+    const displayType3 = getDisplaySpaces(
+    spaces.question.map(s => ({ ...s, pendingCount: '未解決質問： ' + s.questionCount })), 
+    showArchivedType3
+  );
 
   return (
     <>
@@ -360,7 +345,6 @@ export default function Dashboard() {
               onToggleArchive={(checked) => setShowArchivedType1(checked ? 1 : 0)}
               onEdit={handleEdit}
               onDelete={(id) => openDeleteConfirm(id, "1")}
-              onCheckError={(msg) => ToiToiNotification.error(msg)}
             />
             <SpaceList
               title="タスク"
@@ -369,7 +353,6 @@ export default function Dashboard() {
               onToggleArchive={(checked) => setShowArchivedType2(checked ? 1 : 0)}
               onEdit={handleEdit}
               onDelete={(id) => openDeleteConfirm(id, "2")}
-              onCheckError={(msg) => ToiToiNotification.error(msg)}
             />
             <SpaceList
               title="質問"
@@ -378,19 +361,18 @@ export default function Dashboard() {
               onToggleArchive={(checked) => setShowArchivedType3(checked ? 1 : 0)}
               onEdit={handleEdit}
               onDelete={(id) => openDeleteConfirm(id, "3")}
-              onCheckError={(msg) => ToiToiNotification.error(msg)}
             />
             {/* 新規作成ボタンメニュー */}
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "30px", position: "relative" }}>
+            <div ref={menuRef} style={{ display: "flex", justifyContent: "flex-end", marginTop: "30px", position: "relative" }}>
               {isCreateMenuOpen && (
-                <div style={{ position: "absolute", bottom: "50px", right: "0", background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)", padding: "8px 0", display: "flex", flexDirection: "column", minWidth: "180px", zIndex: 50 }}>
+                <div style={{ position: "absolute", bottom: "50px", right: "0", background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)", padding: "8px 0", display: "flex", flexDirection: "column",  zIndex: 50 }}>
                   <button type="button" onClick={() => { setEditingSpace(null); openModal(1); setIsCreateMenuOpen(false); }} style={{ padding: "10px 16px", textAlign: "left", background: "none", border: "none", cursor: "pointer", fontSize: "14px", color: "#334155", fontWeight: "500" }} onMouseEnter={(e) => e.currentTarget.style.background = "#f1f5f9"} onMouseLeave={(e) => e.currentTarget.style.background = "none"}>チャットスペース</button>
                   <button type="button" onClick={() => { setEditingSpace(null); openModal(2); setIsCreateMenuOpen(false); }} style={{ padding: "10px 16px", textAlign: "left", background: "none", border: "none", cursor: "pointer", fontSize: "14px", color: "#334155", fontWeight: "500" }} onMouseEnter={(e) => e.currentTarget.style.background = "#f1f5f9"} onMouseLeave={(e) => e.currentTarget.style.background = "none"}>タスクスペース</button>
                   <button type="button" onClick={() => { setEditingSpace(null); openModal(3); setIsCreateMenuOpen(false); }} style={{ padding: "10px 16px", textAlign: "left", background: "none", border: "none", cursor: "pointer", fontSize: "14px", color: "#334155", fontWeight: "500" }} onMouseEnter={(e) => e.currentTarget.style.background = "#f1f5f9"} onMouseLeave={(e) => e.currentTarget.style.background = "none"}>質問スペース</button>
                 </div>
               )}
-              <button type="button" onClick={() => setIsCreateMenuOpen(prev => !prev)} style={{ padding: "12px 24px", background: "#2563eb", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
-                <span>{isCreateMenuOpen ? "×" : "＋"}</span> 新規作成
+              <button type="button" onClick={() => setIsCreateMenuOpen(prev => !prev)} style={{ padding: "12px 24px", background: "#2563eb", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "14px", display: "flex", alignItems: "center", gap: "6px", width: "130px" }}>
+                <span className="w-4">{isCreateMenuOpen ? "×" : "＋"}</span> 新規作成
               </button>
             </div>
           </>
@@ -459,7 +441,7 @@ export default function Dashboard() {
             });
 
             if (!res.ok) {
-              handleApiResponse(res);
+              await handleApiResponse(res);
               throw new Error();
             }
             const data = await res.json();

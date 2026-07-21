@@ -1,6 +1,5 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 
 type Space = {
   id: string;
@@ -8,6 +7,7 @@ type Space = {
   spaceType: number;
   favoriteFlag: number;
   isArchived: number;
+  pendingCount?: string;
 };
 
 type SpaceListProps = {
@@ -17,11 +17,10 @@ type SpaceListProps = {
   onToggleArchive: (checked: boolean) => void;
   onEdit: (space: Space) => void;
   onDelete: (id: string, spaceType: number) => void;
-  onCheckError: (message: string) => void;
 };
 
 export default function SpaceList(props: SpaceListProps) {
-  const { items, title, showArchived, onToggleArchive, onEdit, onDelete, onCheckError } = props;
+  const { items, title, showArchived, onToggleArchive, onEdit, onDelete } = props;
   const [open, setOpen] = useState(true);
   const [localItems, setLocalItems] = useState<Space[]>(items);
   // const router = useRouter();
@@ -38,21 +37,7 @@ export default function SpaceList(props: SpaceListProps) {
       default: return `/chat/${id}`;
     }
   };
-  // 遷移先で入れたから問題なし
-  // const handleSpaceClick = async (e: React.MouseEvent, type: number, id: string) => {
-  //   e.preventDefault();
-  //   try {
-  //     const res = await fetchWithTimeout(`/api/spaces/${id}?spaceType=${type}`, { method: "GET" });
-  //     if(!res.ok){
-  //       handleApiResponse(res);
-  //       throw new Error();
-  //     }
-  //       router.push(getLinkPath(type, id));
-  //   } catch (error) {
-  //     console.error(error);
-  //     onCheckError("通信エラーが発生しました。");
-  //   }
-  // };
+
   return (
     <div style={{ marginBottom: "20px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f3f3f3", padding: "10px", borderRadius: "4px", border: "1px solid #ddd" }}>
@@ -105,69 +90,81 @@ export default function SpaceList(props: SpaceListProps) {
         <ul style={{ marginTop: "10px", paddingLeft: "0", listStyle: "none" }}>
           {localItems && localItems.length > 0 ? (
             localItems.map((s: Space) => (
-              <li
-                key={s.id}
-                style={{
-                  display: "flex",
-                  gap: "10px",
-                  padding: "8px",
-                  borderBottom: "1px solid #eee",
-                  alignItems: "center",
-                  opacity: s.isArchived === 1 ? 0.5 : 1,
-                  background: s.isArchived === 1 ? "#fafafa" : "transparent",
-                  transition: "all 0.2s ease"
-                }}
-              >
-                {/* ★マークエリア */}
-                <div style={{ width: "36px", display: "flex", justifyContent: "center", flexShrink: 0 }}>
-                  {s.favoriteFlag === 1 ? (
-                    <span
-                      style={{
-                        fontSize: "18px",
-                        color: "#eab308",
-                        userSelect: "none",
-                      }}
-                    >
-                      ★
-                    </span>
-                  ) : (
-                    ""
-                  )}
-                </div>
+            <li
+              key={s.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                padding: "8px 0",
+                borderBottom: "1px solid #eee",
+                
+                // 【追加】アーカイブ済みの時に薄くする
+                opacity: s.isArchived === 1 ? 0.5 : 1,
+                // 【追加】アーカイブ済みの時に背景を少しグレーにする
+                backgroundColor: s.isArchived === 1 ? "#fafafa" : "transparent",
+                
+                transition: "all 0.2s ease"
+              }}
+            >
+              {/* ★用コンテナ：ここで幅を固定する（これで位置が揃う） */}
+              <div style={{ width: "36px", flexShrink: 0, textAlign: "center" }}>
+                {s.favoriteFlag === 1 && <span style={{ color: "#eab308" }}>★</span>}
+              </div>
 
-                {/* リンクとテキストエリア */}
-                <div style={{ flexGrow: 1, display: "flex", alignItems: "center", gap: "8px" }}>
-                  <a
-                    href={getLinkPath(s.spaceType, s.id)}
-                    style={{
-                      textDecoration: "none",
-                      color: "#333",
-                      fontWeight: "500"
+                {/* 左側のメインエリア：ここを flex-1 にして、タイトルを省略可能にする */}
+                <div style={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  flex: 1, 
+                  minWidth: 0, // これが重要！truncateを効かせるため
+                  gap: "8px" 
+                }}>
+                  <a 
+                    href={getLinkPath(s.spaceType, s.id)} 
+                    title={s.name}
+                    style={{ 
+                      textDecoration: "none", 
+                      color: "#333", 
+                      fontWeight: "500",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      display: "block"
                     }}
                   >
                     {s.name}
                   </a>
-
-                  {s.isArchived === 1 && (
-                    <span
-                      style={{
+                  {/* ラベルやバッジ */}
+                  <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
+                    {s.isArchived === 1 && (
+                      <span style={{ 
+                        fontSize: "10px", 
                         padding: "2px 6px",
-                        background: "#cbd5e1",
-                        color: "#475569",
-                        borderRadius: "4px",
-                        fontSize: "11px",
-                        fontWeight: "bold",
-                        userSelect: "none"
-                      }}
-                    >
-                      アーカイブ済
+                        lineHeight: "1",
+                        background: "#e2e8f0", 
+                        color: "#64748b", 
+                        borderRadius: "4px" 
+                      }}>
+                        アーカイブ済
+                      </span>
+                    )}                    
+                    <span style={{ 
+                      fontSize: "11px", 
+                      padding: "2px 8px",
+                      lineHeight: "1",
+                      background: "#f1f5f9", 
+                      color: "#475569", 
+                      borderRadius: "999px" 
+                    }}>
+                    {s.pendingCount}
                     </span>
-                  )}
+                  </div>
                 </div>
-
-                {/* 操作ボタン */}
-                <button onClick={() => onEdit(s)} style={{ padding: "4px 8px", cursor: "pointer" }}>編集</button>
-                <button onClick={() => onDelete(s.id, s.spaceType)} style={{ padding: "4px 8px", cursor: "pointer" }}>削除</button>
+                {/* 右側のボタンエリア：ここも縮まないようにする */}
+                <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
+                  <button onClick={() => onEdit(s)} className="text-sm text-slate-600 hover:text-blue-600 px-2">編集</button>
+                  <button onClick={() => onDelete(s.id, s.spaceType)} className="text-sm text-red-600 hover:text-red-800 px-2">削除</button>
+                </div>
               </li>
             ))
           ) : (
