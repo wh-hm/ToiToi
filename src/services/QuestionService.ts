@@ -80,7 +80,7 @@ export async function getQuestion(questionId: number, userId: string): Promise<Q
 export async function deleteQuestion(questionId: number, spaceId: number, userId: string, tx?: Tx): Promise<Question> {
   const db = tx || prisma;
   const updatedQuestion = await db.question.update({
-    where: { id: questionId },
+    where: { id: questionId, space_id: spaceId, user_id: userId },
     data: { delete_flag: 1 },
   });
 
