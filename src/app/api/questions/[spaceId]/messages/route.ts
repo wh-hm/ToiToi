@@ -29,8 +29,9 @@ export async function GET(
 
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+  
   try {
+    
     const [isSpaceAlive,  isQuestionAlive] = await Promise.all([
       getQuestionChatsWithImages(auth.user_id, questionId), // ※関数名が推測ですが合わせる
       checkQuestion(auth.user_id, spaceIdNum, questionId),
@@ -70,7 +71,7 @@ export async function POST(
   
   const { spaceId } = await params;
   const spaceIdNum = Number(spaceId);
-
+  
   try {
     const formData = await request.formData();
     
@@ -98,16 +99,17 @@ export async function POST(
     if (message && message.length > 100) {
       return NextResponse.json({ message: MESSAGES.E1002("チャット内容", 100) }, { status: 400 });
     }
-
+    
     // 権限チェック
+    
     const [isSpaceAlive, isQuestionAlive] = await Promise.all([
       getSpaceCheck(auth.user_id, spaceIdNum),
       checkQuestion(auth.user_id, spaceIdNum, questionId),
     ]);
         
     if (!isSpaceAlive) return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
-    if (!isQuestionAlive) return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
-
+    if (!isQuestionAlive) return NextResponse.json({ message: MESSAGES.E2006 }, { status: 404 });
+    
     // 画像アップロード
     let imageUrls: string[] = [];
     if (files.length > 0) {

@@ -20,6 +20,7 @@ export async function PATCH(
         getSpaceCheck(auth.user_id, spaceId), // ※関数名が推測ですが合わせる
         getChatCheck(auth.user_id, spaceId, chatId)
     ]);
+    
     // スペースチェックの判定
     if (!isSpaceAlive) {
         return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });

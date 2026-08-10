@@ -28,7 +28,7 @@ export async function PATCH(
       getSpaceCheck(auth.user_id, spaceId),
       getChatCheck(auth.user_id, spaceId, chatId)
     ]);
-
+    
     if (!isSpaceAlive) return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     if (!isChatAlive) return NextResponse.json({ message: MESSAGES.E2005("チャット") }, { status: 404 });
 

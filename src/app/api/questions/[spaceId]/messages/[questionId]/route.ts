@@ -35,6 +35,7 @@ export async function PATCH(
       checkQuestion(auth.user_id, spaceIdNum, questionIdNum),
       checkQuestionChat(chatId, questionIdNum, auth.user_id)
     ]);
+    
     console.log("データよ～",chatId, questionIdNum, auth.user_id, message);
         
     // スペースチェックの判定
@@ -91,6 +92,7 @@ export async function DELETE(
     checkQuestion(auth.user_id, spaceIdNum, questionIdNum),
     checkQuestionChat(chatId, questionIdNum, auth.user_id)
     ]);
+    
     if (!isSpaceAlive) {
         return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 }); // 権限なし
     }

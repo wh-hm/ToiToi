@@ -11,7 +11,7 @@ import { getSpaceCheck, getSpaceName } from "@/services/SpaceService";
 export async function GET(request: NextRequest) {
     const auth = await getAuthContext();
     if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+    
     const { searchParams } = new URL(request.url);
     const spaceId = Number(searchParams.get("spaceId"));
 
@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
 
 
 export async function POST(request: NextRequest) {
+  
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
 
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
     const caption = formData.get("caption") as string | null; // 追加
 
     const isSpaceAlive = await getSpaceCheck(auth.user_id, spaceId);
-      
+    
     if (!isSpaceAlive) {
         return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }

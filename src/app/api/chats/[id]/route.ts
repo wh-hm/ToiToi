@@ -44,7 +44,7 @@ export async function DELETE(
   const spaceId = Number(id);
   const auth = await getAuthContext();
   if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+  
   const chatId = Number(request.nextUrl.searchParams.get("chatId"));
   if (isNaN(chatId) || isNaN(spaceId)) return NextResponse.json({ message: MESSAGES.E1008 }, { status: 400 });
 

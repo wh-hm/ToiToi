@@ -9,7 +9,7 @@ import { Prisma } from "@prisma/client";
 export async function GET(request: NextRequest) {
     const auth = await getAuthContext();
     if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+    
     const { searchParams } = new URL(request.url);
     const spaceId = Number(searchParams.get("spaceId"));
 
