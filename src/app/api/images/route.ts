@@ -76,24 +76,35 @@ export async function POST(request: Request) {
     const sId = parseInt(spaceId);
     const cId = parseInt(chatId);
     const qId = questionId ? parseInt(questionId) : null;
-    const checkTasks = [];
 
     if (type === "chat") {
-      checkTasks.push(getSpaceCheck(auth.user_id, sId));
-      checkTasks.push(getChatCheck(auth.user_id, sId, cId));
+      const [isSpaceAlive, isChatAlive] = await Promise.all([
+          getSpaceCheck(auth.user_id, sId),
+          getChatCheck(auth.user_id, sId, cId)
+      ]);
+
+      if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
+        return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+      }
+      if (!isChatAlive) return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
+
+
     } else if (type === "question") {
       if (!qId) return NextResponse.json({ message: MESSAGES.E1008 }, { status: 400 });
-      checkTasks.push(getSpaceCheck(auth.user_id, sId));
-      checkTasks.push(checkQuestionChat(cId, qId, auth.user_id));
+      const [isSpaceAlive, isChatAlive] = await Promise.all([
+          getSpaceCheck(auth.user_id, sId),
+          checkQuestionChat(cId, qId, auth.user_id)
+      ]);
+
+      if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
+        return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+      }
+      if (!isChatAlive) return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
+
     }
 
-    const [isSpaceAlive, isChatAlive] = await Promise.all(checkTasks);
 
-    if (!isSpaceAlive  || isSpaceAlive?.delete_flag === 1) {
-      return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
-    }
-    if (!isChatAlive) return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
-
+    
     // 4. R2からダウンロード実行
     // フロントから送られてきた storageKey をそのまま信頼してキーとして使用する
     const key = decodeURIComponent(storageKey);
