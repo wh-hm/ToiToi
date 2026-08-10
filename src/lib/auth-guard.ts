@@ -5,17 +5,25 @@ import { MESSAGES } from "@/constants/messages";
 
 export async function getAuthContext() {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) return { error: MESSAGES.E4003, status: 401 };
+    if (!session?.user?.id) 
+    return { error: MESSAGES.E4003, status: 401 };
     
     // 1. ユーザーを検索
     const user = await getUserId(session.user.id);
     
     // 2. そもそもユーザーが存在しない場合
-    if (!user) return { error: MESSAGES.E1010("ユーザー"), status: 404 };
+    // if (!user) return NextResponse.json({ message: MESSAGES.E1010("ユーザー"), }, { status: 404 });
+    if (!user) {
+        return { error: MESSAGES.E1010("ユーザー"), status: 403 };
+    }
 
     // 3. 削除済みの場合
     if (user.delete_flag === 1) {
-        return { error: MESSAGES.E2005("ユーザー"), code: "USER_DELETED", status: 403 };
+        return{ 
+            error: MESSAGES.E2005("ユーザー"),
+            status: 403,
+            code: "USER_DELETED",
+        };
     }
     
     // 全てクリアすれば user_id を返す

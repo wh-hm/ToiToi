@@ -10,8 +10,9 @@ import { getSpaceCheck, getSpaceName } from "@/services/SpaceService";
 // 1. GET: チャット一覧取得
 export async function GET(request: NextRequest) {
     const auth = await getAuthContext();
-    if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+    if ('error' in auth) {
+        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+    }
     const { searchParams } = new URL(request.url);
     const spaceId = Number(searchParams.get("spaceId"));
 
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
     try {
         const isSpaceAlive = await getSpaceCheck(auth.user_id, spaceId);
         
-        if (!isSpaceAlive) {
+        if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
             return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
         }
       
@@ -50,8 +51,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+  if ('error' in auth) {
+        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+  }
   // 1. 変数を用意（配列に変更）
   let imageUrls: string[] | undefined;
 
@@ -65,8 +67,7 @@ export async function POST(request: NextRequest) {
     const caption = formData.get("caption") as string | null; // 追加
 
     const isSpaceAlive = await getSpaceCheck(auth.user_id, spaceId);
-      
-    if (!isSpaceAlive) {
+    if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
         return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
 

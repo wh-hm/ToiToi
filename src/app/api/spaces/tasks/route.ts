@@ -8,8 +8,8 @@ export async function DELETE() {
     // 1. 認証チェック
     const auth = await getAuthContext();
     if ('error' in auth) {
-        return NextResponse.json({ message: auth.error }, { status: auth.status });
-    }
+        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+    }  
 
     try {
         // 2. サービス層でタスク(TASK)の全削除を実行

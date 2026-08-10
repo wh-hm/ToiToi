@@ -12,8 +12,9 @@ import { getQuestionsCount } from "@/services/QuestionService";
 // ==========================================
 export async function GET() {
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+  if ('error' in auth) {
+        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+  }
   try {
     // 1. スペース一覧 と スペースごとのタスク数配列 を取得
     const [allSpaces, tasksWithCounts, questionsWithCounts, goal, login_management] = await Promise.all([

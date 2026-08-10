@@ -68,7 +68,18 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     console.log(spaceId)
   }, [params]);
 
-  useEffect(() => { fetchMessages(); }, []);
+  useEffect(() => {
+    fetchMessages();
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        fetchMessages();
+      }
+    };
+    window.addEventListener('pageshow', handlePageShow);
+    return () => {
+      window.removeEventListener('pageshow', handlePageShow);
+    };
+  }, []);
 
   const fetchMessages = async () => {
     setIsLoading(true); 
@@ -200,12 +211,13 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     try {
   const res = await fetchWithTimeout(`/api/chats/`, { method: "POST", body: formData });
   const responseData = await res.json();
-  const data = JSON.parse(JSON.stringify(responseData));
 
   if (!res.ok) {
     await handleApiResponse(res);
     throw new Error();
   }
+  const data = JSON.parse(JSON.stringify(responseData));
+
   const confirmedData = data.newChat || [];
     // ★サーバーから返ってきたデータが一つ以上ある場合
     if (data.newChat && Array.isArray(data.newChat)) {
@@ -360,11 +372,12 @@ const handleToggleFavorite = async (chatId: number) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ background: bg, chatId: chatId }),
       });
-      const data = await res.json();
       if (!res.ok) {
         await handleApiResponse(res); // 内部のthrowを待つ
         throw new Error(); // 明示的にエラーを投げる
       };
+      const data = await res.json();
+
       if (data.updatedChat) {
         setChats((prev) => 
           prev.map((msg) => (msg.id === chatId ? { ...msg, ...data.updatedChat } : msg))

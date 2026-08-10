@@ -8,8 +8,9 @@ import { prisma } from "@/lib/prisma";
 // 1. GET: スペース一覧取得
 export async function GET() {
     const auth = await getAuthContext();
-    if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+    if ('error' in auth) {
+        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+    }  
     try {
         const spaces = await getSpaces(auth.user_id); 
 
@@ -33,8 +34,9 @@ export async function GET() {
 // 2. POST: スペース登録（単体チェックを追加）
 export async function POST(request: Request) {
     const auth = await getAuthContext();
-    if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+    if ('error' in auth) {
+        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+    }  
     try {
         //const body = await request.json();
         const { name, spaceType, favoriteFlag, isArchived } = await request.json();
@@ -69,8 +71,9 @@ export async function POST(request: Request) {
 // 3. DELETE: スペース削除（パラメータチェックを追加）
 export async function DELETE() {
     const auth = await getAuthContext();
-    if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+    if ('error' in auth) {
+        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+    }  
     try {
         const success = await prisma.$transaction(async (tx) => {
             return await deleteSpaces(auth.user_id, "ALL", tx );

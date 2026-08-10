@@ -29,11 +29,14 @@ export async function getSpaces(
 
 
 //スペースが生きているかどうかの確認
-export async function getSpaceCheck(userId: string, spaceId: number): Promise<boolean> {
+export async function getSpaceCheck(userId: string, spaceId: number): Promise<Space | null> {
   const space = await prisma.space.findFirst({
     where: { user_id: userId, id: spaceId },
   });
-  return !!space && space.delete_flag === 0;
+  if(!space){
+    return null;
+  }
+  return space;
 }
 
 
@@ -76,10 +79,16 @@ export async function deleteSpace(
 ): Promise<boolean> {
   const db = tx || prisma;
   
-  if (spaceType === 'CHAT') await deleteSpaceChat(spaceId, userId, db);
-  else if (spaceType === 'TASK') await deleteSpaceTask(spaceId, userId, db);
-  else if (spaceType === 'QUESTION') await deleteSpaceQuestion(spaceId, userId, db);
-
+  if (spaceType === 'CHAT') {
+    await deleteSpaceChat(spaceId, userId, db);
+  }else if (spaceType === 'TASK') {
+    await deleteSpaceTask(spaceId, userId, db);
+  }
+  else if (spaceType === 'QUESTION') {
+    await deleteSpaceQuestion(spaceId, userId, db);
+  }else{
+    return false;
+  }
   await db.space.update({
     where: { id: spaceId },
     data: { delete_flag: 1 },

@@ -9,11 +9,14 @@ const safeRegex = /[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uFF01-\uFF
 // 1. GET: タスク一覧取得
 export async function GET(request: NextRequest) {
     const auth = await getAuthContext();
-    if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+    if ('error' in auth) {
+        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+    }  
     const { searchParams } = new URL(request.url);
     const spaceIdParam = searchParams.get("spaceId") || searchParams.get("space_id");
     const spaceId = Number(spaceIdParam);
+
+    
 
     if (!spaceId || isNaN(spaceId)) {
         return NextResponse.json({ message: MESSAGES.E1001("スペースID") }, { status: 400 });
@@ -21,8 +24,8 @@ export async function GET(request: NextRequest) {
 
     try {
         const isSpaceAlive = await getSpaceCheck(auth.user_id, spaceId);
-        if (!isSpaceAlive) {
-            return NextResponse.json({ message: MESSAGES.E1010("対象のスペース") }, { status: 404 });
+        if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
+            return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
         }
 
         const tasks = await getTasks(spaceId, auth.user_id);
@@ -40,8 +43,9 @@ export async function GET(request: NextRequest) {
 // 2. POST: タスク登録（単体チェック実装）
 export async function POST(request: NextRequest) {
     const auth = await getAuthContext();
-    if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+    if ('error' in auth) {
+        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+    }  
     try {
         const body = await request.json();
         console.log("POST body:", body);
@@ -76,7 +80,7 @@ export async function POST(request: NextRequest) {
         }
 
         const isSpaceAlive = await getSpaceCheck(auth.user_id, spaceId);
-        if (!isSpaceAlive) {
+        if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
             return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
         }
 

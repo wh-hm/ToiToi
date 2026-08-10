@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth-guard";
 import { MESSAGES } from "@/constants/messages";
+import { updateGoal } from "@/services/GoalService";
 
 const safeRegex =
   /[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uFF01-\uFF5E]/;
@@ -9,11 +9,8 @@ const safeRegex =
 export async function PATCH(request: Request) {
   // 認証
   const auth = await getAuthContext();
-  if ("error" in auth) {
-    return NextResponse.json(
-      { message: auth.error },
-      { status: auth.status }
-    );
+  if ('error' in auth) {
+        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
   }
 
   try {
@@ -41,30 +38,19 @@ export async function PATCH(request: Request) {
         { status: 400 }
       );
     }
-    const deletedAt = new Date();
-    deletedAt.setDate(deletedAt.getDate() + 7);
 
-    const goal = await prisma.goal.upsert({
-      where: {
-        id: auth.user_id,
-      },
-      update: {
-        content,
-        delete_flag: 0,
-        deleted_at: deletedAt,
-      },
-      create: {
-        id: auth.user_id,
-        content,
-        status: 0,
-        delete_flag: 0,
-        created_at: new Date(),
-        deleted_at: deletedAt,
-      },
-    });
+
+    const goal = await updateGoal(auth.user_id, content);
+    if(!goal){
+      return NextResponse.json(
+        { message: MESSAGES.E2007, code: "USER_DELETED" }, 
+        { status: 403 }
+      );
+    }
+
     return NextResponse.json({ 
         goal: goal, 
-        message: MESSAGES.S1002("目標") 
+        message: MESSAGES.S1002("目標"),
     }, { status: 200 });
   } catch (error) {
     console.error("目標更新エラー:", error);

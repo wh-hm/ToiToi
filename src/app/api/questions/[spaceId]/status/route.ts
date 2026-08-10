@@ -11,8 +11,9 @@ export async function PATCH(
 ) {
   // 認証ガードを適用
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+  if ('error' in auth) {
+    return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+  }  
   try {
     const { spaceId } = await params;
     const body = await request.json();
@@ -37,8 +38,8 @@ export async function PATCH(
     ]);
         
     // スペースチェックの判定
-    if (!isSpaceAlive) {
-        return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+    if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
+      return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
     if (!isQuestionAlive) {
         return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });

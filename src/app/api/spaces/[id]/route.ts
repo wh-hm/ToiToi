@@ -12,7 +12,9 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> }
 ) {
     const auth = await getAuthContext();
-    if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
+    if ('error' in auth) {
+        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+    }     
     try {
         const { id } = await params;
         const { name, favoriteFlag, isArchived } = await request.json();
@@ -24,8 +26,8 @@ export async function PATCH(
             return NextResponse.json({ message: MESSAGES.E1003("スペース名", "記号") }, { status: 400 });
         }
         const isSpaceAlive = await getSpaceCheck(auth.user_id, Number(id));
-        if (!isSpaceAlive) {
-            return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+        if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
+            return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 409 });
         }
         
         const updatedSpace = await updateSpace(Number(id), name, auth.user_id, favoriteFlag, isArchived);
@@ -47,7 +49,9 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     const auth = await getAuthContext();
-    if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
+    if ('error' in auth) {
+        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+    }  
     try {
         const { id } = await params;
         const spaceId = Number(id);
@@ -60,17 +64,18 @@ export async function DELETE(
         }
         
         const isSpaceAlive = await getSpaceCheck(auth.user_id, spaceId);
-        if (!isSpaceAlive) {
-            return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+        if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
+            return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 409 });
         }
 
         const success = await deleteSpace(spaceId, spaceType, auth.user_id);
-        if (!success) return NextResponse.json({ message: MESSAGES.E2004("スペース") }, { status: 500 });
+        if (!success) return NextResponse.json({ message: MESSAGES.E2006 }, { status: 500 });
         
         return NextResponse.json({ 
             success: true, 
             message: MESSAGES.S1003("スペース") 
         });
+        
     } catch (error) {
         console.error("DELETE Space Error:", error);
         return NextResponse.json({ message: MESSAGES.E2004("スペース") }, { status: 500 });

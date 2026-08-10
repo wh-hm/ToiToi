@@ -24,7 +24,6 @@ export default function SpaceList(props: SpaceListProps) {
   const { items, title, showArchived, onToggleArchive, onEdit, onDelete } = props;
   const [open, setOpen] = useState(true);
   const [localItems, setLocalItems] = useState<Space[]>(items);
-  // const router = useRouter();
 
   useEffect(() => {
     setLocalItems(items);
@@ -35,7 +34,7 @@ export default function SpaceList(props: SpaceListProps) {
       case 1: return `/chat/${id}`;
       case 2: return `/task/${id}`;
       case 3: return `/question/${id}`;
-      default: return `/chat/${id}`;
+      default: return `/404`;
     }
   };
 
@@ -139,18 +138,19 @@ export default function SpaceList(props: SpaceListProps) {
                   >
                     {s.name}
                   </a>
-                  {/* ラベルやバッジ */}
-                  <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
-                    <span style={{ 
-                      fontSize: "13px", 
-                      padding: "3px 8px",
-                      background: "#f1f5f9", 
-                      color: "#475569", 
-                      borderRadius: "999px" 
-                    }}>
-                    {s.pendingCount}
-                    </span>
-                  </div>
+                  {s.pendingCount && (
+                    <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
+                      <span style={{ 
+                        fontSize: "13px", 
+                        padding: "3px 8px",
+                        background: "#f1f5f9", 
+                        color: "#475569", 
+                        borderRadius: "999px" 
+                      }}>
+                      {s.pendingCount}
+                      </span>
+                    </div>
+                    )} 
                 </div>
                 {/* 右側のボタンエリア：ここも縮まないようにする */}
                 <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>

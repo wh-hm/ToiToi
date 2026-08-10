@@ -11,6 +11,7 @@ import { useCelebration, Celebration } from "@/components/Celebration";
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import { handleApiResponse } from "@/lib/api-utils";
 import { fetchWithTimeout } from "@/lib/api";
+import { MESSAGES } from "@/constants/messages";
 
 export default function TaskPage() {
   const { data: session, status } = useSession();
@@ -37,6 +38,7 @@ export default function TaskPage() {
 
   //お祝い演出
   const { showCelebration, celebrationOpacity, celebrationMessage, triggerCelebration } = useCelebration();
+  const [isLoading, setIsLoading] = useState(true);
 
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
@@ -80,6 +82,7 @@ export default function TaskPage() {
   const fetchTasks = useCallback(async () => {
     if (!space_id) return;
     try {
+      setIsLoading(true);
       const res = await fetchWithTimeout(`/api/task?spaceId=${space_id}`);
       if (!res.ok) {
         setError(true)
@@ -93,14 +96,16 @@ export default function TaskPage() {
       });
     } catch (error) {
       console.error("タスク取得失敗", error);
-    } 
+    } finally{
+      setIsLoading(false);
+    }
   }, [space_id]);
 
   // セッションチェックと自動フェッチ
   useEffect(() => {
     if (status === "loading") return;
     if (status === "unauthenticated") {
-      alert("セッションが無効です。ログイン画面へ遷移します。");
+      ToiToiNotification.error(MESSAGES.E4003);
       router.push("/");
       return;
     }
@@ -207,15 +212,6 @@ export default function TaskPage() {
       setTaskData(previousTaskData);
     }
   };
-  if (status === "loading" || status === "unauthenticated") {
-    return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#f8fafc" }}>
-        <p>読み込み中...</p>
-        <Loading />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 p-6 md:p-12">
       <div className="max-w-4xl mx-auto space-y-6">
@@ -228,7 +224,7 @@ export default function TaskPage() {
           </div>
           <button
             onClick={handleCreateOpen}
-            disabled={error}
+            disabled={error || isLoading} // ← ここで error が true のときに非活性になります
             className="
               bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 rounded-xl shadow-sm transition-all text-sm flex items-center gap-1
               disabled:bg-gray-400 disabled:cursor-not-allowed disabled:shadow-none
@@ -292,13 +288,19 @@ export default function TaskPage() {
 
         {/* メインコンテンツ */}
         <main className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
-          <TaskList
-            tasks={processedTasks}
-            toggleComplete={toggleComplete}
-            onEdit={handleEdit}
-            onDelete={openDeleteConfirm}
-            onDetail={handleDetail}
-          />
+          {!isLoading ? (
+            <TaskList
+              tasks={processedTasks}
+              toggleComplete={toggleComplete}
+              onEdit={handleEdit}
+              onDelete={openDeleteConfirm}
+              onDetail={handleDetail}
+            />
+          ) : (
+            <div className="text-center py-12">
+              <Loading text="読み込み中..." />
+            </div>
+          )}
         </main>
       </div>
       {isModalOpen && (
@@ -312,7 +314,7 @@ export default function TaskPage() {
           onSuccess={async (newStatus: number) => {
             setIsModalOpen(false);
             if (newStatus === 1) {
-              triggerCelebration();
+              triggerCelebration("タスク完了おめでとう！");
             }
             try {
               const res = await fetchWithTimeout(`/api/task?spaceId=${space_id}`);

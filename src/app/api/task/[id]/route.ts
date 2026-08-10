@@ -11,8 +11,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+  if ('error' in auth) {
+      return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+  }  
   try {
     // 1. URLパス（/api/task/[id]）から確実にタスクIDを取得
     const { id } = await params;
@@ -28,7 +29,7 @@ export async function PATCH(
     // --- 単体チェック ---
     if (!title) return NextResponse.json({ message: MESSAGES.E1001("タスク名") }, { status: 400 });
     if (!dueDate) return NextResponse.json({ message: MESSAGES.E1001("期限") }, { status: 400 });
-    if (!description) return NextResponse.json({ message: MESSAGES.E1001("詳細") }, { status: 400 });
+    // if (!description) return NextResponse.json({ message: MESSAGES.E1001("詳細") }, { status: 400 });
 
     if (isNaN(spaceIdNum) || isNaN(taskId)) {
       return NextResponse.json({ message: "不正なスペースIDまたはタスクIDです。" }, { status: 400 });
@@ -50,14 +51,14 @@ export async function PATCH(
         getTaskCheck(auth.user_id, spaceIdNum, taskId)
     ]);
     // スペースチェックの判定
-    if (!isSpaceAlive) {
-        return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+    if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
+      return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
     if (!isTaskAlive) {
         return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
     }
     const updatedTask = await updateTask(taskId, auth.user_id, title, description, dueDate, spaceIdNum, tag, isAllday, priority, status);
-    return NextResponse.json({ updatedTask: updatedTask, message: MESSAGES.S1001("タスク") });
+    return NextResponse.json({ updatedTask: updatedTask, message: MESSAGES.S1002("タスク") });
   } catch (error) {
     console.error("PATCHタスクエラー詳細:", error);
     return NextResponse.json({ message: MESSAGES.E2002("タスク") }, { status: 500 });
@@ -70,8 +71,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-    
+  if ('error' in auth) {
+      return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+  }  
   try {
     const { id } = await params;
     // DELETEメソッドではボディを読み取らないのが安全なため、クエリパラメータから取得を推奨します
@@ -87,8 +89,8 @@ export async function DELETE(
         getTaskCheck(auth.user_id, spaceIdNum, taskId)
     ]);
     // スペースチェックの判定
-    if (!isSpaceAlive) {
-        return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+    if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
+      return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
     if (!isTaskAlive) {
         return NextResponse.json({ message: MESSAGES.E1010("タスク") }, { status: 409 });
@@ -97,6 +99,8 @@ export async function DELETE(
     if (!success) return NextResponse.json({ message: MESSAGES.E2004("タスク") }, { status: 500 });
 
     return NextResponse.json({ success: true, message: MESSAGES.S1003("タスク") });
+
+    
   } catch (error) {
     return NextResponse.json({ message: MESSAGES.E2004("タスク") }, { status: 500 });
   }

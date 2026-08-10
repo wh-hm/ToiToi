@@ -13,8 +13,9 @@ export async function PATCH(
 ) {
   const { spaceId, questionId } = await params;
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+  if ('error' in auth) {
+    return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+  }  
   try {
     const spaceIdNum = Number(spaceId);
     const questionIdNum = Number(questionId);
@@ -38,8 +39,8 @@ export async function PATCH(
     console.log("データよ～",chatId, questionIdNum, auth.user_id, message);
         
     // スペースチェックの判定
-    if (!isSpaceAlive) {
-        return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+    if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
+      return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
     console.log("データよ～",chatId, questionIdNum, auth.user_id, message);
 
@@ -72,8 +73,9 @@ export async function DELETE(
 ) {
  const { spaceId, questionId } = await params;
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+  if ('error' in auth) {
+    return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+  }  
   const spaceIdNum = Number(spaceId);
   const questionIdNum = Number(questionId);
   // 1. 認証チェックを先に済ませる
@@ -91,8 +93,8 @@ export async function DELETE(
     checkQuestion(auth.user_id, spaceIdNum, questionIdNum),
     checkQuestionChat(chatId, questionIdNum, auth.user_id)
     ]);
-    if (!isSpaceAlive) {
-        return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 }); // 権限なし
+    if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
+      return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
     if (!isQuestionAlive) {
         return NextResponse.json({ message: MESSAGES.E2005("質問") }, { status: 404 }); // データなし

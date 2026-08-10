@@ -164,17 +164,18 @@ export default function SpaceModal({ isOpen, onClose, spaceType, editingSpace, o
             onClick={handleSave}
             disabled={isSubmitting}
             style={{
-              padding: "0 18px",
-              height: "38px",
-              background: isSubmitting ? "#60a5fa" : "#2563eb",
-              color: "white",
-              border: "none",
-              borderRadius: "6px",
-              cursor: "pointer",
-              fontWeight: "600",
-              fontSize: "14px",
-              boxShadow: "0 1px 2px rgba(37, 99, 235, 0.2)"
-            }}
+            padding: "0 18px",
+            height: "38px",
+            background: isSubmitting ? "#9ca3af" : "#2563eb",
+            color: "white",
+            border: "none",
+            borderRadius: "6px",
+            cursor: isSubmitting ? "not-allowed" : "pointer",
+            opacity: isSubmitting ? 0.7 : 1, 
+            fontWeight: "600",
+            fontSize: "14px",
+            boxShadow: "0 1px 2px rgba(37, 99, 235, 0.2)"
+          }}
           >
             {isSubmitting ? "保存中..." : "保存する"}
           </button>

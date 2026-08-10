@@ -8,8 +8,9 @@ import { Prisma } from "@prisma/client";
 // 1. GET: 質問一覧取得
 export async function GET(request: NextRequest) {
     const auth = await getAuthContext();
-    if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+    if ('error' in auth) {
+        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+    }
     const { searchParams } = new URL(request.url);
     const spaceId = Number(searchParams.get("spaceId"));
 
@@ -19,7 +20,8 @@ export async function GET(request: NextRequest) {
 
     const isSpaceAlive = await getSpaceCheck(auth.user_id, spaceId);
     // スペースチェックの判定
-    if (!isSpaceAlive) {
+    
+    if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
         return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
 
@@ -38,8 +40,9 @@ export async function GET(request: NextRequest) {
 // 2. POST: 質問作成
 export async function POST(request: NextRequest) {
     const auth = await getAuthContext();
-    if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+    if ('error' in auth) {
+        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+    }
     try {
         const { title, question, spaceId, tag } = await request.json();
 
@@ -55,7 +58,8 @@ export async function POST(request: NextRequest) {
              // ※関数名が推測ですが合わせる
         const isSpaceAlive = await getSpaceCheck(auth.user_id, spaceId);
         // スペースチェックの判定
-        if (!isSpaceAlive) {
+        
+        if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
             return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
         }
 

@@ -33,13 +33,13 @@ export async function GET(req: Request) {
 
     // 🔒 1. ログインチェック
     const auth = await getAuthContext();
-    if ("error" in auth) {
-      return NextResponse.json({ message: auth.error }, { status: auth.status });
+    if ('error' in auth) {
+      return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
     }
 
     // 🔒 2. スペース所属チェック
     const hasPermission = await getSpaceCheck(auth.user_id, spaceId);
-    if (!hasPermission) {
+    if (!hasPermission || hasPermission.delete_flag === 1) {
       return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 403 });
     }
 

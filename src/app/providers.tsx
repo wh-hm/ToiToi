@@ -13,6 +13,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         //今回はダークモードの設定なし
         // defaultTheme="system"
         enableSystem
+        scriptProps={{ type: "application/json" } as any}
       >
         <AuthProvider>
           {children}

@@ -13,8 +13,9 @@ import { prisma } from "@/lib/prisma";
 export async function DELETE() {
   // 1. 認証チェック
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+  if ('error' in auth) {
+        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+  }
   try {
     // 1. 物理削除すべき画像IDリストを取得
     const imageIds = await getAuthorizedImageIds(auth.user_id);
@@ -68,8 +69,9 @@ export async function POST(request: Request) {
 
     // 2. 認証チェック
     const auth = await getAuthContext();
-    if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+    if ('error' in auth) {
+      return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+    }
     // 3. 権限・生存チェック（並列化）
     const sId = parseInt(spaceId);
     const cId = parseInt(chatId);
@@ -87,7 +89,9 @@ export async function POST(request: Request) {
 
     const [isSpaceAlive, isChatAlive] = await Promise.all(checkTasks);
 
-    if (!isSpaceAlive) return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+    if (!isSpaceAlive  || isSpaceAlive?.delete_flag === 1) {
+      return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+    }
     if (!isChatAlive) return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
 
     // 4. R2からダウンロード実行

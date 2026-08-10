@@ -11,8 +11,9 @@ export async function PATCH(
   { params }: { params: Promise<{ spaceId: string }> }
 ) {
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+  if ('error' in auth) {
+      return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+  }
   try {
     const { spaceId } = await params;
     const spaceIdNum = Number(spaceId);
@@ -29,7 +30,9 @@ export async function PATCH(
       checkQuestion(auth.user_id, spaceIdNum, questionId)
     ]);
 
-    if (!isSpaceAlive) return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+    if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
+      return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+    }
     if (!isQuestionAlive) return NextResponse.json({ message: MESSAGES.E2005("質問") }, { status: 404 });
 
     // ケースA: 解決ステータスのみ更新
@@ -61,8 +64,9 @@ export async function DELETE(
   { params }: { params: Promise<{ spaceId: string }> }
 ) {
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+  if ('error' in auth) {
+      return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+  }
   try {
     const { spaceId } = await params;
     const spaceIdNum = Number(spaceId);

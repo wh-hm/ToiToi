@@ -11,11 +11,11 @@ export async function checkQuestionChat(chatId: number, questionId: number, user
     { where: { 
       id: chatId, 
       question_id: questionId, 
-      user_id: userId, 
-      delete_flag: 0 }
+      user_id: userId 
+      }
     });
 
-  if (!chat) return false;
+  if (!chat || chat.delete_flag === 1) return false;
   return true;
 }
 

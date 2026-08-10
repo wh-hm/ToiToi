@@ -48,7 +48,7 @@ export default function Username() {
     // 2. フロント側バリデーションの3連コンボ
     if (!username) {
       // ToiToiNotification.error(MESSAGES.E1001("ユーザ名"));
-      ToiToiNotification.info(MESSAGES.E1001("ユーザ名"))
+      ToiToiNotification.error(MESSAGES.E1001("ユーザ名"))
       return;
     }
 
@@ -70,16 +70,15 @@ export default function Username() {
         body: JSON.stringify({ username }), // トリム済みの綺麗な値を送る
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        await handleApiResponse(res); // 内部のthrowを待つ
-        throw new Error(); // 明示的にエラーを投げる
+        await handleApiResponse(res);
+        throw new Error();
       }
+      const data = await res.json();
       ToiToiNotification.success(data.message);
       router.push("/dashboard");
     } catch (error: any) {
-      ToiToiNotification.error(MESSAGES.E3003);
+      console.log(error);
     } finally {
       setIsSubmitting(false);
     }
@@ -87,20 +86,19 @@ export default function Username() {
   // 認証ステータスの監視
   useEffect(() => {
     if (status === "unauthenticated") {
+      ToiToiNotification.error(MESSAGES.E4003);
       router.push("/");
       return;
     }
 
     const checkUsername = async () => {
-      if (!session?.user?.id) return;
       try {
         const res = await fetchWithTimeout(`/api/user/username/check`);
-        const data = await res.json();
-
         if (!res.ok) {
-          await handleApiResponse(res); // 内部のthrowを待つ
-          throw new Error(); // 明示的にエラーを投げる
+          await handleApiResponse(res);
+          throw new Error();
         }
+        const data = await res.json();
 
         if (data.hasUsername) {
           router.push("/dashboard");
@@ -231,7 +229,7 @@ export default function Username() {
                         <button 
                           type="submit"
                           disabled={isSubmitting || loading}
-                          className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 py-3.5 px-4 text-sm font-bold text-white shadow-sm shadow-blue-100 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 py-3.5 px-4 text-sm font-bold text-white shadow-sm shadow-blue-100 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-400"
                         >
                           {isSubmitting ? (
                               <div className="animate-spin h-5 w-5 border-2 border-white rounded-full border-t-transparent"></div>

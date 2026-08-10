@@ -8,8 +8,8 @@ export async function DELETE() {
     // 1. 認証チェック
     const auth = await getAuthContext();
     if ('error' in auth) {
-        return NextResponse.json({ message: auth.error }, { status: auth.status });
-    }
+        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+    }  
     try {
         const success = await prisma.$transaction(async (tx) => {
             return await deleteSpaces(auth.user_id, "QUESTION", tx );

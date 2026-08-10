@@ -13,8 +13,9 @@ export async function PATCH(
   const { id } = await params;
   const spaceId = parseInt(id);
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+  if ('error' in auth) {
+        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+  }
   try {
     const { chatId, favoriteFlag } = await request.json();
 
@@ -29,7 +30,9 @@ export async function PATCH(
       getChatCheck(auth.user_id, spaceId, chatId)
     ]);
 
-    if (!isSpaceAlive) return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+    if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
+      return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+    }
     if (!isChatAlive) return NextResponse.json({ message: MESSAGES.E2005("チャット") }, { status: 404 });
 
     // 3. 更新実行

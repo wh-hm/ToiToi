@@ -127,6 +127,6 @@ export async function updateEmail(id: string, googleId: string, email: string): 
 export async function getUserId(googleId: string): Promise<User | null> {
   // ログイン処理等で利用される前提のため、有効なユーザーのみを対象に
   return await prisma.user.findFirst({
-    where: { google_id: googleId, delete_flag: 0 },
+    where: { google_id: googleId },
   });
 }

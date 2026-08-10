@@ -7,8 +7,8 @@ import { MESSAGES } from "@/constants/messages";
 export async function PATCH() {
   const auth = await getAuthContext();
   if ('error' in auth) {
-    return NextResponse.json({ message: auth.error }, { status: auth.status });
-  }
+    return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+  }  
   try {
     await updateLoginManagement(auth.user_id);
     return NextResponse.json({ 

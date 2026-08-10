@@ -10,7 +10,9 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     const auth = await getAuthContext();
-    if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
+    if ('error' in auth) {
+        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+    }  
     try {
         const success = await prisma.$transaction(async (tx) => {
             return await deleteArchives(auth.user_id, tx );
