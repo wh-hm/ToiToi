@@ -36,14 +36,14 @@ const CelebrationModal = ({ message, onClose }: { message: string; onClose: () =
       <div className="relative z-10 flex flex-col items-center justify-center">
         <img src="/complete.png" alt="お祝い" className="max-w-[90vw] w-full" />
        <p 
-  className="absolute top-[20%] left-1/2 -translate-x-1/2 text-5xl md:text-7xl font-black text-white tracking-widest rotate-[-3deg] whitespace-nowrap" // ★ここを追加
-  style={{ 
-      textShadow: '3px 3px 0px #FF9500, 6px 6px 0px rgba(0,0,0,0.15)',
-      fontFamily: "'M PLUS Rounded 1c', 'Rounded Mplus 1c', 'Hiragino Maru Gothic ProN', sans-serif" 
-  }}
->
-  {message}
-</p>
+        className="absolute top-[20%] left-1/2 -translate-x-1/2 text-5xl md:text-7xl font-black text-white tracking-widest rotate-[-3deg] whitespace-nowrap" // ★ここを追加
+        style={{ 
+            textShadow: '3px 3px 0px #FF9500, 6px 6px 0px rgba(0,0,0,0.15)',
+            fontFamily: "'M PLUS Rounded 1c', 'Rounded Mplus 1c', 'Hiragino Maru Gothic ProN', sans-serif" 
+        }}
+      >
+        {message}
+      </p>
       </div>
     </div>
   );

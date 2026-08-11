@@ -1,39 +1,19 @@
 "use client";
-//修正中
 import { useRouter } from "next/navigation";
 import SpaceModal from "@/components/SpaceModal";
-import { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
+import { useState, useEffect, useRef } from "react";
+import { signOut, useSession } from "next-auth/react";
 import SpaceList from "@/components/SpaceList";
 import { fetchWithTimeout } from "@/lib/api";
 import { Loading } from "@/components/LoadingSpinner";
 import { handleApiResponse } from "@/lib/api-utils";
 import { ToiToiNotification } from "@/components/Toast";
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
-import { pre } from "framer-motion/client";
-
-// 型定義
-type Space = {
-  id: string;
-  name: string;
-  spaceType: number;
-  favoriteFlag: number;
-  isArchived: number;
-  taskCount?: number;
-  questionCount?: number;
-};
-
-type Goal = {
-  id: string;
-  content: string | null;
-  status: number;
-};
-
-type SpacesState = {
-  chat: Space[];
-  task: Space[];
-  question: Space[];
-};
+import { Space, SpacesState } from "@/types/space";
+import { Goal } from "@/types/goal";
+import { messageMaster } from "@/constants/greetings";
+import { Celebration } from "@/components/Celebration";
+import { MESSAGES } from "@/constants/messages";
 
 export default function Dashboard() {
   const { data: session, status } = useSession();
@@ -51,83 +31,111 @@ export default function Dashboard() {
   const [editingSpace, setEditingSpace] = useState<Space | null>(null);
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
   const [consecutiveLoginDays, setConsecutiveLoginDays] = useState<number>(0);
-
-  // 異常系用のステート定義
-  const [loginError, setLoginError] = useState<boolean>(false);
-
   const [goal, setGoal] = useState<Goal | null>(null);
   const [showArchivedType1, setShowArchivedType1] = useState<number>(0);
   const [showArchivedType2, setShowArchivedType2] = useState<number>(0);
   const [showArchivedType3, setShowArchivedType3] = useState<number>(0);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [isError, setIsError] = useState(false);
+  const [isCelebrationShow, setIsCelebrationShow] = useState(false);
+  const [celebrationOpacity, setCelebrationOpacity] = useState(false);
+  const [celebrationMessage, setCelebrationMessage] = useState<string | null>(null);
+
+  const triggerCelebration = (msg: string) => {
+    setCelebrationMessage(msg);
+    setIsCelebrationShow(true);
+    setTimeout(() => setCelebrationOpacity(true), 50);
+
+    setTimeout(() => {
+      setCelebrationOpacity(false);
+      setTimeout(() => setIsCelebrationShow(false), 500);
+    }, 3000);
+  };
 
   const [currentLoginMessage, setCurrentLoginMessage] = useState<{ name: string; text: string; image: string }>({
     name: "",
     text: "",
     image: ""
   });
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsCreateMenuOpen(false);
+      }
+    };
+
+    if (isCreateMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isCreateMenuOpen]);
+
   // 連続ログインメッセージの更新
   const updateLoginMessage = (streakDays: number, isStreakAchieved: number) => {
     const now = new Date();
     const hour = now.getHours();
     let timeZone: "朝" | "昼" | "夜" = "昼";
 
-    if (hour >= 3 && hour < 11) {
+    if (3 <= hour && hour < 11) {
       timeZone = "朝";
-    } else if (hour >= 11 && hour < 19) {
+    } else if (11 <= hour && hour < 19) {
       timeZone = "昼";
     } else {
       timeZone = "夜";
     }
 
-    const messageMaster = {
-      "朝": {
-        charName: "しきじー",
-        image: "/stamps/shikiji_default.png",
-        normal: ["おはよう よく来たな 共に頑張ろう", "Good Morning!", "勉強しに来るとは偉いぞ！"],
-        success: `おお！ 連続ログイン日数${streakDays}日が達成したぞ！`
-      },
-      "昼": {
-        charName: "といまる",
-        image: "/stamps/toimaru_default.png",
-        normal: ["こんにちは〜 今日も一緒に頑張ろうね〜", "ハロ〜 休憩してね〜", "お昼ご飯は食べた〜？"],
-        success: `わ〜 連続で${streakDays}日も来れて偉いね〜`
-      },
-      "夜": {
-        charName: "フクロウ",
-        image: "/stamps/hukurou_default.png",
-        normal: ["ホー(こんばんは)", "ホーホー(夕飯は食べましたか？)", "ホーホーホー(とても偉いです)"],
-        success: `ホー！（おめでとうございます。 連続ログイン日数${streakDays}日が達成されました。）`
-      }
-    };
-
     const selectedZone = messageMaster[timeZone];
-    const finalMessageText = isStreakAchieved ? selectedZone.success : selectedZone.normal[Math.floor(Math.random() * 3)];
-
+    // const finalMessageText = isStreakAchieved ? selectedZone.success : selectedZone.normal[Math.floor(Math.random() * 3)];
+    const text = isStreakAchieved 
+        ? selectedZone.success(streakDays) 
+        : selectedZone.normal[Math.floor(Math.random() * selectedZone.normal.length)];
     setCurrentLoginMessage({
       name: selectedZone.charName,
-      text: finalMessageText,
+      text: text,
       image: selectedZone.image
     });
   };
+
   // データのAPI取得処理
   const fetchSpaces = async () => {
-    if (!session?.user?.id) return null;
+    if (status === "unauthenticated") {
+      ToiToiNotification.error(MESSAGES.E4003);
+      router.push("/");
+    }
+    setIsError(false);
+
     setIsLoading(true);
 
     try {
       // ログイン状況の更新
       const loginRes = await fetchWithTimeout("/api/user/loginUpdate", { method: "PATCH" });
+      if (loginRes.status === 404) {
+        try {
+          await signOut({ callbackUrl: '/' });
+        } catch (e) {
+          console.error(e);
+        } 
+      }
       if (!loginRes.ok) {
-        handleApiResponse(loginRes);
+        await handleApiResponse(loginRes);
+        throw new Error();
       }
 
       // ダッシュボードデータの取得
-      const res = await fetchWithTimeout("/api/dashboard", {
-        cache: "no-store"
-      });
+      const res = await fetchWithTimeout("/api/dashboard");
+      if (res.status === 404) {
+        try {
+          await signOut({ callbackUrl: '/' });
+        } catch (e) {
+          console.error(e);
+        } 
+      }
       if (!res.ok) {
-        handleApiResponse(res);
-        return null;
+        await handleApiResponse(res);
+        throw new Error();
       }
       const data = await res.json();
       console.log("ダッシュボードの最新データ：", data);
@@ -151,7 +159,6 @@ export default function Dashboard() {
       }
       setGoal(data.goal)
       setConsecutiveLoginDays(streakDays);
-      setLoginError(false);
       updateLoginMessage(streakDays, isStreakAchieved ? 1 : 0);
 
       const targetData = data.spaces || data;
@@ -161,7 +168,7 @@ export default function Dashboard() {
         return list.map((s) => ({
           id: String(s.id),
           name: String(s.name),
-          spaceType: Number(s.spaceType ?? s.spaceType ?? 0),
+          spaceType: Number(s.spaceType ?? s.space_type ?? 0),
           favoriteFlag: Number(s.favoriteFlag ?? s.favorite_flag ?? 0),
           isArchived: Number(s.isArchived ?? s.is_archived ?? 0),
           taskCount: Number(s.taskCount ?? s.task_count ?? 0),
@@ -173,11 +180,12 @@ export default function Dashboard() {
         task: convertSpaces(targetData.task),
         question: convertSpaces(targetData.question),
       });
-
+      setIsLoading(false);
       return targetData;
     } catch (error) {
+      setIsError(true);
       console.error("取得失敗:", error);
-    } finally {
+    }finally{
       setIsLoading(false);
     }
   };
@@ -196,9 +204,9 @@ export default function Dashboard() {
   // 目標ステータスの更新
   const handleToggleGoalStatus = async () => {
     if (!goal) return;
-    const newStatus = goal.status === 1 ? 0 : 1;
+    const previousStatus = goal.status;
+    const newStatus = previousStatus === 1 ? 0 : 1;
     setGoal(prev => prev ? { ...prev, status: newStatus } : null);
-
     try {
       const res = await fetchWithTimeout("/api/goal/status", {
         method: "PATCH",
@@ -206,16 +214,20 @@ export default function Dashboard() {
         body: JSON.stringify({ status: newStatus })
       });
       if (!res.ok) {
-        handleApiResponse(res);
-        throw new Error();
+        await handleApiResponse(res);
+        throw new Error("Failed to update status");
       }
       const data = await res.json();
       setGoal(data.updatedGoal);
-
-      // クライアント側のステートも即座に更新して fetchSpaces の無駄な通信を削減
-      ToiToiNotification.success(data.message);
+      
+      if(data.updatedGoal.status === 1){
+        triggerCelebration("目標達成おめでとう！");
+      }else{
+        ToiToiNotification.info("目標を未達成に戻しました。");
+      }
     } catch (error: any) {
       console.error(error);
+      setGoal(prev => prev ? { ...prev, status: previousStatus } : null);
     }
   };
 
@@ -236,50 +248,49 @@ export default function Dashboard() {
       onConfirm: async () => {
         const toastId = "delete-space-toast";
         try {
-          const res = await fetch(`/api/spaces/${id}?spaceType=${spaceType}`, {
+          // APIに送るパラメータ（もしAPI側が "TASK" などを求めているならそのまま使う）
+          const res = await fetchWithTimeout(`/api/spaces/${id}?spaceType=${spaceType}`, {
             method: "DELETE"
           });
           if (!res.ok) {
-            const errorData = await res.json().catch(() => ({}));
-            console.error("【バックエンドからのエラー詳細】:", errorData);
+            await handleApiResponse(res);
             throw new Error();
           }
           ToiToiNotification.success("スペースを削除しました！", toastId);
           setSpaces((prev) => {
-            const key = spaceType === "1" ? "chat" : spaceType === "2" ? "task" : "question";
+            const key = spaceType.toLowerCase() as "chat" | "task" | "question";
             return {
               ...prev,
-              [key]: prev[key].filter((s) => s.id !== id),
+              [key]: prev[key].filter((s) => String(s.id) !== String(id)),
             };
           });
         } catch (error) {
           console.error(error);
-          ToiToiNotification.error("削除に失敗しました。", toastId);
         }
       },
     });
   };
 
-  // 異常系1: 未認証時に即リダイレクト
   useEffect(() => {
     if (status === "unauthenticated") {
+      ToiToiNotification.error(MESSAGES.E4003);
       router.push("/");
     }
   }, [status, router]);
-  // 初期ロード時のみAPIを実行（アーカイブ切替時はクライアント側でソートするためここには含めない）
+  // ド時およびブラウザの「戻る」で復元された時にAPIを実行
   useEffect(() => {
-    if (status === "authenticated") {
-      fetchSpaces();
-    }
-  }, [status]);
+    fetchSpaces();
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted && status === "authenticated") {
+        fetchSpaces();
+      }
+    };
+    window.addEventListener('pageshow', handlePageShow);
+    return () => {
+      window.removeEventListener('pageshow', handlePageShow);
+    };
+  }, []);
 
-  if (status === "loading" || status === "unauthenticated") {
-    return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#f8fafc" }}>
-        <Loading />
-      </div>
-    );
-  }
   const showActiveGoal = !!(goal && goal.content && goal.content.trim() !== "");
 
   const getDisplaySpaces = (list: Space[], isShowArchived: number) => {
@@ -292,12 +303,23 @@ export default function Dashboard() {
     return sorted.filter(s => s.isArchived === 0);
   };
 
-  const displayType1 = getDisplaySpaces(spaces.chat, showArchivedType1);
-  const displayType2 = getDisplaySpaces(spaces.task, showArchivedType2);
-  const displayType3 = getDisplaySpaces(spaces.question, showArchivedType3);
+    const displayType1 = getDisplaySpaces(spaces.chat, showArchivedType1);
+    const displayType2 = getDisplaySpaces(
+      spaces.task.map(s => ({ ...s, pendingCount: '未完了： ' + s.taskCount })), 
+      showArchivedType2
+    );
+    const displayType3 = getDisplaySpaces(
+    spaces.question.map(s => ({ ...s, pendingCount: '未解決： ' + s.questionCount })), 
+    showArchivedType3
+  );
 
   return (
     <>
+      <Celebration 
+        show={isCelebrationShow} 
+        opacity={celebrationOpacity} 
+        message={celebrationMessage} 
+      />
       <section style={{ maxWidth: "900px", margin: "40px auto", padding: "30px", background: "white", borderRadius: "8px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
         <h1 style={{ fontSize: "28px", fontWeight: "bold", marginBottom: "20px" }}>ダッシュボード</h1>
 
@@ -348,7 +370,28 @@ export default function Dashboard() {
               ) : (
                 <div style={{ padding: "20px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ fontSize: "16px", color: "#166534", fontWeight: "bold" }}>今週の目標を登録しよう！</span>
-                  <button type="button" onClick={() => { setSelectedType(99); setEditingSpace({ id: "new_goal", name: "", spaceType: 99, favoriteFlag: 0, isArchived: 0 }); setIsModalOpen(true); }} style={{ padding: "8px 16px", background: "#16a34a", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontWeight: "bold", fontSize: "14px" }}>登録</button>
+                  <button 
+                    type="button" 
+                    onClick={() => { 
+                      setSelectedType(99); 
+                      setEditingSpace({ id: "new_goal", name: "", spaceType: 99, favoriteFlag: 0, isArchived: 0 }); 
+                      setIsModalOpen(true); 
+                    }} 
+                    disabled={isError} // エラー時はボタンを無効化
+                    style={{ 
+                      padding: "8px 16px", 
+                      background: isError ? "#94a3b8" : "#16a34a", // エラー時はグレーにする
+                      color: "white", 
+                      border: "none", 
+                      borderRadius: "6px", 
+                      cursor: isError ? "not-allowed" : "pointer", 
+                      fontWeight: "bold", 
+                      fontSize: "14px",
+                      opacity: isError ? 0.6 : 1
+                    }}
+                  >
+                    登録
+                  </button>                
                 </div>
               )}
             </div>
@@ -359,8 +402,7 @@ export default function Dashboard() {
               showArchived={showArchivedType1}
               onToggleArchive={(checked) => setShowArchivedType1(checked ? 1 : 0)}
               onEdit={handleEdit}
-              onDelete={(id) => openDeleteConfirm(id, "1")}
-              onCheckError={(msg) => ToiToiNotification.error(msg)}
+              onDelete={(id) => openDeleteConfirm(id, "CHAT")}
             />
             <SpaceList
               title="タスク"
@@ -368,8 +410,7 @@ export default function Dashboard() {
               showArchived={showArchivedType2}
               onToggleArchive={(checked) => setShowArchivedType2(checked ? 1 : 0)}
               onEdit={handleEdit}
-              onDelete={(id) => openDeleteConfirm(id, "2")}
-              onCheckError={(msg) => ToiToiNotification.error(msg)}
+              onDelete={(id) => openDeleteConfirm(id, "TASK")}
             />
             <SpaceList
               title="質問"
@@ -377,20 +418,38 @@ export default function Dashboard() {
               showArchived={showArchivedType3}
               onToggleArchive={(checked) => setShowArchivedType3(checked ? 1 : 0)}
               onEdit={handleEdit}
-              onDelete={(id) => openDeleteConfirm(id, "3")}
-              onCheckError={(msg) => ToiToiNotification.error(msg)}
+              onDelete={(id) => openDeleteConfirm(id, "QUESTION")}
             />
             {/* 新規作成ボタンメニュー */}
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "30px", position: "relative" }}>
+            <div ref={menuRef} style={{ display: "flex", justifyContent: "flex-end", marginTop: "30px", position: "relative" }}>
               {isCreateMenuOpen && (
-                <div style={{ position: "absolute", bottom: "50px", right: "0", background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)", padding: "8px 0", display: "flex", flexDirection: "column", minWidth: "180px", zIndex: 50 }}>
+                <div style={{ position: "absolute", bottom: "50px", right: "0", background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)", padding: "8px 0", display: "flex", flexDirection: "column",  zIndex: 50 }}>
                   <button type="button" onClick={() => { setEditingSpace(null); openModal(1); setIsCreateMenuOpen(false); }} style={{ padding: "10px 16px", textAlign: "left", background: "none", border: "none", cursor: "pointer", fontSize: "14px", color: "#334155", fontWeight: "500" }} onMouseEnter={(e) => e.currentTarget.style.background = "#f1f5f9"} onMouseLeave={(e) => e.currentTarget.style.background = "none"}>チャットスペース</button>
                   <button type="button" onClick={() => { setEditingSpace(null); openModal(2); setIsCreateMenuOpen(false); }} style={{ padding: "10px 16px", textAlign: "left", background: "none", border: "none", cursor: "pointer", fontSize: "14px", color: "#334155", fontWeight: "500" }} onMouseEnter={(e) => e.currentTarget.style.background = "#f1f5f9"} onMouseLeave={(e) => e.currentTarget.style.background = "none"}>タスクスペース</button>
                   <button type="button" onClick={() => { setEditingSpace(null); openModal(3); setIsCreateMenuOpen(false); }} style={{ padding: "10px 16px", textAlign: "left", background: "none", border: "none", cursor: "pointer", fontSize: "14px", color: "#334155", fontWeight: "500" }} onMouseEnter={(e) => e.currentTarget.style.background = "#f1f5f9"} onMouseLeave={(e) => e.currentTarget.style.background = "none"}>質問スペース</button>
                 </div>
               )}
-              <button type="button" onClick={() => setIsCreateMenuOpen(prev => !prev)} style={{ padding: "12px 24px", background: "#2563eb", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
-                <span>{isCreateMenuOpen ? "×" : "＋"}</span> 新規作成
+              <button 
+                type="button" 
+                onClick={() => setIsCreateMenuOpen(prev => !prev)} 
+                disabled={isError} // エラー時はボタンを無効化
+                style={{ 
+                  padding: "12px 24px", 
+                  background: isError ? "#94a3b8" : "#2563eb", // エラー時はグレーにする等
+                  color: "white", 
+                  border: "none", 
+                  borderRadius: "8px", 
+                  cursor: isError ? "not-allowed" : "pointer", 
+                  fontWeight: "bold", 
+                  fontSize: "14px", 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: "6px", 
+                  width: "130px",
+                  opacity: isError ? 0.6 : 1
+                }}
+              >
+                <span className="w-4">{isCreateMenuOpen ? "×" : "＋"}</span> 新規作成
               </button>
             </div>
           </>
@@ -457,49 +516,48 @@ export default function Dashboard() {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(bodyData),
             });
-
             if (!res.ok) {
-              handleApiResponse(res);
+              await handleApiResponse(res);
               throw new Error();
             }
             const data = await res.json();
+            console.log(data);
             ToiToiNotification.success(isGoal ? "目標を保存しました！" : "スペースを保存しました！");
             setIsModalOpen(false);
             setEditingSpace(null);
             window.dispatchEvent(new Event("refresh-header"));
             if (isGoal) {
-              // 目標の場合
               setGoal((prev)=>{
                 return prev
                   ?{...prev, content: name }
                   :{id: "", status: 0,content: name};
               });
             } else {
-              // スペースの更新（編集）の場合
               if (isEditingExistingSpace) {
                 setSpaces((prev) => {
-                  const selectedNum = Number(selectedType);
-                  const key = selectedNum === 1 ? "chat" : selectedNum === 2 ? "task" : "question";
-
-                  return {
-                    ...prev,
-                    [key]: prev[key].map((s) => {
-                      if (s.id === editingSpace.id) {
-                        const updated = data.updatedSpace || {};
-                        return {
-                          ...s,
-                          name: updated.name ?? s.name,
-                          favoriteFlag: Number(updated.favoriteFlag ?? updated.favorite_flag ?? s.favoriteFlag),
-                          isArchived: Number(
-                            updated.isArchived ?? updated.is_archived ?? s.isArchived
-                          ),
-                          taskCount: Number(updated.taskCount ?? updated.task_count ?? s.taskCount ?? 0),
-                          questionCount: Number(updated.questionCount ?? updated.question_count ?? s.questionCount ?? 0),
+                    const updated = data.updatedSpace || {};
+                    const actualSpaceType = Number(updated.space_type ?? editingSpace.spaceType ?? 1);
+                    const key = actualSpaceType === 1 ? "chat" : actualSpaceType === 2 ? "task" : "question";
+                    const list = [...prev[key]];
+                    const index = list.findIndex(s => String(s.id) === String(editingSpace.id));
+                    if (index !== -1) {
+                        list[index] = {
+                            ...list[index],
+                            name: updated.name ?? list[index].name,
+                            spaceType: updated.space_type ?? list[index].spaceType,
+                            favoriteFlag: Number(updated.favorite_flag ?? updated.favoriteFlag ?? list[index].favoriteFlag ?? 0),
+                            isArchived: Number(updated.is_archived ?? updated.isArchived ?? list[index].isArchived ?? 0),
                         };
-                      }
-                      return s;
-                    })
-                  };
+                    }
+                    list.sort((a, b) => {
+                        if (a.isArchived !== b.isArchived) return a.isArchived - b.isArchived;
+                        if (a.favoriteFlag !== b.favoriteFlag) return b.favoriteFlag - a.favoriteFlag;
+                        return Number(a.id) - Number(b.id);
+                    });
+                    return {
+                        ...prev,
+                        [key]: list
+                    };
                 });
               } else {
                 // 新規作成：該当する配列にデータを追加
@@ -507,23 +565,15 @@ export default function Dashboard() {
                   const newSpace = data.space || {};
                   const currentSpaceType = Number(newSpace.spaceType ?? newSpace.space_type ?? selectedType);
                   const key = currentSpaceType === 1 ? "chat" : currentSpaceType === 2 ? "task" : "question";
-
                   const formattedNewSpace = {
-                    id: String(newSpace.id),
-                    name: String(newSpace.name ?? name),
+                    id: newSpace.id,
+                    name: newSpace.name,
                     spaceType: currentSpaceType,
-                    favoriteFlag: Number(
-                      newSpace.favoriteFlag ?? newSpace.favorite_flag ?? favoriteFlag ?? 0
-                    ),
-                    isArchived: Number(
-                      newSpace.isArchived ?? newSpace.is_archived ?? isArchived ?? 0
-                    ),
+                    favoriteFlag: newSpace.favorite_flag,
+                    isArchived: newSpace.is_archived,
                     taskCount: 0,
                     questionCount: 0,
                   };
-
-                  console.log("【画面に追加するデータ検証（修正完了版）】", formattedNewSpace);
-
                   return {
                     ...prev,
                     [key]: [...prev[key], formattedNewSpace]

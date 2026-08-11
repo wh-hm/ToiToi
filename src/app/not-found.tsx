@@ -1,25 +1,31 @@
 "use client"; // NextUIを使うため必須
 import { Image, Button } from "@nextui-org/react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react"; // 1. useSessionをインポート
+
 
 export default function NotFound() {
-  const router = useRouter(); // routerを呼び出す
-  const handleBack = () => {
-  // ブラウザの履歴が1つ以上あれば戻る
-  if (window.history.length > 1) {
-    router.back();
-  } else {
-    // なければダッシュボードへ飛ばす
-    router.push("/dashboard"); 
-  }
-};
+  const router = useRouter();
+  const { data: session, status } = useSession(); // 2. セッション情報を取得
 
+  // 読み込み中はボタンなどを無効化（またはスケルトン表示）するために判定
+  const isLoading = status === "loading";
+  
+  // sessionが存在すればログイン済み（isAuthenticated）とみなす
+  const isAuthenticated = !!session;
+
+  const handleBack = () => {
+    if (isLoading) return;
+
+    if (isAuthenticated) {
+      router.push("/dashboard");
+    } else {
+      router.push("/"); // またはトップページ "/"
+    }
+  };
 
   return (
-    <div 
-      className="flex flex-col items-center justify-center min-h-[70vh] px-4 text-center bg-cover bg-center bg-no-repeat"
-      style={{ backgroundImage: 'url(/images/shikiji_default.jpg)', opacity: 0.9 }}
-    >
+    <div className={`flex flex-col items-center justify-center px-4 ${isAuthenticated ? "min-h-[calc(100vh-7rem)]" : "min-h-[calc(100vh-3rem)]"}`}>
       <div className="absolute inset-0 bg-white/80 z-0" />
       <div className="relative z-10 flex flex-col items-center">
         <h2 
@@ -31,11 +37,11 @@ export default function NotFound() {
         >
           404
         </h2>
-        <Image src={"not_found.png"}></Image>
+        <Image src={"/not_found.png"}></Image>
 
         {/* メッセージエリア */}
         <div className="mb-6">
-          <p className="text-lg text-slate-600 mb-3 leading-relaxed">
+          <p className="text-lg text-slate-600 mb-3 leading-relaxed text-center">
             お探しのページが見つかりません。<br/>
             URLが間違っているか、ページが削除された可能性があります。
           </p>
@@ -43,15 +49,18 @@ export default function NotFound() {
 
         {/* トップへ戻るボタン */}
         <Button
-          onPress={handleBack} // onClick から onPress に変更
+          onPress={handleBack}
+          isDisabled={isLoading}
           color="primary"
           variant="shadow"
           size="lg"
           radius="full"
           className="font-semibold text-lg px-10 py-4 shadow-primary/30"
         >
-          前の画面に戻る
+          {isAuthenticated ? "ダッシュボードに戻る" : "ログイン画面に戻る"}
         </Button>
+
+        
       </div>
     </div>
   );

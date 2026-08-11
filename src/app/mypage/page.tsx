@@ -6,11 +6,11 @@ import { signOut, useSession } from "next-auth/react";
 import { Trash2, User, Settings, Loader2 } from "lucide-react";
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, useDisclosure } from "@nextui-org/react";
 import { Loading } from "@/components/LoadingSpinner";
-// 💡 自作の可愛いコンポーネントたちを正しくインポート
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import { ToiToiNotification } from "@/components/Toast";
 import { fetchWithTimeout } from "@/lib/api";
 import { handleApiResponse } from "@/lib/api-utils";
+import { MESSAGES } from "@/constants/messages";
 
 export default function MyPage() {
   const router = useRouter();
@@ -39,12 +39,19 @@ export default function MyPage() {
   // 1. 認証ガード
   useEffect(() => {
     if (status === "unauthenticated") {
+      ToiToiNotification.error(MESSAGES.E4003);
       router.push("/");
     }
   }, [status, router]);
 
   // 2. データ取得処理
   const fetchData = useCallback(async () => {
+    if (status === "unauthenticated") {
+      ToiToiNotification.error(MESSAGES.E4003);
+      router.push("/");
+    }
+    setLoading(true);
+
     try {
       const res = await fetchWithTimeout("/api/user/account");
       if (!res.ok) {
@@ -83,9 +90,26 @@ export default function MyPage() {
     if (isOpen) setNewName(username);
   }, [isOpen, username]);
 
+  // useEffect(() => {
+  //   if (status === "authenticated") fetchData();
+  // }, [status, fetchData]);
+
+
+
+  // 初期ロード時およびブラウザの「戻る」で復元された時にAPIを実行
   useEffect(() => {
-    if (status === "authenticated") fetchData();
-  }, [status, fetchData]);
+    fetchData();
+    // 💡 ブラウザの「戻る」でキャッシュから復元されたときに再取得する
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted && status === "authenticated") {
+        fetchData();
+      }
+    };
+    window.addEventListener('pageshow', handlePageShow);
+    return () => {
+      window.removeEventListener('pageshow', handlePageShow);
+    };
+  }, []);
 
   // 3. ローディング・未認証時の表示分岐
   if (status === "loading" || loading) {
@@ -122,6 +146,7 @@ export default function MyPage() {
       }
       await fetchData();
       ToiToiNotification.success(data.message);
+      window.dispatchEvent(new Event("refresh-header"));
     } catch (e: any) {
       console.log(e);
     } finally {

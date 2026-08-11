@@ -29,11 +29,14 @@ export async function getSpaces(
 
 
 //スペースが生きているかどうかの確認
-export async function getSpaceCheck(userId: string, spaceId: number): Promise<boolean> {
+export async function getSpaceCheck(userId: string, spaceId: number): Promise<Space | null> {
   const space = await prisma.space.findFirst({
     where: { user_id: userId, id: spaceId },
   });
-  return !!space && space.delete_flag === 0;
+  if(!space){
+    return null;
+  }
+  return space;
 }
 
 
@@ -76,10 +79,16 @@ export async function deleteSpace(
 ): Promise<boolean> {
   const db = tx || prisma;
   
-  if (spaceType === 'CHAT') await deleteSpaceChat(spaceId, userId, db);
-  else if (spaceType === 'TASK') await deleteSpaceTask(spaceId, userId, db);
-  else if (spaceType === 'QUESTION') await deleteSpaceQuestion(spaceId, userId, db);
-
+  if (spaceType === 'CHAT') {
+    await deleteSpaceChat(spaceId, userId, db);
+  }else if (spaceType === 'TASK') {
+    await deleteSpaceTask(spaceId, userId, db);
+  }
+  else if (spaceType === 'QUESTION') {
+    await deleteSpaceQuestion(spaceId, userId, db);
+  }else{
+    return false;
+  }
   await db.space.update({
     where: { id: spaceId },
     data: { delete_flag: 1 },
@@ -99,6 +108,9 @@ export async function deleteSpaces(userId: string, spaceType: string, tx?: Tx): 
   };
 
   const spaces = await db.space.findMany({ where: whereClause, select: { id: true, space_type: true } });
+  if(spaces.length === 0){
+    return false;
+  }
 
   await Promise.all(spaces.map(space => {
     const stringType = spaceType === "ALL" 
@@ -120,7 +132,7 @@ export async function deleteSpaceChat(spaceId: number, userId: string, tx?: Tx):
     select: { id: true, image_id: true }
   });
 
-  if (chats.length === 0) return true;
+  if (chats.length === 0) return false;
 
   const imageIds = chats.map(c => c.image_id).filter((id): id is number => id !== null);
 
@@ -141,10 +153,13 @@ export async function deleteSpaceChat(spaceId: number, userId: string, tx?: Tx):
 
 export async function deleteSpaceTask(spaceId: number, userId: string, tx?: Tx): Promise<boolean> {
   const db = tx || prisma;
-  await db.task.updateMany({
+  const result =  await db.task.updateMany({
     where: { space_id: spaceId, user_id: userId, delete_flag: 0 },
     data: { delete_flag: 1 },
   });
+  if(result.count === 0){
+    return false;
+  }
   return true;
 }
 
@@ -156,7 +171,7 @@ export async function deleteSpaceQuestion(spaceId: number, userId: string, tx?: 
     where: { space_id: spaceId, user_id: userId, delete_flag: 0 },
     select: { id: true }
   });
-  if (questions.length === 0) return true;
+  if (questions.length === 0) return false;
   const qIds = questions.map(q => q.id);
   // 2. 紐付く画像IDを特定
   const questionChats = await db.questionChats.findMany({
@@ -182,6 +197,9 @@ export async function deleteSpaceQuestion(spaceId: number, userId: string, tx?: 
 export async function deleteArchives(userId: string, tx?: Tx): Promise<boolean> {
   const db = tx || prisma;
   const archivedSpaces = await getSpaces(userId, 1, null);
+  if(archivedSpaces.length === 0){
+    return false;
+  }
 
   await Promise.all(archivedSpaces.map(space => {
     const typeString = SPACE_TYPE_MAP[space.space_type] || "UNKNOWN";

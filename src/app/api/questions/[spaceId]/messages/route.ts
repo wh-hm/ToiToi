@@ -28,8 +28,9 @@ export async function GET(
   }
 
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-  
+  if ('error' in auth) {
+      return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+  }
   try {
     
     const [isSpaceAlive,  isQuestionAlive] = await Promise.all([
@@ -67,8 +68,9 @@ export async function POST(
   { params }: { params: Promise<{ spaceId: string }> }
 ) {
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-  
+  if ('error' in auth) {
+    return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+  }  
   const { spaceId } = await params;
   const spaceIdNum = Number(spaceId);
   
@@ -107,9 +109,11 @@ export async function POST(
       checkQuestion(auth.user_id, spaceIdNum, questionId),
     ]);
         
-    if (!isSpaceAlive) return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
-    if (!isQuestionAlive) return NextResponse.json({ message: MESSAGES.E2006 }, { status: 404 });
-    
+    if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
+      return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+    }
+    if (!isQuestionAlive) return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
+
     // 画像アップロード
     let imageUrls: string[] = [];
     if (files.length > 0) {

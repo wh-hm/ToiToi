@@ -7,8 +7,9 @@ export async function GET() {
     // 1. 認証チェックを共通化された関数で行う
     const auth = await getAuthContext();
     if ('error' in auth) {
-        return NextResponse.json({ message: auth.error }, { status: auth.status });
+        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
     }
+    
     try {
         const userName = await getUsername(auth.user_id);
         if (!userName) {

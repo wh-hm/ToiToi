@@ -13,8 +13,9 @@ import { prisma } from "@/lib/prisma";
 export async function DELETE() {
   // 1. 認証チェック
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+  if ('error' in auth) {
+        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+  }
   try {
     // 1. 物理削除すべき画像IDリストを取得
     const imageIds = await getAuthorizedImageIds(auth.user_id);
@@ -68,28 +69,42 @@ export async function POST(request: Request) {
 
     // 2. 認証チェック
     const auth = await getAuthContext();
-    if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+    if ('error' in auth) {
+      return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+    }
     // 3. 権限・生存チェック（並列化）
     const sId = parseInt(spaceId);
     const cId = parseInt(chatId);
     const qId = questionId ? parseInt(questionId) : null;
-    const checkTasks = [];
 
     if (type === "chat") {
-      checkTasks.push(getSpaceCheck(auth.user_id, sId));
-      checkTasks.push(getChatCheck(auth.user_id, sId, cId));
+      const [isSpaceAlive, isChatAlive] = await Promise.all([
+          getSpaceCheck(auth.user_id, sId),
+          getChatCheck(auth.user_id, sId, cId)
+      ]);
+
+      if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
+        return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+      }
+      if (!isChatAlive) return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
+
+
     } else if (type === "question") {
       if (!qId) return NextResponse.json({ message: MESSAGES.E1008 }, { status: 400 });
-      checkTasks.push(getSpaceCheck(auth.user_id, sId));
-      checkTasks.push(checkQuestionChat(cId, qId, auth.user_id));
+      const [isSpaceAlive, isChatAlive] = await Promise.all([
+          getSpaceCheck(auth.user_id, sId),
+          checkQuestionChat(cId, qId, auth.user_id)
+      ]);
+
+      if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
+        return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+      }
+      if (!isChatAlive) return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
+
     }
 
-    const [isSpaceAlive, isChatAlive] = await Promise.all(checkTasks);
 
-    if (!isSpaceAlive) return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
-    if (!isChatAlive) return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
-
+    
     // 4. R2からダウンロード実行
     // フロントから送られてきた storageKey をそのまま信頼してキーとして使用する
     const key = decodeURIComponent(storageKey);

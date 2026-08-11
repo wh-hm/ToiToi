@@ -10,14 +10,14 @@ export async function POST() {
         if (!session?.user?.id) {
             return NextResponse.json({ message: MESSAGES.E4001 }, { status: 401 });
         }
-        const google_id = session.user.id;
+        const googleId = session.user.id;
         const email = session.user.email;
 
         if (!email) {
             return NextResponse.json({ message: MESSAGES.E4001 }, { status: 400 });
         }
 
-        await registerUser(google_id, email);
+        await registerUser(googleId, email);
 
         return NextResponse.json({ 
             message: MESSAGES.USER001, 

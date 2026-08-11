@@ -9,11 +9,14 @@ export async function PATCH(
   { params }: { params: Promise<{ id?: string; spaceId?: string }> }
 ) {
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-  
+  if ('error' in auth) {
+      return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+  }  
   try {
     const resolvedParams = await params;
     const body = await request.json();
+
+    
     
     // 💡 キャメルケースに統一。paramsとbodyのどちらから送られてきても取得できるように安全にフォールバックを設定
     const taskId = Number(resolvedParams.id || body.taskId || body.task_id);
@@ -31,7 +34,7 @@ export async function PATCH(
     ]);
 
     // スペースチェックの判定
-    if (!isSpaceAlive) {
+    if (!isSpaceAlive || isSpaceAlive.delete_flag === 1) {
         return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
 

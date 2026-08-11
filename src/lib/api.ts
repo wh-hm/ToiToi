@@ -1,5 +1,7 @@
 import { ToiToiNotification } from "@/components/Toast";
 // 💡 これを共通のユーティリティ（例: src/lib/api.ts）などに置いておく
+// export async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 500) {
+
 export async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 60000) {
   // 1. タイムアウトを制御するためのコントローラーを作成
   const controller = new AbortController();

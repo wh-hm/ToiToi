@@ -13,7 +13,9 @@ export async function PATCH(
   const spaceId = parseInt(id);
   // 1. 認証とユーザーID取得を共通化
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
+  if ('error' in auth) {
+        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+  }
   try {
     const { background, chatId } = await request.json();
     const [isSpaceAlive, isChatAlive] = await Promise.all([
@@ -22,9 +24,10 @@ export async function PATCH(
     ]);
     
     // スペースチェックの判定
-    if (!isSpaceAlive) {
-        return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+    if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
+      return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
+
     // チャットチェックの判定
     if (!isChatAlive) {
         return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });

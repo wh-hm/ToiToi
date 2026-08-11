@@ -2,19 +2,22 @@ import { NextResponse } from "next/server";
 import { deleteSpaces } from "@/services/SpaceService";
 import { getAuthContext } from "@/lib/auth-guard";
 import { MESSAGES } from "@/constants/messages";
+import { prisma } from "@/lib/prisma";
 
 export async function DELETE() {
     // 1. 認証チェック
     const auth = await getAuthContext();
     if ('error' in auth) {
-        return NextResponse.json({ message: auth.error }, { status: auth.status });
-    }
+        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+    }  
     try {
-        const success = await deleteSpaces(auth.user_id, "QUESTION"); 
+        const success = await prisma.$transaction(async (tx) => {
+            return await deleteSpaces(auth.user_id, "QUESTION", tx );
+        });
         if (!success) {
             return NextResponse.json(
-                { message: MESSAGES.E2004("質問スペース全削除") }, 
-                { status: 500 }
+                { message: MESSAGES.E2006 }, 
+                { status: 409 }
             );
         }
         return NextResponse.json({ 

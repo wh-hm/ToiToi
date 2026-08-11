@@ -8,8 +8,8 @@ export async function PATCH(request: Request) {
     // 1. 共通の認証ガードを使用（セッションチェックとuser_id取得を統合）
     const auth = await getAuthContext();
     if ('error' in auth) {
-        return NextResponse.json({ message: auth.error }, { status: auth.status });
-    }
+        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+    }  
     try {
         const userCheck = await checkUser(auth.user_id);
         if (!userCheck) {
@@ -32,6 +32,7 @@ export async function PATCH(request: Request) {
                 { status: 400 }
             );
         }
+        
         const updatedUser = await updateUsername(auth.user_id, username);
         if (!updatedUser) {
             return NextResponse.json({ message: MESSAGES.E2002("ユーザー名") }, { status: 500 });

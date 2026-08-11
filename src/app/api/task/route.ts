@@ -9,11 +9,14 @@ const safeRegex = /[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uFF01-\uFF
 // 1. GET: タスク一覧取得
 export async function GET(request: NextRequest) {
     const auth = await getAuthContext();
-    if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+    if ('error' in auth) {
+        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+    }  
     const { searchParams } = new URL(request.url);
     const spaceIdParam = searchParams.get("spaceId") || searchParams.get("space_id");
     const spaceId = Number(spaceIdParam);
+
+    
 
     if (!spaceId || isNaN(spaceId)) {
         return NextResponse.json({ message: MESSAGES.E1001("スペースID") }, { status: 400 });
@@ -21,11 +24,13 @@ export async function GET(request: NextRequest) {
 
     try {
         const isSpaceAlive = await getSpaceCheck(auth.user_id, spaceId);
-        if (!isSpaceAlive) {
-            return NextResponse.json({ message: MESSAGES.E1010("対象のスペース") }, { status: 404 });
+        if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
+            return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
         }
 
         const tasks = await getTasks(spaceId, auth.user_id);
+        // return NextResponse.json({ message: MESSAGES.E2003("タスク") }, { status: 500 });
+
         return NextResponse.json({
             incomplete: tasks.filter((t) => t.status === 0),
             complete: tasks.filter((t) => t.status === 1),
@@ -38,20 +43,20 @@ export async function GET(request: NextRequest) {
 // 2. POST: タスク登録（単体チェック実装）
 export async function POST(request: NextRequest) {
     const auth = await getAuthContext();
-    if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
-
+    if ('error' in auth) {
+        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+    }  
     try {
         const body = await request.json();
-        
-        // 💡 キャメルケースに統一（どちらで送られてきても受け取れるようにフォールバックを設定）
-        const spaceId = Number(body.spaceId || body.space_id);
-        const title = body.title;
-        const description = body.description;
-        const dueDate = body.dueDate || body.due_date;
-        const tag = body.tag;
-        const isAllDay = body.isAllDay ?? body.is_allday;
-        const priority = body.priority;
+        console.log("POST body:", body);
 
+        const spaceId = body.spaceId || body.space_id;
+        const { title, description, dueDate, tag, isAllday, priority } = body;
+
+        // --- 単体チェック ---
+        if (!title) return NextResponse.json({ message: MESSAGES.E1001("タスク名") }, { status: 400 });
+        if (!dueDate) return NextResponse.json({ message: MESSAGES.E1001("期限") }, { status: 400 });
+        
         // 1. 必須チェック (E1001)
         if (!title || title.trim() === "") return NextResponse.json({ message: MESSAGES.E1001("タスク名") }, { status: 400 });
         if (!dueDate) return NextResponse.json({ message: MESSAGES.E1001("期限") }, { status: 400 });
@@ -75,16 +80,16 @@ export async function POST(request: NextRequest) {
         }
 
         const isSpaceAlive = await getSpaceCheck(auth.user_id, spaceId);
-        if (!isSpaceAlive) {
+        if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
             return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
         }
 
         // データベース保存（引数もキャメルケースの変数に修正）
         const newTask = await registerTask(
-            auth.user_id, title, description, dueDate, spaceId, tag || 0, isAllDay, priority
+            auth.user_id, title, description, dueDate, spaceId, tag || 0, isAllday, priority
         );
-
-        return NextResponse.json(newTask, { status: 201 });
+        
+        return NextResponse.json({task: newTask, message: MESSAGES.S1001("タスク")}, { status: 201 });
     } catch (error) {
         return NextResponse.json({ message: MESSAGES.E2001("タスク") }, { status: 500 });
     }

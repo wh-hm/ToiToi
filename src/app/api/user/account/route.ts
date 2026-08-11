@@ -8,7 +8,9 @@ import { getImageCount } from "@/services/StorageService";
 
 export async function GET() {
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
+  if ('error' in auth) {
+    return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+  }  
   try {
     const [user, spaces, imageCount] = await Promise.all([
       getUser(auth.user_id),
@@ -22,7 +24,7 @@ export async function GET() {
       question: spaces.filter(s => s.space_type === 3),
     };
     if (!user) {
-      return NextResponse.json({ message: MESSAGES.E1010("ユーザー") }, { status: 404 });
+      return NextResponse.json({ message: MESSAGES.E1010("ユーザー") }, { status: 403 });
     }
     return NextResponse.json({ 
       user: user, 
@@ -41,7 +43,9 @@ export async function GET() {
 
 export async function DELETE() {
   const auth = await getAuthContext();
-  if ('error' in auth) return NextResponse.json({ message: auth.error }, { status: auth.status });
+  if ('error' in auth) {
+    return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+  }  
   try {
     const success = await deleteUser(auth.user_id);
     

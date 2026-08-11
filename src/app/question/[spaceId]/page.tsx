@@ -9,6 +9,7 @@ import { ToiToiNotification } from "@/components/Toast";
 import { Loading } from "@/components/LoadingSpinner";
 import { useCelebration, Celebration } from "@/components/Celebration";
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
+import { MESSAGES } from "@/constants/messages";
 
 export default function QuestionPage() {
   const { data: session, status } = useSession();
@@ -71,6 +72,7 @@ export default function QuestionPage() {
   // 1. 初期表示・セッション有効チェック
   useEffect(() => {
     if (status === "unauthenticated") {
+      ToiToiNotification.error(MESSAGES.E4003);
       router.push("/");
     }
   }, [status, router]);

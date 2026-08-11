@@ -6,11 +6,8 @@ import { MESSAGES } from "@/constants/messages";
 export async function PATCH(request: NextRequest) {
   const auth = await getAuthContext();
 
-  if ("error" in auth) {
-    return NextResponse.json(
-      { message: auth.error },
-      { status: auth.status }
-    );
+  if ('error' in auth) {
+        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
   }
   try {
     const { status } = await request.json();
@@ -28,10 +25,10 @@ export async function PATCH(request: NextRequest) {
       Number(status)
     );
 
-    if (!updatedGoal) {
+    if (!updatedGoal || updatedGoal.delete_flag === 1) {
       return NextResponse.json(
-        { message: MESSAGES.E2005("目標") }, 
-        { status: 404 }
+        { message: MESSAGES.E2007, code: "USER_DELETED" }, 
+        { status: 403 }
       );
     }
 
