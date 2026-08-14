@@ -17,9 +17,10 @@ export async function POST() {
             return NextResponse.json({ message: MESSAGES.E4001 }, { status: 400 });
         }
 
-        await registerUser(googleId, email);
+        const user = await registerUser(googleId, email);
 
         return NextResponse.json({ 
+            hasUsername: user.username,
             message: MESSAGES.USER001, 
         }, { status: 200 });
         
