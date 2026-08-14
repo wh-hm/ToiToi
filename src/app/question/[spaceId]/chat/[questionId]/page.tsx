@@ -414,7 +414,6 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
           </details>
         </div>
       )}
-      
       <div className="flex-1 overflow-y-auto relative w-full p-4">
         <ChatList 
           chats={messages}

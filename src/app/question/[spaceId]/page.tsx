@@ -50,12 +50,15 @@ export default function QuestionPage() {
       onConfirm: async () => {
         const toastId = "delete-space-toast";
         try {
-          const res = await fetch(`/api/questions/${space_id}`, {
+          const res = await fetchWithTimeout(`/api/questions/${space_id}?questionId=${id}`, {
             method: "DELETE"
           });
-          if (!res.ok) throw new Error();
+          if (!res.ok){
+            await handleApiResponse(res)
+            throw new Error();
+          }
           ToiToiNotification.success("質問を削除しました！", toastId);
-          const refreshRes = await fetch(`/api/questions?spaceId=${space_id}`);
+          const refreshRes = await fetchWithTimeout(`/api/questions?spaceId=${space_id}`);
           if (refreshRes.ok) {
             const data = await refreshRes.json();
             console.log("【APIからのレスポンス】:", data);
@@ -63,7 +66,6 @@ export default function QuestionPage() {
           }
         } catch (error) {
           console.error(error);
-          ToiToiNotification.error("削除に失敗しました。", toastId);
         }
       },
     });
@@ -169,24 +171,24 @@ export default function QuestionPage() {
     };
 
     try {
-      const res = await fetch(url, {
+      const res = await fetchWithTimeout(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formattedPayload),
       });
 
-      if (res.ok) {
-        ToiToiNotification.success(isEdit ? "質問を更新しました" : "質問を作成しました");
-        setIsModalOpen(false);
-        fetchQuestions();
-        if (isEdit && previousStatus !== 1 && newStatus === 1) {
-          triggerCelebration("解決おめでとう！");
-        }
-      } else {
-        ToiToiNotification.error(isEdit ? "更新に失敗しました" : "作成に失敗しました");
+      if(!res.ok){
+        await handleApiResponse(res);
+        throw new Error();
+      }
+      ToiToiNotification.success(isEdit ? "質問を更新しました" : "質問を作成しました");
+      setIsModalOpen(false);
+      fetchQuestions();
+      if (isEdit && previousStatus !== 1 && newStatus === 1) {
+        triggerCelebration("解決おめでとう！");
       }
     } catch (error) {
-      ToiToiNotification.error("通信エラーが発生しました");
+      console.log(error);
     }
   };
 
