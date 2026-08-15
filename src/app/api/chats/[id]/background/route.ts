@@ -27,11 +27,12 @@ export async function PATCH(
     if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
       return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
-
+    
     // チャットチェックの判定
     if (!isChatAlive) {
         return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
     }
+    
     // 2. 背景変更を実行
     const updatedChat = await changeBackground(chatId, spaceId, auth.user_id, background);
     if (!updatedChat) {

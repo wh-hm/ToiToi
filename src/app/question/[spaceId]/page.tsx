@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import TaskModal from "@/components/TaskModal";
@@ -24,6 +24,7 @@ export default function QuestionPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit' | 'detail'>('create');
   const [selectedQuestion, setSelectedQuestion] = useState<any>(null);
+  const isDeletingRef = useRef(false);
 
   // 検索用ステート（仕様：タグ検索 ＆ ナレッジ検索）
   const [searchTag, setSearchTag] = useState<string>("");
@@ -42,28 +43,53 @@ export default function QuestionPage() {
     onConfirm: () => { },
   });
 
-
   const openDeleteConfirm = (id: string) => {
     setModalConfig({
       isOpen: true,
       title: "質問を削除する？",
       onConfirm: async () => {
-        const toastId = "delete-space-toast";
+        // ① 連打防止：すでに処理中なら弾く
+        if (isDeletingRef.current) return;
+        
+        // ② 処理開始：ロックをかける
+        isDeletingRef.current = true;
+
+        const toastId = "delete-question-toast"; 
+        
         try {
-          const res = await fetch(`/api/questions/${space_id}`, {
+          // 🌟 修正ポイント：パスに space_id を、クエリパラメータに questionId を指定する
+          const res = await fetch(`/api/questions/${space_id}?questionId=${id}`, {
             method: "DELETE"
           });
-          if (!res.ok) throw new Error();
+
+          if (!res.ok) {
+            if (res.status === 404) throw new Error("ALREADY_DELETED");
+            throw new Error("API_ERROR");
+          }
+
           ToiToiNotification.success("質問を削除しました！", toastId);
+          
+          // リストの再取得
           const refreshRes = await fetch(`/api/questions?spaceId=${space_id}`);
           if (refreshRes.ok) {
             const data = await refreshRes.json();
             console.log("【APIからのレスポンス】:", data);
             setQuestions(Array.isArray(data.questions) ? data.questions : []);
           }
-        } catch (error) {
-          console.error(error);
-          ToiToiNotification.error("削除に失敗しました。", toastId);
+          
+          // (必要に応じてモーダルを閉じる処理)
+          // setModalConfig((prev) => ({ ...prev, isOpen: false }));
+
+        } catch (error: any) {
+          console.error("削除エラー:", error);
+          if (error.message === "ALREADY_DELETED") {
+            ToiToiNotification.error("この質問は既に削除されているか、見つかりません。", toastId);
+          } else {
+            ToiToiNotification.error("削除に失敗しました。", toastId);
+          }
+        } finally {
+          // ③ 最後に必ずロックを解除
+          isDeletingRef.current = false;
         }
       },
     });

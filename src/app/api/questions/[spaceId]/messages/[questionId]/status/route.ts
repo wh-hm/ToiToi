@@ -19,12 +19,13 @@ export async function PATCH(
     return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
   }  
   try {
+    
     const spaceIdNum = parseInt(spaceId);
     const questionIdNum = parseInt(questionId);
 
     const { searchParams } = new URL(request.url);
     const chatId = Number(searchParams.get("chatId"));
-
+    
     const [isSpaceAlive, isQuestionAlive, isChatAlive] = await Promise.all([
       getSpaceCheck(auth.user_id, spaceIdNum), // ※関数名が推測ですが合わせる
       checkQuestion(auth.user_id, spaceIdNum, questionIdNum),

@@ -399,6 +399,7 @@ const handleDownload = async (imageUrl: string, chatId: string) => {
   }
 
   try {
+    
     const res = await fetchWithTimeout("/api/images", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

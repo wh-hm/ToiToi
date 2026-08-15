@@ -112,7 +112,7 @@ export default function TaskModal(props: any): React.JSX.Element {
     // バリデーション
     if (!titleText) return showError(`${itemName}を入力してください。`);
     // if (!descText) return showError("詳細を入力してください。");
-    if (titleText.length > 20) return showError(`${itemName}は20文字以内で入力してください。`);
+    if (titleText.length > 50) return showError(`${itemName}は50文字以内で入力してください。`);
     if (descText.length > 100) return showError("詳細は100文字以内で入力してください。");
 
     const safeRegex = /[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uFF01-\uFF5E]/;
@@ -230,7 +230,7 @@ export default function TaskModal(props: any): React.JSX.Element {
           {/* タイトル入力欄 */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold text-slate-500">
-              {type === "question" ? "質問タイトル" : "タスク名"} (20文字以内・記号不可)
+              {type === "question" ? "質問タイトル" : "タスク名"} (50文字以内・記号不可)
               <span className="text-red-500 ml-1">*</span>
             </label>
             <input

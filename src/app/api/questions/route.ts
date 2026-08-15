@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
 
 
     try {
+        
         const questions = await getQuestions(spaceId, auth.user_id);
         return NextResponse.json({ 
             questions: questions, 

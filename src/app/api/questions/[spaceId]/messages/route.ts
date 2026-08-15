@@ -15,6 +15,12 @@ export async function GET(
   request: Request,
    { params }: { params: Promise<{ spaceId: string }> }
 ) {
+  // 🧪 【検証1：サーバー500エラー / 通信障害モック】
+  // ※ 一覧非表示 & 各種コントロール（入力欄/送信/画像UP/スタンプ）の非活性化テスト用
+  // const is500ErrorTest = true;
+  // if (is500ErrorTest) {
+  //   return NextResponse.json({ message: MESSAGES.E2003("チャット") }, { status: 500 });
+  // }
   const { spaceId } = await params;
   const { searchParams } = new URL(request.url);
   const questionId = Number(searchParams.get("questionId"));
@@ -32,7 +38,17 @@ export async function GET(
       return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
   }
   try {
-    
+    // 🧪 【検証2：対象スペース削除済み / 閲覧権限なし（404モック）】
+    // const isSpaceDeletedTest = true;
+    // if (isSpaceDeletedTest) {
+    //   return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+    // }
+
+    // 🧪 【検証3：対象質問削除済み（404モック）】
+    // const isQuestionDeletedTest = true;
+    // if (isQuestionDeletedTest) {
+    //   return NextResponse.json({ message: MESSAGES.E1010("質問") }, { status: 404 });
+    // }
     const [isSpaceAlive,  isQuestionAlive] = await Promise.all([
       getQuestionChatsWithImages(auth.user_id, questionId), // ※関数名が推測ですが合わせる
       checkQuestion(auth.user_id, spaceIdNum, questionId),
@@ -43,7 +59,7 @@ export async function GET(
         return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
     if (!isQuestionAlive) {
-        return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
+        return NextResponse.json({ message: MESSAGES.E2006 }, { status: 404 });
     }
     const [messages, question] = await Promise.all([
       getQuestionChatsWithImages(auth.user_id, questionId),
@@ -67,6 +83,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ spaceId: string }> }
 ) {
+  
   const auth = await getAuthContext();
   if ('error' in auth) {
     return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
@@ -75,6 +92,7 @@ export async function POST(
   const spaceIdNum = Number(spaceId);
   
   try {
+    
     const formData = await request.formData();
     
     // 💡 修正1: caption と message の両方を安全に取得
@@ -101,9 +119,26 @@ export async function POST(
     if (message && message.length > 100) {
       return NextResponse.json({ message: MESSAGES.E1002("チャット内容", 100) }, { status: 400 });
     }
-    
-    // 権限チェック
-    
+    // 🧪 【POST検証2：送信時スペース削除済み（404モック）】
+     const isPostSpaceDeletedTest = true;
+     if (isPostSpaceDeletedTest) {
+       return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+     }
+
+    // 🧪 【POST検証3：送信時質問削除済み（404モック）】
+    // ※ 別ユーザー等により送信直前に質問が削除された状況の再現
+    // const isPostQuestionDeletedTest = true;
+    // if (isPostQuestionDeletedTest) {
+    //   return NextResponse.json({ message: MESSAGES.E1010("質問") }, { status: 404 });
+    // }
+
+    // 🧪 【POST検証4：DB登録エラー（500モック）】
+    // ※ DB登録失敗、入力値保持、送信ボタン再活性化のテスト用
+    // const isPostDbErrorTest = true;
+    // if (isPostDbErrorTest) {
+    //   return NextResponse.json({ message: MESSAGES.E2001("データ登録") }, { status: 500 });
+    // }
+    // 権限チェック  
     const [isSpaceAlive, isQuestionAlive] = await Promise.all([
       getSpaceCheck(auth.user_id, spaceIdNum),
       checkQuestion(auth.user_id, spaceIdNum, questionId),
@@ -113,7 +148,7 @@ export async function POST(
       return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
     if (!isQuestionAlive) return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
-
+    
     // 画像アップロード
     let imageUrls: string[] = [];
     if (files.length > 0) {
@@ -125,7 +160,7 @@ export async function POST(
       }
       imageUrls = await uploadImages(files, auth.user_id, spaceIdNum);
     }
-
+    
     // 2. DB登録処理
     const newChats = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
 
