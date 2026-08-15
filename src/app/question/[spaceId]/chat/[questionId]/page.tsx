@@ -30,6 +30,8 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
   const { status } = useSession();
   const router = useRouter();
   const isInitialLoad = useRef(true);
+  const isLikingRef = useRef(false);
+  const isSubmittingRef = useRef(false);
   
   // 質問の解決状態を管理する（0:未解決, 1:解決済み）
   const [isResolved, setIsResolved] = useState(0);
@@ -99,26 +101,34 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
     if (questionId) fetchMessages();
   }, [questionId]);
 
+ 
   const fetchMessages = async () => {
-    setIsLoading(true);
-    try {
-      const { questionId, spaceId } = await params;
-      const res = await fetchWithTimeout(`/api/questions/${spaceId}/messages?questionId=${questionId}`);
-      if (!res.ok) {
-        await handleApiResponse(res);
-        throw new Error();
-      }
-      const data = await res.json();
-      setMessages(data.chats || []);
-      setQuestion(data.question);
-    } catch (error) {
-      console.error("メッセージ取得エラー:", error);
-      setIsError(true);
-      setIsSubmitting(true);
-    } finally {
-      setIsLoading(false);
+  setIsLoading(true);
+  try {
+    const { questionId, spaceId } = await params;
+    const res = await fetchWithTimeout(`/api/questions/${spaceId}/messages?questionId=${questionId}`);
+    if (!res.ok) {
+      await handleApiResponse(res);
+      throw new Error();
     }
-  };
+    const data = await res.json();
+
+    // 💡 APIから届く nice_flag を niceFlag に変換して state に保存
+    const formattedChats = (data.chats || []).map((chat: any) => ({
+      ...chat,
+      niceFlag: chat.nice_flag,
+    }));
+
+    setMessages(formattedChats);
+    setQuestion(data.question);
+  } catch (error) {
+    console.error("メッセージ取得エラー:", error);
+    setIsError(true);
+    setIsSubmitting(true);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleFileSelect = (input: File | File[]) => {
     const newFiles = Array.isArray(input) ? input : [input];
@@ -220,89 +230,122 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
     }
   };
 
-  const handleUpdate = async (chatId: number) => {
-    if (isSubmitting || !editValue.trim()) return;
-    const previousMessages = [...messages];
+const handleUpdate = async (chatId: number) => {
+  if (isSubmittingRef.current || isSubmitting || !editValue.trim()) return;
 
-    setMessages((prev) => 
-      prev.map((msg) => 
-        msg.id === chatId ? { ...msg, message: editValue } : msg
-      )
-    );
+  isSubmittingRef.current = true;
+  setIsSubmitting(true);
+
+  const previousMessages = [...messages];
+
+  setMessages((prev) => 
+    prev.map((msg) => 
+      msg.id === chatId ? { ...msg, message: editValue } : msg
+    )
+  );
+
+  try {
+    const res = await fetchWithTimeout(`/api/questions/${spaceId}/messages/${questionId}?chatId=${chatId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: editValue }),
+    });
+
+    if (!res.ok) {
+      await handleApiResponse(res);
+      throw new Error();
+    }
+    const data = await res.json();
+    
+    setMessages((prev) => prev.map(m => m.id === chatId ? data.updatedChat : m));
+    
     setEditingId(null);
     setEditValue("");
-    setIsSubmitting(true);
-    try {
-      const res = await fetchWithTimeout(`/api/questions/${spaceId}/messages/${questionId}?chatId=${chatId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: editValue }),
-      });
 
-      if (!res.ok) {
-        await handleApiResponse(res);
-        throw new Error();
-      }
-      const data = await res.json();
-
-      setMessages((prev) => prev.map(m => m.id === chatId ? data.updatedChat : m));
-    } catch (e: any) {
-      setMessages(previousMessages);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  } catch (e: any) {
+    setMessages(previousMessages);
+  } finally {
+    setIsSubmitting(false);
+    isSubmittingRef.current = false;
+  }
+};
 
   const handleNiceFlag = async (chatId: number) => {
-    const previousMessages = [...messages];
+  // ① 連打防止：すでに処理中ならここで弾く（即時ロック）
+  if (isLikingRef.current) return;
 
-    setMessages((prev) => 
-      prev.map((msg) => 
-        msg.id === chatId 
-          ? { ...msg, niceFlag: msg.niceFlag === 1 ? 0 : 1 } 
-          : msg
-      )
-    );
+  // ② 処理開始：瞬時にカギをかける
+  isLikingRef.current = true;
 
-    try {
-      const res = await fetchWithTimeout(`/api/questions/${spaceId}/messages/${questionId}/status?chatId=${chatId}`, { 
-        method: "PATCH" 
-      });
-      if (!res.ok) {
-        await handleApiResponse(res);
-        throw new Error();
-      }
-    } catch (e: any) {
-      setMessages(previousMessages);
+  const previousMessages = [...messages];
+
+  // オプティミスティックUI：先に画面の見た目（星マーク）を切り替える
+  setMessages((prev) => 
+    prev.map((msg) => 
+      msg.id === chatId 
+        ? { ...msg, niceFlag: msg.niceFlag === 1 ? 0 : 1 } 
+        : msg
+    )
+  );
+
+  try {
+    const res = await fetchWithTimeout(`/api/questions/${spaceId}/messages/${questionId}/status?chatId=${chatId}`, { 
+      method: "PATCH" 
+    });
+    
+    if (!res.ok) {
+      await handleApiResponse(res);
+      throw new Error("NiceFlag update failed");
     }
-  };
+  } catch (e: any) {
+    // 通信エラー(500)や削除済み(404)の場合は、見た目を元に戻す（ロールバック）
+    console.error("いいね更新エラー:", e);
+    setMessages(previousMessages);
+  } finally {
+    // ③ 処理完了：成功しても失敗してもカギを開ける
+    isLikingRef.current = false;
+  }
+};
 
   const handleDeleteClick = async (chatId: number) => {
-    const previousMessages = [...messages];
-    setMessages((prev) => prev.filter((msg) => msg.id !== chatId));
+  // ① 連打防止：処理中なら弾く（即時ロック判定）
+  if (isSubmittingRef.current || isSubmitting) return;
 
-    try {
-      const res = await fetchWithTimeout(`/api/questions/${spaceId}/messages/${questionId}?chatId=${chatId}`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-      });
+  // ② 処理開始：瞬時にカギをかける
+  isSubmittingRef.current = true;
+  setIsSubmitting(true);
 
-      if (!res.ok) {
-        await handleApiResponse(res);
-        throw new Error();
-      }
-    } catch (e: any) {
-      ToiToiNotification.error(e.message);
-      setMessages(previousMessages);
+  // オプティミスティックUI：先に画面から消す
+  const previousMessages = [...messages];
+  setMessages((prev) => prev.filter((msg) => msg.id !== chatId));
+
+  try {
+    const res = await fetchWithTimeout(`/api/questions/${spaceId}/messages/${questionId}?chatId=${chatId}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!res.ok) {
+      await handleApiResponse(res);
+      throw new Error("Delete failed");
     }
-  };
+  } catch (e: any) {
+    // 失敗時は見た目を元に戻す
+    console.error("削除エラー:", e);
+    setMessages(previousMessages);
+  } finally {
+    // ③ 処理完了：カギを開けて、また押せるようにする
+    setIsSubmitting(false);
+    isSubmittingRef.current = false;
+  }
+};
 
   const handleDownload = async (imageUrl: string, chatId: string) => {
     const res = await fetchWithTimeout("/api/images", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ 
-        targetUrl: imageUrl,
+        storageKey: imageUrl,
         spaceId: spaceId,
         type: "question",
         questionId: questionId,
@@ -362,6 +405,7 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
       setIsResolved(previousStatus); 
     }
   };
+ 
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] w-full overflow-hidden bg-gray-50 relative">

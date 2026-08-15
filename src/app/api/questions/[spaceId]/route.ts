@@ -15,6 +15,7 @@ export async function PATCH(
       return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
   }
   try {
+    
     const { spaceId } = await params;
     const spaceIdNum = Number(spaceId);
     const { title, question, tag, questionId, isResolved } = await request.json();

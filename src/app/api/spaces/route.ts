@@ -46,8 +46,8 @@ export async function POST(request: Request) {
         if (!name || name.trim() === "") {
             return NextResponse.json({ message: MESSAGES.E1001("スペース名") }, { status: 400 });
         }        
-        // 2. 桁数チェック (E1002: 20文字)
-        if (name.length > 20) return NextResponse.json({ message: MESSAGES.E1002("スペース名", 20) }, { status: 400 });
+        // 2. 桁数チェック (E1002: 50文字)
+        if (name.length > 50) return NextResponse.json({ message: MESSAGES.E1002("スペース名", 20) }, { status: 400 });
 
         // 3. 不適切文字チェック (E1003: 記号制限)
         const safeRegex = /[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uFF01-\uFF5E]/;

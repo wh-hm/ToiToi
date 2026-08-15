@@ -28,8 +28,8 @@ export async function PATCH(
     if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
         return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
+    
     if (!isChatAlive) return NextResponse.json({ message: MESSAGES.E2005("チャット") }, { status: 404 });
-
     const updatedChat = await updateChat(chatIdNum, spaceId, auth.user_id, message);
     return NextResponse.json({ updatedChat, message: MESSAGES.S1002("チャット内容") });
     
@@ -55,8 +55,9 @@ export async function DELETE(
   try {
     // 削除前に存在チェック（既に削除済みなら404を返してあげるのが親切）
     const isAlive = await getChatCheck(auth.user_id, spaceId, chatId);
+    
     if (!isAlive) return NextResponse.json({ message: MESSAGES.E2005("チャット") }, { status: 404 });
-
+    
     await deleteChat(chatId, auth.user_id, spaceId);
     return NextResponse.json({ message: MESSAGES.S1003("チャット") });
     

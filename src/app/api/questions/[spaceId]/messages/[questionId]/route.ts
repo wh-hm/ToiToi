@@ -11,6 +11,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ spaceId: string; questionId: string }> }
 ) {
+  
   const { spaceId, questionId } = await params;
   const auth = await getAuthContext();
   if ('error' in auth) {
@@ -30,12 +31,12 @@ export async function PATCH(
 
     console.log("データよ～",chatId, spaceIdNum, questionIdNum, auth.user_id, message);
 
-
     const [isSpaceAlive, usQuestionAlive, isChatAlive] = await Promise.all([
       getSpaceCheck(auth.user_id, spaceIdNum), // ※関数名が推測ですが合わせる
       checkQuestion(auth.user_id, spaceIdNum, questionIdNum),
       checkQuestionChat(chatId, questionIdNum, auth.user_id)
     ]);
+    
     console.log("データよ～",chatId, questionIdNum, auth.user_id, message);
         
     // スペースチェックの判定
@@ -99,6 +100,7 @@ export async function DELETE(
     if (!isQuestionAlive) {
         return NextResponse.json({ message: MESSAGES.E2005("質問") }, { status: 404 }); // データなし
     }
+    
     if (!isChatAlive) {
         return NextResponse.json({ message: MESSAGES.E2005("チャット") }, { status: 404 }); // データなし
     }
@@ -117,3 +119,4 @@ export async function DELETE(
     return NextResponse.json({ message: MESSAGES.E2001("チャット") }, { status: 500 });
   }
 }
+
