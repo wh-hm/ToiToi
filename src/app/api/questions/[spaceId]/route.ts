@@ -43,8 +43,8 @@ export async function PATCH(
     }
 
     // ケースB: フル更新
-    if (!title?.trim() || !question?.trim()) {
-      return NextResponse.json({ message: MESSAGES.E1001("必須項目") }, { status: 400 });
+    if (!title?.trim()) {
+      return NextResponse.json({ message: MESSAGES.E1001("質問") }, { status: 400 });
     }
     
     const updated = await updateQuestion(
@@ -73,9 +73,13 @@ export async function DELETE(
     const spaceIdNum = Number(spaceId);
     const questionId = Number(request.nextUrl.searchParams.get("questionId"));
 
+
+    const isSpaceAlive = await getSpaceCheck(auth.user_id, spaceIdNum);
+    if (!isSpaceAlive) return NextResponse.json({ message: MESSAGES.E2005("スペース") }, { status: 404 });
+
     // 存在確認を行ってから削除
     const isAlive = await checkQuestion(auth.user_id, spaceIdNum, questionId);
-    if (!isAlive) return NextResponse.json({ message: MESSAGES.E2005("質問") }, { status: 404 });
+    if (!isAlive) return NextResponse.json({ message: MESSAGES.E2005("質問") }, { status: 409 });
 
     await deleteQuestion(questionId, spaceIdNum, auth.user_id);
     return NextResponse.json({ success: true, message: MESSAGES.S1003("質問") });

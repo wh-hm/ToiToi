@@ -15,8 +15,8 @@ const sanitizeOptions = {
 export async function checkQuestion(userId: string, spaceId: number, questionId: number, tx?: Tx): Promise<boolean> {
   const db = tx || prisma;
   const [question, space] = await Promise.all([
-    db.question.findFirst({ where: { id: questionId, delete_flag: 0, user_id: userId } }),
-    db.space.findFirst({ where: { id: spaceId, delete_flag: 0, user_id: userId } }),
+    db.question.findFirst({ where: { id: questionId, user_id: userId, space_id: spaceId } }),
+    db.space.findFirst({ where: { id: spaceId, user_id: userId } }),
   ]);
   return !!question && !!space;
 }
@@ -80,7 +80,7 @@ export async function getQuestion(questionId: number, userId: string): Promise<Q
 export async function deleteQuestion(questionId: number, spaceId: number, userId: string, tx?: Tx): Promise<Question> {
   const db = tx || prisma;
   const updatedQuestion = await db.question.update({
-    where: { id: questionId },
+    where: { id: questionId, space_id: spaceId, user_id: userId },
     data: { delete_flag: 1 },
   });
 

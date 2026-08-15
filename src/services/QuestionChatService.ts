@@ -150,7 +150,7 @@ export async function toggleLike(chatId: number, questionId: number, userId: str
   if (!chat) throw new Error("対象が見つかりません。");
 
   return await prisma.questionChats.update({
-    where: { id: chatId },
+    where: { id: chatId, question_id: questionId, delete_flag: 0, user_id: userId },
     data: { nice_flag: chat.nice_flag === 0 ? 1 : 0 },
   });
 }

@@ -57,39 +57,22 @@ export default function QuestionPage() {
         const toastId = "delete-question-toast"; 
         
         try {
-          // 🌟 修正ポイント：パスに space_id を、クエリパラメータに questionId を指定する
-          const res = await fetch(`/api/questions/${space_id}?questionId=${id}`, {
+          const res = await fetchWithTimeout(`/api/questions/${space_id}?questionId=${id}`, {
             method: "DELETE"
           });
-
-          if (!res.ok) {
-            if (res.status === 404) throw new Error("ALREADY_DELETED");
-            throw new Error("API_ERROR");
+          if (!res.ok){
+            await handleApiResponse(res)
+            throw new Error();
           }
-
           ToiToiNotification.success("質問を削除しました！", toastId);
-          
-          // リストの再取得
-          const refreshRes = await fetch(`/api/questions?spaceId=${space_id}`);
+          const refreshRes = await fetchWithTimeout(`/api/questions?spaceId=${space_id}`);
           if (refreshRes.ok) {
             const data = await refreshRes.json();
             console.log("【APIからのレスポンス】:", data);
             setQuestions(Array.isArray(data.questions) ? data.questions : []);
           }
-          
-          // (必要に応じてモーダルを閉じる処理)
-          // setModalConfig((prev) => ({ ...prev, isOpen: false }));
-
-        } catch (error: any) {
-          console.error("削除エラー:", error);
-          if (error.message === "ALREADY_DELETED") {
-            ToiToiNotification.error("この質問は既に削除されているか、見つかりません。", toastId);
-          } else {
-            ToiToiNotification.error("削除に失敗しました。", toastId);
-          }
-        } finally {
-          // ③ 最後に必ずロックを解除
-          isDeletingRef.current = false;
+        } catch (error) {
+          console.error(error);
         }
       },
     });
@@ -195,24 +178,24 @@ export default function QuestionPage() {
     };
 
     try {
-      const res = await fetch(url, {
+      const res = await fetchWithTimeout(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formattedPayload),
       });
 
-      if (res.ok) {
-        ToiToiNotification.success(isEdit ? "質問を更新しました" : "質問を作成しました");
-        setIsModalOpen(false);
-        fetchQuestions();
-        if (isEdit && previousStatus !== 1 && newStatus === 1) {
-          triggerCelebration("解決おめでとう！");
-        }
-      } else {
-        ToiToiNotification.error(isEdit ? "更新に失敗しました" : "作成に失敗しました");
+      if(!res.ok){
+        await handleApiResponse(res);
+        throw new Error();
+      }
+      ToiToiNotification.success(isEdit ? "質問を更新しました" : "質問を作成しました");
+      setIsModalOpen(false);
+      fetchQuestions();
+      if (isEdit && previousStatus !== 1 && newStatus === 1) {
+        triggerCelebration("解決おめでとう！");
       }
     } catch (error) {
-      ToiToiNotification.error("通信エラーが発生しました");
+      console.log(error);
     }
   };
 

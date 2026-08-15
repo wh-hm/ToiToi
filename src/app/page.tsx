@@ -54,20 +54,14 @@ function TopPageContent() {
         setIsProcessing(true);
         try {
             const res = await fetchWithTimeout("/api/auth/login", { method: "POST" });
-            const loginData = await res.json();
             if (!res.ok) {
                 await handleApiResponse(res); // 内部のthrowを待つ
                 throw new Error(); // 明示的にエラーを投げる
             }
 
-            const checkRes = await fetchWithTimeout("/api/user/username/check");
-            const data = await checkRes.json();
-            if (!checkRes.ok) {
-                await handleApiResponse(checkRes); // 内部のthrowを待つ
-                throw new Error(); // 明示的にエラーを投げる
-            }
+            const loginData = await res.json();
 
-            if (data.hasUsername) {
+            if (loginData.hasUsername) {
                 router.push('/dashboard');
                 ToiToiNotification.success(loginData.message);
             } else {
@@ -81,13 +75,6 @@ function TopPageContent() {
             setIsProcessing(false);
         }
     };
-
-    // const handleLoginClick = () => {
-    //     setIsButtonClick(true);
-    //     // ログイン遷移前にフラグを保存
-    //     localStorage.setItem("pending_initialization", "true");
-    //     signIn("google", { prompt: "select_account" });
-    // };
 
     const handleLoginClick = async () => {
     setIsButtonClick(true);
@@ -104,8 +91,6 @@ function TopPageContent() {
             throw new Error(result.error);
         }
         
-        // redirect: false にした場合、自分でリダイレクトを処理する必要があるため
-        // 必要に応じてここに遷移処理を追加するか、デフォルトの挙動に任せます
     } catch (err: any) {
         console.error("Login failed:", err);
         // エラー時は状態をリセット
