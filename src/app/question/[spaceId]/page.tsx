@@ -43,36 +43,64 @@ export default function QuestionPage() {
     onConfirm: () => { },
   });
 
+  // const openDeleteConfirm = (id: string) => {
+  //   setModalConfig({
+  //     isOpen: true,
+  //     title: "質問を削除する？",
+  //     onConfirm: async () => {
+  //       // ① 連打防止：すでに処理中なら弾く
+  //       if (isDeletingRef.current) return;
+        
+  //       // ② 処理開始：ロックをかける
+  //       isDeletingRef.current = true;
+
+  //       const toastId = "delete-question-toast"; 
+        
+  //       try {
+  //         const res = await fetchWithTimeout(`/api/questions/${space_id}?questionId=${id}`, {
+  //           method: "DELETE"
+  //         });
+  //         if (!res.ok){
+  //           await handleApiResponse(res)
+  //           throw new Error();
+  //         }
+  //         ToiToiNotification.success("質問を削除しました！", toastId);
+  //         const refreshRes = await fetchWithTimeout(`/api/questions?spaceId=${space_id}`);
+  //         if (refreshRes.ok) {
+  //           const data = await refreshRes.json();
+  //           console.log("【APIからのレスポンス】:", data);
+  //           setQuestions(Array.isArray(data.questions) ? data.questions : []);
+  //         }
+  //       } catch (error) {
+  //         console.error(error);
+  //       }
+  //     },
+  //   });
+  // };
+
   const openDeleteConfirm = (id: string) => {
     setModalConfig({
       isOpen: true,
       title: "質問を削除する？",
       onConfirm: async () => {
-        // ① 連打防止：すでに処理中なら弾く
         if (isDeletingRef.current) return;
-        
-        // ② 処理開始：ロックをかける
         isDeletingRef.current = true;
-
         const toastId = "delete-question-toast"; 
-        
         try {
           const res = await fetchWithTimeout(`/api/questions/${space_id}?questionId=${id}`, {
             method: "DELETE"
           });
           if (!res.ok){
-            await handleApiResponse(res)
+            await handleApiResponse(res);
             throw new Error();
           }
           ToiToiNotification.success("質問を削除しました！", toastId);
-          const refreshRes = await fetchWithTimeout(`/api/questions?spaceId=${space_id}`);
-          if (refreshRes.ok) {
-            const data = await refreshRes.json();
-            console.log("【APIからのレスポンス】:", data);
-            setQuestions(Array.isArray(data.questions) ? data.questions : []);
-          }
+          // 💡 再取得のfetchを無くし、現在のstateから削除したIDのものを除外して即時反映
+          setQuestions((prevQuestions) => prevQuestions.filter((q) => q.id !== id));
         } catch (error) {
           console.error(error);
+        } finally {
+          isDeletingRef.current = false;
         }
       },
     });
