@@ -23,10 +23,10 @@ export async function DELETE() {
       // 2. 物理削除を実行 (R2ファイル削除 + Imageレコード削除)
       const resultR2 = await deleteImages(imageIds); 
       if(resultR2 === false){
-        return NextResponse.json({ message: MESSAGES.E2006}, { status: auth.status },);
+        return NextResponse.json({ message: MESSAGES.E2006}, { status: 409 },);
       }
     }else{
-      return NextResponse.json({ message: MESSAGES.E2006}, { status: auth.status },);
+      return NextResponse.json({ message: MESSAGES.E2006}, { status: 409 },);
     }
 
     // 3. 【重要】紐付いているチャット側のフラグも「削除」にする

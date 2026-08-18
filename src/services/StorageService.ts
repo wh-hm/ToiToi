@@ -128,10 +128,9 @@ export async function uploadImages(images: File[], userId: string, spaceId: numb
 }
 
 export async function getAuthorizedImageIds(userId: string): Promise<number[]> {
-  // 1. 全スペース取得
-  // 2. Imageテーブルを直接検索し、紐付いているチャット/質問チャットからスペースIDを逆引きする
   const images = await prisma.image.findMany({
     where: {
+      delete_flag: 0, // ← ここに Image 自体の削除フラグ条件を追加
       OR: [
         {
           chats: {
