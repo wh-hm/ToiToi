@@ -210,7 +210,7 @@ export default function TaskModal(props: any): React.JSX.Element {
 
   return (
     <div 
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 m-0"
       onClick={handleBackdropClick}
     >
       <div 
@@ -463,6 +463,8 @@ export default function TaskModal(props: any): React.JSX.Element {
             </div>
           </div>
         )}
+
+        
 
       </div>
     </div>

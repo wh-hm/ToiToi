@@ -258,7 +258,7 @@ export default function QuestionPage() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6 text-slate-800">
+    <div className="p-6 max-w-5xl mx-auto text-slate-800">
       {/* ヘッダーエリア */}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-slate-900">質問スペース</h1>

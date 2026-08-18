@@ -21,11 +21,16 @@ export async function DELETE() {
     const imageIds = await getAuthorizedImageIds(auth.user_id);
     if (imageIds.length > 0) {
       // 2. 物理削除を実行 (R2ファイル削除 + Imageレコード削除)
-      await deleteImages(imageIds); 
+      const resultR2 = await deleteImages(imageIds); 
+      if(resultR2 == null || resultR2 === false || !resultR2){
+        return NextResponse.json({ message: MESSAGES.E2006}, { status: auth.status },);
+      }
     }
+
+    
     // 3. 【重要】紐付いているチャット側のフラグも「削除」にする
     // 画像だけでなく、チャットメッセージ自体を「見えない状態」にする
-    await prisma.$transaction([
+    const result = await prisma.$transaction([
       prisma.chat.updateMany({
         where: { user_id: auth.user_id, delete_flag: 0 },
         data: { delete_flag: 1 }
@@ -35,7 +40,9 @@ export async function DELETE() {
         data: { delete_flag: 1 }
       })
     ]);
-
+    if(!result){
+      return NextResponse.json({ message: MESSAGES.E2006}, { status: auth.status },);
+    }
     return NextResponse.json({ 
         success: true, 
         message: MESSAGES.S1004("画像とチャット") 

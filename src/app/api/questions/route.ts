@@ -62,20 +62,22 @@ export async function POST(request: NextRequest) {
         if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
             return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
         }
+        return NextResponse.json({ message: MESSAGES.E2001("質問") }, { status: 500 });
 
-        // データベースに保存
-        const newQuestion = await registerQuestion(
-            spaceId,
-            auth.user_id,
-            title,
-            question,
-            tag || 0
-        );
 
-        return NextResponse.json({ 
-            newQuestion: newQuestion, 
-            message: MESSAGES.S1001("質問") 
-        }, { status: 201 });
+        // // データベースに保存
+        // const newQuestion = await registerQuestion(
+        //     spaceId,
+        //     auth.user_id,
+        //     title,
+        //     question,
+        //     tag || 0
+        // );
+
+        // return NextResponse.json({ 
+        //     newQuestion: newQuestion, 
+        //     message: MESSAGES.S1001("質問") 
+        // }, { status: 201 });
     } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
             return NextResponse.json({ message: MESSAGES.E4009 }, { status: 409 });

@@ -124,7 +124,6 @@ export default function MyPage() {
     );
   }
 
-  // 💡 【ここを追加】どんな削除処理でもこれ1つでモーダルを開けるようにする魔法の関数
   const openConfirmModal = (label: string, onConfirmAction: () => void) => {
     setModalConfig({
       isOpen: true,
@@ -133,7 +132,6 @@ export default function MyPage() {
     });
   };
 
-  // 💡 【ここを修正】共通化されたAPI削除の実行処理
   const executeDelete = async (action: string) => {
     setIsDeleting(true);
     try {
