@@ -11,6 +11,7 @@ import { ToiToiNotification } from "@/components/Toast";
 import { fetchWithTimeout } from "@/lib/api";
 import { handleApiResponse } from "@/lib/api-utils";
 import { MESSAGES } from "@/constants/messages";
+import { tr } from "framer-motion/client";
 
 export default function MyPage() {
   const router = useRouter();
@@ -24,6 +25,7 @@ export default function MyPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [archiveCount, setArchiveCount] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isError, setIsError] = useState(true);
 
   // 💡 【ここを修正】複数の処理を1つで受け止めるための共通State
   const [modalConfig, setModalConfig] = useState<{
@@ -79,8 +81,10 @@ export default function MyPage() {
 
       setUsername(data.user?.username);
       setImageCount(data.imageCount || 0);
+      setIsError(false);
     } catch (e) {
       console.log(e)
+      setIsError(true);
     } finally {
       setLoading(false);
     }
@@ -187,7 +191,14 @@ export default function MyPage() {
         </h2>
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex justify-between items-center">
           <span className="text-gray-600 font-medium">{username}</span>
-          <button onClick={onOpen} className="text-blue-600 font-bold hover:underline">変更する</button>
+          {/* <button onClick={onOpen} disabled={isError} className="text-blue-600 font-bold hover:underline">変更する</button> */}
+          <button 
+            onClick={onOpen} 
+            disabled={isError} 
+            className="font-bold text-blue-600 hover:underline disabled:text-gray-300 disabled:no-underline disabled:cursor-not-allowed disabled:opacity-80"
+          >
+            変更する
+          </button>
         </div>
       </div>
 
@@ -223,7 +234,7 @@ export default function MyPage() {
           ].map((item) => (
             <button 
               key={item.action} 
-              disabled={item.count === 0} 
+              disabled={item.count === 0 || isError} 
               /* 💡 1行で文章とそのあとの関数をセットで渡す！ */
               onClick={() => openConfirmModal(item.label, () => executeDelete(item.action))} 
               className={`w-full flex items-center justify-between p-4 rounded-xl font-medium transition-all ${item.count === 0 ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-white border border-gray-200 hover:border-red-300 hover:bg-red-50 text-gray-700 hover:text-red-600"}`}
@@ -238,7 +249,13 @@ export default function MyPage() {
       <div className="pt-8 border-t border-gray-100 space-y-4">
         <button onClick={() => signOut({ callbackUrl: "/" })} className="w-full bg-gray-100 hover:bg-gray-200 py-3 rounded-xl font-bold transition-all">ログアウト</button>
         {/* 💡 ここも共通の関数に文章と削除アクションを渡すだけ */}
-        <button onClick={() => openConfirmModal("アカウント削除", () => executeDelete("user/account"))} className="w-full text-red-500 hover:bg-red-50 font-medium py-3 rounded-xl transition-all">アカウントを削除</button>
+        <button 
+          disabled={isError} 
+          onClick={() => openConfirmModal("アカウント削除", () => executeDelete("user/account"))} 
+          className="w-full text-red-500 font-medium py-3 rounded-xl transition-all hover:bg-red-50 disabled:text-gray-300 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+        >
+          アカウントを削除
+        </button>
       </div>
       
       {isDeleting && (
