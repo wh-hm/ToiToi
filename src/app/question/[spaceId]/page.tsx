@@ -25,10 +25,12 @@ export default function QuestionPage() {
   const [modalMode, setModalMode] = useState<'create' | 'edit' | 'detail'>('create');
   const [selectedQuestion, setSelectedQuestion] = useState<any>(null);
   const isDeletingRef = useRef(false);
+  const [isError, setIsError] = useState(true);
 
   // 検索用ステート（仕様：タグ検索 ＆ ナレッジ検索）
   const [searchTag, setSearchTag] = useState<string>("");
   const [searchKnowledge, setSearchKnowledge] = useState<string>("");
+
 
   //お祝い演出
   const { showCelebration, celebrationOpacity, celebrationMessage, triggerCelebration } = useCelebration();
@@ -130,8 +132,11 @@ export default function QuestionPage() {
       setQuestions(data.questions || []);
       setIsLoading(false);
       // ToiToiNotification.success(data.message);
+      setIsError(false);
+
     } catch (error: any) {
       console.log(error);
+      setIsError(true);
     } finally {
       setIsLoading(false);
     }
@@ -157,7 +162,7 @@ export default function QuestionPage() {
       )
     );
     try {
-      const res = await fetchWithTimeout(`/api/questions/${space_id}`, {
+      const res = await fetchWithTimeout(`/api/questions/${space_id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -264,7 +269,8 @@ export default function QuestionPage() {
         <h1 className="text-2xl font-bold text-slate-900">質問スペース</h1>
         <button
           onClick={() => { setModalMode('create'); setSelectedQuestion(null); setIsModalOpen(true); }}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 shadow-sm transition-all"
+          className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 shadow-sm transition-all disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed disabled:shadow-none"
+          disabled={isError}
         >
           + 新規質問作成
         </button>
@@ -299,10 +305,13 @@ export default function QuestionPage() {
       </div>
 
       {/* データの表示判定 */}
-      {!processedQuestions.hasOriginalData ? (
-        <div className="text-center py-12 text-slate-400 font-medium">質問がありません</div>
+      {isLoading ? (
+        <Loading></Loading>
       ) : processedQuestions.totalFiltered === 0 ? (
         <div className="text-center py-12 text-slate-400 font-medium">該当のデータはありません</div>
+      ) : !processedQuestions.hasOriginalData ?(
+        <div className="text-center py-12 text-slate-400 font-medium">質問がありません</div>
+
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
@@ -359,7 +368,9 @@ export default function QuestionPage() {
               <div key={q.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center opacity-75 hover:opacity-100 transition-all">
                 <div
                   className="cursor-pointer flex-1 pr-4"
-                  onClick={() => { setSelectedQuestion(q); setModalMode('detail'); setIsModalOpen(true); }}
+                  onClick={() => {
+                    router.push(`/question/${space_id}/chat/${q.id}`);
+                  }}
                 >
                   <p className="font-semibold text-slate-500">{q.title}</p>
                   <p className="text-xs text-slate-400 mt-1">解決済み</p>
@@ -371,6 +382,12 @@ export default function QuestionPage() {
                     onChange={() => handleStatusToggle(q)}
                     className="w-4 h-4 cursor-pointer rounded text-indigo-600 focus:ring-indigo-500"
                   />
+                  <button
+                    onClick={() => { setSelectedQuestion(q); setModalMode('edit'); setIsModalOpen(true); }}
+                    className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                  >
+                    編集
+                  </button>
                   <button
                     onClick={() => openDeleteConfirm(q.id)}
                     className="text-xs font-medium text-red-500 hover:text-red-700"

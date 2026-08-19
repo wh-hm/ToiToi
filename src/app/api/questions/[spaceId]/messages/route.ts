@@ -33,7 +33,7 @@ export async function GET(
   }
   try {
     const [isSpaceAlive,  isQuestionAlive] = await Promise.all([
-      getQuestionChatsWithImages(auth.user_id, questionId),
+      getSpaceCheck(auth.user_id, spaceIdNum),
       checkQuestion(auth.user_id, spaceIdNum, questionId),
     ]);
         

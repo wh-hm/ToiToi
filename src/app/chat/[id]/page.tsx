@@ -255,8 +255,10 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
   const handleUpdate = async () => {
     if (isSubmitting || !editingId || spaceId === null) return;
-    
     const previousMessages = [...chats];
+    const previousEditingId = editingId;
+    const previousEditValue = editValue; // ★ 編集中のテキストをバックアップ
+    
 
     setChats((prev) => 
       prev.map((msg) => 
@@ -267,6 +269,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     setEditingId(null);
     setEditValue("");
     setIsSubmitting(true);
+    
     try {
       const res = await fetchWithTimeout(`/api/chats/${spaceId}`, {
         method: "PATCH",
@@ -287,6 +290,8 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     } catch (e) {
       console.log(e);
       setChats(previousMessages);
+      setEditingId(previousEditingId);
+      setEditValue(previousEditValue);
     } finally {
       setIsSubmitting(false);
     }

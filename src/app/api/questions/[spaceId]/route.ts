@@ -34,7 +34,7 @@ export async function PATCH(
     if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
       return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
-    if (!isQuestionAlive) return NextResponse.json({ message: MESSAGES.E2005("質問") }, { status: 404 });
+    if (!isQuestionAlive) return NextResponse.json({ message: MESSAGES.E2005("質問") }, { status: 409 });
 
     // ケースA: 解決ステータスのみ更新
     if (isResolved !== undefined && !title && !question) {
@@ -75,7 +75,7 @@ export async function DELETE(
 
 
     const isSpaceAlive = await getSpaceCheck(auth.user_id, spaceIdNum);
-    if (!isSpaceAlive) return NextResponse.json({ message: MESSAGES.E2005("スペース") }, { status: 404 });
+    if (!isSpaceAlive || isSpaceAlive.delete_flag === 1) return NextResponse.json({ message: MESSAGES.E2005("スペース") }, { status: 404 });
 
     // 存在確認を行ってから削除
     const isAlive = await checkQuestion(auth.user_id, spaceIdNum, questionId);

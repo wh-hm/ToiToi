@@ -14,11 +14,12 @@ const sanitizeOptions = {
 
 export async function checkQuestion(userId: string, spaceId: number, questionId: number, tx?: Tx): Promise<boolean> {
   const db = tx || prisma;
-  const [question, space] = await Promise.all([
-    db.question.findFirst({ where: { id: questionId, user_id: userId, space_id: spaceId } }),
-    db.space.findFirst({ where: { id: spaceId, user_id: userId } }),
-  ]);
-  return !!question && !!space;
+    const result = await db.question.findFirst({ where: { id: questionId, user_id: userId, space_id: spaceId } });
+
+  if (!result || result.delete_flag === 1) {
+    return false;
+  }
+  return true;
 }
 
 /**

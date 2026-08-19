@@ -45,7 +45,7 @@ export async function PATCH(
         return NextResponse.json({ message: MESSAGES.E2006 }, { status: 409 });
     }
 
-    // 更新処理
+    // // 更新処理
     const updatedQuestion = await updateQuestionStatus(questionIdNum, spaceIdNum, auth.user_id, isResolved);
 
     if (!updatedQuestion) {
