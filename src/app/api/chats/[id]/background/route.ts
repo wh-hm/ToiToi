@@ -36,7 +36,7 @@ export async function PATCH(
     // 2. 背景変更を実行
     const updatedChat = await changeBackground(chatId, spaceId, auth.user_id, background);
     if (!updatedChat) {
-      return NextResponse.json({ message: MESSAGES.E2001("背景色") }, { status: 403 });
+      return NextResponse.json({ message: MESSAGES.E2001("背景色") }, { status: 500 });
     }
     return NextResponse.json({ 
         updatedChat: updatedChat, 

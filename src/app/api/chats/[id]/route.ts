@@ -29,7 +29,7 @@ export async function PATCH(
         return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
     
-    if (!isChatAlive) return NextResponse.json({ message: MESSAGES.E2005("チャット") }, { status: 404 });
+    if (!isChatAlive) return NextResponse.json({ message: MESSAGES.E2005("チャット") }, { status: 409 });
     const updatedChat = await updateChat(chatIdNum, spaceId, auth.user_id, message);
     return NextResponse.json({ updatedChat, message: MESSAGES.S1002("チャット内容") });
     
@@ -53,10 +53,12 @@ export async function DELETE(
   if (isNaN(chatId) || isNaN(spaceId)) return NextResponse.json({ message: MESSAGES.E1008 }, { status: 400 });
 
   try {
-    // 削除前に存在チェック（既に削除済みなら404を返してあげるのが親切）
-    const isAlive = await getChatCheck(auth.user_id, spaceId, chatId);
-    
-    if (!isAlive) return NextResponse.json({ message: MESSAGES.E2005("チャット") }, { status: 404 });
+    const [isSpaceAlive, isChatAlive] = await Promise.all([
+      getSpaceCheck(auth.user_id, spaceId),
+      getChatCheck(auth.user_id, spaceId, chatId)
+    ]);
+    if (!isSpaceAlive) return NextResponse.json({ message: MESSAGES.E2005("チャット") }, { status: 404 });
+    if (!isChatAlive) return NextResponse.json({ message: MESSAGES.E2005("チャット") }, { status: 409 });
     
     await deleteChat(chatId, auth.user_id, spaceId);
     return NextResponse.json({ message: MESSAGES.S1003("チャット") });

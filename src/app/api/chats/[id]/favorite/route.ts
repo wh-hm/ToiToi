@@ -33,7 +33,7 @@ export async function PATCH(
     if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
       return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
-    if (!isChatAlive) return NextResponse.json({ message: MESSAGES.E2005("チャット") }, { status: 404 });
+    if (!isChatAlive) return NextResponse.json({ message: MESSAGES.E2005("チャット") }, { status: 409 });
     
     // 3. 更新実行
     const updatedChat = await toggleFavorite(chatId, spaceId, auth.user_id, favoriteFlag);
