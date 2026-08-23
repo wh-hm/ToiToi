@@ -16,7 +16,8 @@ export interface ChatMessage {
   image?: {
     id: number;
     storage_key: string;
-    caption: string
+    caption: string;
+    delete_flag: number;
     // 必要なら他のフィールドも追加
   } | null;
 }

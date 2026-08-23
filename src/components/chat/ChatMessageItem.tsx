@@ -142,6 +142,17 @@ export default function ChatMessageItem({
             ${(isHovered || isOpen) && !isSubmitting ? "brightness-90" : "brightness-100"}
           `}
         >
+          {message.image?.delete_flag === 1 && (
+            <div 
+                className="w-32 h-32 flex flex-col items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-2 text-center"
+              >
+                <span className="text-gray-700 font-bold text-[11px] leading-tight select-none">
+                  画像が<br />見つかりません
+                </span>
+              </div>
+          )
+
+          }
           {message.message && (
             <p className="text-lg text-gray-800 whitespace-pre-wrap select-none">{message.message}</p>
           )}         
