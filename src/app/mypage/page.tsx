@@ -245,7 +245,17 @@ export default function MyPage() {
 
       {/* アカウント操作 */}
       <div className="pt-8 border-t border-gray-100 space-y-4">
-        <button onClick={() => signOut({ callbackUrl: "/" })} className="w-full bg-gray-100 hover:bg-gray-200 py-3 rounded-xl font-bold transition-all">ログアウト</button>
+        
+        <button 
+          onClick={async () => {
+            try {
+              await signOut({ callbackUrl: "/" });
+            } catch (error) {
+              console.error("ログアウトに失敗しました:", error);
+              alert("ログアウトに失敗しました。通信環境を確認してください。");
+            }
+          }}
+          className="w-full bg-gray-100 hover:bg-gray-200 py-3 rounded-xl font-bold transition-all">ログアウト</button>
         {/* 💡 ここも共通の関数に文章と削除アクションを渡すだけ */}
         <button 
           disabled={isError} 
