@@ -252,7 +252,7 @@ export default function MyPage() {
               await signOut({ callbackUrl: "/" });
             } catch (error) {
               console.error("ログアウトに失敗しました:", error);
-              alert("ログアウトに失敗しました。通信環境を確認してください。");
+              ToiToiNotification.error("ログアウトに失敗しました。通信環境を確認してください。");
             }
           }}
           className="w-full bg-gray-100 hover:bg-gray-200 py-3 rounded-xl font-bold transition-all">ログアウト</button>
