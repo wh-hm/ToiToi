@@ -249,6 +249,7 @@ export default function MyPage() {
         <button 
           onClick={async () => {
             try {
+              throw new Error();
               await signOut({ callbackUrl: "/" });
             } catch (error) {
               console.error("ログアウトに失敗しました:", error);
