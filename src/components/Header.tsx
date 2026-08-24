@@ -11,6 +11,7 @@ import {
 import {ChevronDownIcon} from "lucide-react"
 import { fetchWithTimeout } from "@/lib/api";
 import { handleApiResponse } from "@/lib/api-utils";
+import { ToiToiNotification } from "./Toast";
 
 export default function Header() {
   const [data, setData] = useState<any>({ chat: [], task: [], question: [] });
@@ -118,8 +119,17 @@ export default function Header() {
             </div>
           ))}
           <Link href="/mypage" className="ml-4 font-medium text-gray-600">マイページ</Link>
+
+          
           <button 
-            onClick={() => signOut({ callbackUrl: '/' })}
+            onClick={async () => {
+              try {
+                await signOut({ callbackUrl: "/" });
+              } catch (error) {
+                console.error("ログアウトに失敗しました:", error);
+                ToiToiNotification.error("ログアウトに失敗しました。通信環境を確認してください。");
+              }
+            }}
             className="ml-4 font-medium text-red-500 hover:text-red-600 transition-colors"
           >
             ログアウト
@@ -175,7 +185,14 @@ export default function Header() {
             </div>
             <div className="border-t p-2 mt-4">
               <button 
-                onClick={() => signOut({ callbackUrl: '/' })}
+                onClick={async () => {
+                  try {
+                    await signOut({ callbackUrl: "/" });
+                  } catch (error) {
+                    console.error("ログアウトに失敗しました:", error);
+                    ToiToiNotification.error("ログアウトに失敗しました。通信環境を確認してください。");
+                  }
+                }}
                 className="font-bold text-red-500 text-sm text-left w-full"
               >
                 ログアウト
