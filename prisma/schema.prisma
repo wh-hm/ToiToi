@@ -21,10 +21,20 @@ model User {
   email           String?            @db.VarChar(255) // phase2で必要
   updated_at      DateTime?          @default(now()) @updatedAt @db.Timestamptz
 
+  //phase2:プロフィール画像
+profile_image_url String?           @db.VarChar(255)   
+
   // リレーション関係
   spaces           Space[]
   loginManagement  LoginManagement?
   goal             Goal?
+
+  //phase2:新規テーブルとのリレーション
+  read_statuses         SpaceReadStatus[]
+  notifications         Notification[]
+  reminders             Reminder[]
+  sent_invitations      Invitation[]      @relation("SentInvitations")
+  received_invitations  Invitation[]      @relation("ReceivedInvitations")
 
   @@map("users")
 }
@@ -48,6 +58,11 @@ model Space {
   tasks            Task[]
   questions        Question[]
 
+  //phase2:新規テーブルとのリレーション
+  read_statuses SpaceReadStatus[]
+  invitations    Invitation[]
+  notifications Notification[]
+
   @@map("spaces")
 }
 
@@ -63,7 +78,7 @@ model Chat {
   favorite_flag Int?      @default(0)
   stamp         String?   @db.VarChar(255)
   background    Int?      @default(0)
-   updated_at  DateTime?  
+  updated_at    DateTime?  @default(now()) @updatedAt @db.Timestamptz
 
   // 外部キーとの紐付け
   image       Image?   @relation(fields: [image_id], references: [id])
@@ -125,8 +140,8 @@ model QuestionChats {
   delete_flag Int      @default(0)
   image_id    Int?     // image_url の代わりに image_id を保持
   stamp       String?  @db.VarChar(255)
-  updated_at  DateTime?  
-  nice_flag   Int?      @default(0)
+  updated_at  DateTime?   @default(now()) @updatedAt @db.Timestamptz
+  nice_flag   Int?        @default(0)
 
   // 外部キーとの紐付け
   image       Image?   @relation(fields: [image_id], references: [id])
@@ -153,12 +168,12 @@ model LoginManagement {
 
 // 8. 目標管理マスタ (goal)
 model Goal {
-  id          String    @id @db.VarChar(255) // ユーザーID (PKかつFK)
+  id          String     @id @db.VarChar(255) // ユーザーID (PKかつFK)
   content     String?    @db.VarChar(255)
-  created_at DateTime @default(now()) @db.Timestamptz // 変更
-  deleted_at DateTime @db.Timestamptz
-  status      Int       @default(0)
-  delete_flag Int?      @default(0)
+  created_at DateTime    @default(now()) @db.Timestamptz // 変更
+  deleted_at DateTime?   @db.Timestamptz
+  status      Int        @default(0)
+  delete_flag Int?       @default(0)
 
   // 外部キーとの紐付け
   user        User      @relation(fields: [id], references: [id])
@@ -187,4 +202,73 @@ model Image {
   questionChats QuestionChats[]
 
   @@map("images")
+}
+
+
+//phase2:スペース既読管理マスタ
+model SpaceReadStatus{
+  id                  Int         @id @default(autoincrement())
+  space_id            Int
+  user_id             String      @db.VarChar(255)
+  last_read_chat_id   Int         @default(0)
+  updated_at          DateTime    @default(now()) @updatedAt @db.Timestamptz
+
+  space               Space       @relation(fields: [space_id], references: [id])
+  user                User        @relation(fields: [user_id], references: [id])
+
+  @@unique([space_id, user_id]) // 同一スペース・ユーザーでの重複防止
+  @@map("space_read_statuses")
+}
+
+//phase2:招待管理マスタ
+model Invitation{
+  id          Int       @id @default(autoincrement())
+  space_id    Int
+  inviter_id  String    @db.VarChar(255)
+  invitee_id  String    @db.VarChar(255)
+  status      Int       @default(0) // 0:保留, 1:承認, 2:拒否
+  created_at  DateTime  @default(now()) @db.Timestamptz
+  delete_flag Int       @default(0)
+
+  space       Space     @relation(fields: [space_id], references: [id], onDelete: Cascade)
+  inviter     User      @relation("SentInvitations", fields: [inviter_id], references: [id], onDelete: Cascade)
+  invitee     User      @relation("ReceivedInvitations", fields: [invitee_id], references: [id], onDelete: Cascade)
+
+  @@map("invitations")
+}
+
+//phase2:通知管理マスタ
+model Notification{
+  id          Int       @id @default(autoincrement())
+  user_id     String    @db.VarChar(255)
+  type        Int       // 1:招待, 2:リマインド等
+  related_id  Int       @default(0) // スペース内の関連するID（タスクIDや質問チャットIDなど）
+  space_id    Int
+  space_type  Int       @default(0) // 1:チャット, 2:タスク, 3:質問
+  content     String?   @db.VarChar(255) // 通知内容
+  is_read     Int       @default(0) // 0:未読, 1:既読
+  created_at  DateTime  @default(now()) @db.Timestamptz
+  delete_flag Int       @default(0)
+
+  user        User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  space       Space     @relation(fields: [space_id], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+//phase2:リマインド管理マスタ
+model Reminder{
+  id          Int       @id @default(autoincrement())
+  user_id     String    @db.VarChar(255)
+  task_id     Int       // 関連ID（対象のタスクID等）※ポリモーフィックのため外部キー制約はなし
+  remind_at   DateTime  @db.Timestamptz
+  is_sent     Int       @default(0) // 0:未送信, 1:送信済
+  space_type  Int       @default(0) // 1:チャット, 2:タスク, 3:質問
+  content     String?   @db.VarChar(255) // リマインド内容
+  created_at  DateTime  @default(now()) @db.Timestamptz
+  delete_flag Int       @default(0)
+
+  user        User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("reminders")
 }
