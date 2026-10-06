@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { Trash2, User, Settings, Loader2 } from "lucide-react";
+import { Trash2, User, Settings, Loader2, Key } from "lucide-react";
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, useDisclosure } from "@nextui-org/react";
 import { Loading } from "@/components/LoadingSpinner";
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
@@ -11,23 +11,33 @@ import { ToiToiNotification } from "@/components/Toast";
 import { fetchWithTimeout } from "@/lib/api";
 import { handleApiResponse } from "@/lib/api-utils";
 import { MESSAGES } from "@/constants/messages";
-import { tr } from "framer-motion/client";
 
 export default function MyPage() {
   const router = useRouter();
   const { status } = useSession();
   const [loading, setLoading] = useState(true);
   const [spaces, setSpaces] = useState({ chat: [], task: [], question: [] });
+  
+  // ユーザー情報State
   const [username, setUsername] = useState("");
+  const [userId, setUserId] = useState(""); // 💡 招待用IDのState
+  
   const [imageCount, setImageCount] = useState(0);
+  const [archiveCount, setArchiveCount] = useState(0);
+  
+  // モーダル管理（ユーザー名用）
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [newName, setNewName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [archiveCount, setArchiveCount] = useState(0);
+
+  // 💡 モーダル管理（招待用ID用）
+  const { isOpen: isUserIdOpen, onOpen: onUserIdOpen, onClose: onUserIdClose } = useDisclosure();
+  const [newUserId, setNewUserId] = useState("");
+  const [isSavingUserId, setIsSavingUserId] = useState(false);
+
   const [isDeleting, setIsDeleting] = useState(false);
   const [isError, setIsError] = useState(true);
 
-  // 💡 【ここを修正】複数の処理を1つで受け止めるための共通State
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
     title: string;
@@ -57,11 +67,10 @@ export default function MyPage() {
     try {
       const res = await fetchWithTimeout("/api/user/account");
       if (!res.ok) {
-          await handleApiResponse(res); // 内部のthrowを待つ
-          throw new Error(); // 明示的にエラーを投げる
+          await handleApiResponse(res);
+          throw new Error();
       }
       const data = await res.json();
-      console.log(data);
       
       const rawSpaces = data.spaces || { chat: [], task: [], question: [] };
       const allItems = [
@@ -79,7 +88,8 @@ export default function MyPage() {
         question: rawSpaces.question || [],
       });
 
-      setUsername(data.user?.username);
+      setUsername(data.user?.username || "");
+      setUserId(data.user?.user_id || ""); // 💡 取得したuser_idをセット
       setImageCount(data.imageCount || 0);
       setIsError(false);
     } catch (e) {
@@ -88,22 +98,19 @@ export default function MyPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [status, router]);
 
   useEffect(() => {
     if (isOpen) setNewName(username);
   }, [isOpen, username]);
 
-  // useEffect(() => {
-  //   if (status === "authenticated") fetchData();
-  // }, [status, fetchData]);
+  // 💡 招待ID変更モーダルが開いたとき、現在のIDを初期値にセット
+  useEffect(() => {
+    if (isUserIdOpen) setNewUserId(userId);
+  }, [isUserIdOpen, userId]);
 
-
-
-  // 初期ロード時およびブラウザの「戻る」で復元された時にAPIを実行
   useEffect(() => {
     fetchData();
-    // 💡 ブラウザの「戻る」でキャッシュから復元されたときに再取得する
     const handlePageShow = (event: PageTransitionEvent) => {
       if (event.persisted && status === "authenticated") {
         fetchData();
@@ -113,9 +120,8 @@ export default function MyPage() {
     return () => {
       window.removeEventListener('pageshow', handlePageShow);
     };
-  }, []);
+  }, [fetchData, status]);
 
-  // 3. ローディング・未認証時の表示分岐
   if (status === "loading" || loading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -128,7 +134,7 @@ export default function MyPage() {
     setModalConfig({
       isOpen: true,
       title: `本当に${label}する？`,
-      onConfirm: onConfirmAction, // 動かしたい中身をそのままStateに預ける
+      onConfirm: onConfirmAction,
     });
   };
 
@@ -137,8 +143,8 @@ export default function MyPage() {
     try {
       const res = await fetchWithTimeout(`/api/${action}`, { method: "DELETE" });
       if (!res.ok) {
-        await handleApiResponse(res); // 内部のthrowを待つ
-        throw new Error(); // 明示的にエラーを投げる
+        await handleApiResponse(res);
+        throw new Error();
       }
       const data = await res.json();
       
@@ -166,8 +172,8 @@ export default function MyPage() {
         body: JSON.stringify({ username: newName }),
       });
       if (!res.ok) {
-        await handleApiResponse(res); // 内部のthrowを待つ
-        throw new Error(); // 明示的にエラーを投げる
+        await handleApiResponse(res);
+        throw new Error();
       }
       const data = await res.json();
       ToiToiNotification.success(data.message);
@@ -180,23 +186,84 @@ export default function MyPage() {
     }
   };
 
+  // 💡 招待用IDの更新処理
+  const handleUpdateUserId = async () => {
+    const trimmedId = newUserId.trim();
+    if (!trimmedId) return ToiToiNotification.error("招待用IDを入力してください");
+    
+    // 半角英数字と一部の記号(-_)のみ許可するバリデーション
+    if (!/^[a-zA-Z0-9_-]+$/.test(trimmedId)) {
+      return ToiToiNotification.error("招待用IDは半角英数字とハイフン(-)、アンダースコア(_)のみ使用可能です");
+    }
+
+    setIsSavingUserId(true);
+    try {
+      const res = await fetchWithTimeout("/api/user/userid", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: trimmedId }),
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || "招待用IDの更新に失敗しました");
+      }
+      
+      ToiToiNotification.success(data.message || "招待用IDを更新しました");
+      setUserId(trimmedId);
+      onUserIdClose();
+    } catch (e: any) {
+      console.log(e);
+      ToiToiNotification.error(e.message);
+    } finally {
+      setIsSavingUserId(false);
+    }
+  };
+
   return (
     <section className="max-w-xl mx-auto p-6 space-y-10 min-h-[calc(100vh-112px)] flex flex-col justify-center">
+      
       {/* ユーザー設定 */}
       <div>
         <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-gray-700">
           <User className="w-5 h-5" /> ユーザー設定
         </h2>
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex justify-between items-center">
-          <span className="text-gray-600 font-medium">{username}</span>
-          {/* <button onClick={onOpen} disabled={isError} className="text-blue-600 font-bold hover:underline">変更する</button> */}
-          <button 
-            onClick={onOpen} 
-            disabled={isError} 
-            className="font-bold text-blue-600 hover:underline disabled:text-gray-300 disabled:no-underline disabled:cursor-not-allowed disabled:opacity-80"
-          >
-            変更する
-          </button>
+        
+        <div className="space-y-4">
+          {/* ユーザー名 */}
+          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex justify-between items-center">
+            <div>
+              <div className="text-sm text-gray-400 mb-1">ユーザー名</div>
+              <div className="text-gray-700 font-medium">{username}</div>
+            </div>
+            <button 
+              onClick={onOpen} 
+              disabled={isError} 
+              className="font-bold text-blue-600 hover:underline disabled:text-gray-300 disabled:no-underline disabled:cursor-not-allowed disabled:opacity-80"
+            >
+              変更する
+            </button>
+          </div>
+
+          {/* 招待用ID */}
+          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex justify-between items-center">
+            <div>
+              <div className="text-sm text-gray-400 mb-1 flex items-center gap-1">
+                <Key className="w-4 h-4" /> 招待用ID
+              </div>
+              <div className="text-gray-700 font-medium">
+                {userId ? userId : <span className="text-gray-400 italic font-normal">未設定</span>}
+              </div>
+            </div>
+            <button 
+              onClick={onUserIdOpen} 
+              disabled={isError} 
+              className="font-bold text-blue-600 hover:underline disabled:text-gray-300 disabled:no-underline disabled:cursor-not-allowed disabled:opacity-80"
+            >
+              {userId ? "変更する" : "登録する"}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -211,6 +278,31 @@ export default function MyPage() {
             <ModalFooter>
               <Button variant="flat" onPress={onClose}>キャンセル</Button>
               <Button color="primary" type="submit" isLoading={isSaving}>保存</Button>
+            </ModalFooter>
+          </form>
+        </ModalContent>
+      </Modal>
+
+      {/* 招待用ID変更モーダル */}
+      <Modal isOpen={isUserIdOpen} onClose={onUserIdClose} placement="center">
+        <ModalContent>
+          <form onSubmit={(e) => { e.preventDefault(); handleUpdateUserId(); }}>
+            <ModalHeader>招待用IDの設定</ModalHeader>
+            <ModalBody>
+              <div className="text-sm text-gray-500 mb-2">
+                他のユーザーからスペースに招待してもらうためのIDです。半角英数字（ハイフン、アンダースコア可）で入力してください。
+              </div>
+              <Input 
+                autoFocus 
+                label="新しい招待用ID" 
+                placeholder="例: kurimanjuu"
+                value={newUserId} 
+                onChange={(e) => setNewUserId(e.target.value)} 
+              />
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="flat" onPress={onUserIdClose}>キャンセル</Button>
+              <Button color="primary" type="submit" isLoading={isSavingUserId}>保存</Button>
             </ModalFooter>
           </form>
         </ModalContent>
@@ -233,7 +325,6 @@ export default function MyPage() {
             <button 
               key={item.action} 
               disabled={item.count === 0 || isError} 
-              /* 💡 1行で文章とそのあとの関数をセットで渡す！ */
               onClick={() => openConfirmModal(item.label, () => executeDelete(item.action))} 
               className={`w-full flex items-center justify-between p-4 rounded-xl font-medium transition-all ${item.count === 0 ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-white border border-gray-200 hover:border-red-300 hover:bg-red-50 text-gray-700 hover:text-red-600"}`}
             >
@@ -245,7 +336,6 @@ export default function MyPage() {
 
       {/* アカウント操作 */}
       <div className="pt-8 border-t border-gray-100 space-y-4">
-        
         <button 
           onClick={async () => {
             try {
@@ -256,7 +346,7 @@ export default function MyPage() {
             }
           }}
           className="w-full bg-gray-100 hover:bg-gray-200 py-3 rounded-xl font-bold transition-all">ログアウト</button>
-        {/* 💡 ここも共通の関数に文章と削除アクションを渡すだけ */}
+        
         <button 
           disabled={isError} 
           onClick={() => openConfirmModal("アカウント削除", () => executeDelete("user/account"))} 
@@ -274,7 +364,6 @@ export default function MyPage() {
         </div>
       )}
 
-      {/* 💡 【ここを修正】Stateがまとまったので、タグの指定もすっきり1つに集約 */}
       <DeleteConfirmModal 
         isOpen={modalConfig.isOpen}
         title={modalConfig.title}
