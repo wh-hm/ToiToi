@@ -14,6 +14,7 @@ import { Goal } from "@/types/goal";
 import { messageMaster } from "@/constants/greetings";
 import { Celebration } from "@/components/Celebration";
 import { MESSAGES } from "@/constants/messages";
+import InviteModal from "@/components/InviteModal";
 
 export default function Dashboard() {
   const { data: session, status } = useSession();
@@ -27,6 +28,7 @@ export default function Dashboard() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [selectedType, setSelectedType] = useState<number | null>(null);
   const [editingSpace, setEditingSpace] = useState<Space | null>(null);
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
@@ -422,6 +424,28 @@ export default function Dashboard() {
             />
             {/* 新規作成ボタンメニュー */}
             <div ref={menuRef} style={{ display: "flex", justifyContent: "flex-end", marginTop: "30px", position: "relative" }}>
+              {/*招待ボタンメニュー*/}
+              <button
+                type="button"
+                onClick={() => setIsInviteModalOpen(true)}
+                disabled={isError}
+                style={{
+                  padding: "12px 24px",
+                  background: isError ? "#94a3b8" : "#16a34a", /* 緑色 */
+                  color: "white",
+                  border: "none",
+                  borderRadius: "8px",
+                  cursor: isError ? "not-allowed" : "pointer",
+                  fontWeight: "bold",
+                  fontSize: "14px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  opacity: isError ? 0.6 : 1
+                }}
+              >
+                <span className="w-4">＋</span> 招待
+              </button>
               {isCreateMenuOpen && (
                 <div style={{ position: "absolute", bottom: "50px", right: "0", background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)", padding: "8px 0", display: "flex", flexDirection: "column",  zIndex: 50 }}>
                   <button type="button" onClick={() => { setEditingSpace(null); openModal(1); setIsCreateMenuOpen(false); }} style={{ padding: "10px 16px", textAlign: "left", background: "none", border: "none", cursor: "pointer", fontSize: "14px", color: "#334155", fontWeight: "500" }} onMouseEnter={(e) => e.currentTarget.style.background = "#f1f5f9"} onMouseLeave={(e) => e.currentTarget.style.background = "none"}>チャットスペース</button>
@@ -432,10 +456,10 @@ export default function Dashboard() {
               <button 
                 type="button" 
                 onClick={() => setIsCreateMenuOpen(prev => !prev)} 
-                disabled={isError} // エラー時はボタンを無効化
+                disabled={isError} 
                 style={{ 
                   padding: "12px 24px", 
-                  background: isError ? "#94a3b8" : "#2563eb", // エラー時はグレーにする等
+                  background: isError ? "#94a3b8" : "#2563eb", 
                   color: "white", 
                   border: "none", 
                   borderRadius: "8px", 
@@ -473,7 +497,7 @@ export default function Dashboard() {
         }}
         spaceType={selectedType ?? 1}
         editingSpace={editingSpace}
-        onSave={async (name, selectedType, favoriteFlag, isArchived) => {
+        onSave={async (name, selectedType, favoriteFlag, isArchived, inviteeId) => {
           const hasInvalidHtmlChars = /[<>"'$&]/.test(name);
           const hasScriptKeywords = /(javascript:|script|onload|onerror|alert\s*\(|confirm\s*\(|prompt\s*\()/i.test(name);
 
@@ -522,7 +546,35 @@ export default function Dashboard() {
             }
             const data = await res.json();
             console.log(data);
-            ToiToiNotification.success(isGoal ? "目標を保存しました！" : "スペースを保存しました！");
+
+            //招待API
+            if (!isEditingExistingSpace && !isGoal && inviteeId) {
+              try {
+                const newSpaceId = data.space?.id;
+                if (newSpaceId) {
+                  const inviteRes = await fetch("/api/invitations", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      space_id: Number(newSpaceId),
+                      invitee_id: inviteeId,
+                    }),
+                  });
+                  if (!inviteRes.ok) {
+                    const inviteData = await inviteRes.json();
+                    ToiToiNotification.error(`スペースは作成しましたが、招待に失敗しました: ${inviteData.error}`);
+                  } else {
+                    ToiToiNotification.success("スペースの作成と招待が完了しました！");
+                  }
+                }
+              } catch (e) {
+                console.error("招待エラー:", e);
+                ToiToiNotification.error("招待処理中にエラーが発生しました。");
+              }
+            } else {
+              // 招待がない場合の通常の通知
+              ToiToiNotification.success(isGoal ? "目標を保存しました！" : "スペースを保存しました！");
+            }
             setIsModalOpen(false);
             setEditingSpace(null);
             window.dispatchEvent(new Event("refresh-header"));
@@ -586,6 +638,14 @@ export default function Dashboard() {
           }
         }}
       />
+      {isInviteModalOpen && (
+        <InviteModal
+          isOpen={isInviteModalOpen}
+          onClose={() => setIsInviteModalOpen(false)}
+          spaces={{ ...spaces, task: [] }}
+          currentUserId={session?.user?.id || ""} 
+        />
+      )}
     </>
   );
 }

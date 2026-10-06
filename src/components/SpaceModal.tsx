@@ -13,7 +13,8 @@ type SpaceModalProps = {
     favoriteFlag: number;
     isArchived: number;
   } | null;
-  onSave: (name: string, selectedType: number, favoriteFlag: number, isArchived: number) => Promise<void>;
+  // 👇 変更点: 5つ目の引数として `inviteeId?`（任意）を追加しました
+  onSave: (name: string, selectedType: number, favoriteFlag: number, isArchived: number, inviteeId?: string) => Promise<void>;
 };
 
 export default function SpaceModal({ isOpen, onClose, spaceType, editingSpace, onSave }: SpaceModalProps) {
@@ -22,6 +23,9 @@ export default function SpaceModal({ isOpen, onClose, spaceType, editingSpace, o
   const [favoriteFlag, setFavoriteFlag] = useState(0);
   const [isArchived, setIsArchived] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // 👇 変更点: 招待ID用のStateを追加
+  const [inviteeId, setInviteeId] = useState("");
 
   useEffect(() => {
     if (isOpen) {
@@ -29,13 +33,15 @@ export default function SpaceModal({ isOpen, onClose, spaceType, editingSpace, o
       setSelectedType(editingSpace ? editingSpace.spaceType : spaceType);
       setFavoriteFlag(editingSpace ? editingSpace.favoriteFlag : 0);
       setIsArchived(editingSpace ? editingSpace.isArchived ?? 0 : 0);
+      setInviteeId(""); // モーダルを開くたびに招待IDをリセット
     }
   }, [isOpen, editingSpace, spaceType]);
 
   const handleSave = async () => {
     setIsSubmitting(true);
     try {
-      await onSave(name, selectedType, favoriteFlag, isArchived);
+      // 👇 変更点: onSave に inviteeId を渡す
+      await onSave(name, selectedType, favoriteFlag, isArchived, inviteeId);
     } catch (error) {
       console.error("保存失敗:", error);
     } finally {
@@ -84,7 +90,7 @@ export default function SpaceModal({ isOpen, onClose, spaceType, editingSpace, o
         </div>
 
         {/* 【2. 入力欄】 */}
-        <div style={{ marginBottom: "24px", position: "relative", display: "flex", alignItems: "center" }}>
+        <div style={{ marginBottom: !editingSpace?.id && (spaceType === 1 || spaceType === 3) ? "16px" : "24px", position: "relative", display: "flex", alignItems: "center" }}>
           <input
             type="text"
             value={name}
@@ -127,6 +133,33 @@ export default function SpaceModal({ isOpen, onClose, spaceType, editingSpace, o
             </button>
           )}
         </div>
+
+        {/* 👇 変更点: チャット(1)または質問(3)の「新規作成時」のみ表示する招待入力欄 */}
+        {!editingSpace?.id && (spaceType === 1 || spaceType === 3) && (
+          <div style={{ marginBottom: "24px" }}>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#475569", marginBottom: "6px" }}>
+              一緒に参加するユーザーを招待（任意）
+            </label>
+            <input
+              type="text"
+              value={inviteeId}
+              onChange={(e) => setInviteeId(e.target.value)}
+              placeholder="招待するユーザーのID（空欄でも可）"
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                padding: "10px 14px",
+                borderRadius: "8px",
+                border: "1px solid #cbd5e1",
+                fontSize: "14px",
+                color: "#334155",
+                outline: "none",
+                background: "#ffffff",
+                transition: "border-color 0.2s",
+              }}
+            />
+          </div>
+        )}
 
         {/* 【3. アクションエリア】 */}
         <div style={{
