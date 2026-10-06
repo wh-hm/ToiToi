@@ -11,20 +11,18 @@ export async function POST(request: Request) {
     // ① ログインセッションを取得
     const session = await getServerSession(authOptions);
 
-    // ② email または google_id / session.id を使って DB から正式なユーザーレコードを取得
+    // ② email または google_id / session.id を使って DB から正式な招待元ユーザーレコードを取得
     let inviterUser = null;
 
     const userEmail = session?.user?.email;
     const sessionId = (session?.user as any)?.id;
 
-    // email が存在する場合は email で検索
     if (userEmail) {
       inviterUser = await prisma.user.findFirst({
         where: { email: userEmail },
       });
     }
 
-    // 見つからない場合は ID/Google ID で検索
     if (!inviterUser && sessionId) {
       const strSessionId = String(sessionId);
       inviterUser = await prisma.user.findFirst({
@@ -37,7 +35,6 @@ export async function POST(request: Request) {
       });
     }
 
-    // クライアントから渡された inviter_id がある場合フォールバック検索
     if (!inviterUser && inviter_id) {
       inviterUser = await prisma.user.findFirst({
         where: {
@@ -49,7 +46,6 @@ export async function POST(request: Request) {
       });
     }
 
-    // 正式なユーザーが存在しない場合はエラー
     if (!inviterUser) {
       return NextResponse.json(
         { error: '招待元のユーザーが見つかりませんでした。ログインし直してください。' },
@@ -57,7 +53,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const realInviterId = inviterUser.id; // DBの真の主キー(UUID)
+    const realInviterId = inviterUser.id; // 招待元の真のUUID
 
     // バリデーション
     if (!space_id || !realInviterId || !invitee_id) {
@@ -67,15 +63,30 @@ export async function POST(request: Request) {
       );
     }
 
-    // ③ 招待先 (invitee) が DB に存在するか確認
-    const inviteeUser = await prisma.user.findUnique({
-      where: { id: String(invitee_id) },
+    // ③ 招待先 (invitee) が DB に存在するか確認（user_id または id で検索）
+    const inviteeUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { user_id: String(invitee_id) }, // マイページで設定する招待ID
+          { id: String(invitee_id) },      // 主キーUUID
+        ],
+      },
     });
 
     if (!inviteeUser) {
       return NextResponse.json(
-        { error: `指定された招待先ユーザー(ID: ${invitee_id})が見つかりません。` },
+        { error: `指定された招待ID（${invitee_id}）のユーザーが見つかりません。` },
         { status: 404 }
+      );
+    }
+
+    const realInviteeId = inviteeUser.id; // 招待先の真のUUID
+
+    // 自分自身を招待しようとしている場合はエラー
+    if (realInviterId === realInviteeId) {
+      return NextResponse.json(
+        { error: '自分自身を招待することはできません。' },
+        { status: 400 }
       );
     }
 
@@ -83,7 +94,7 @@ export async function POST(request: Request) {
     const existingInvitation = await prisma.invitation.findFirst({
       where: {
         space_id: Number(space_id),
-        invitee_id: String(invitee_id),
+        invitee_id: String(realInviteeId),
         status: 0,
         delete_flag: 0,
       },
@@ -101,15 +112,15 @@ export async function POST(request: Request) {
       const invitation = await tx.invitation.create({
         data: {
           space_id: Number(space_id),
-          inviter_id: String(realInviterId), // DBの真のUUIDを使用
-          invitee_id: String(invitee_id),
+          inviter_id: String(realInviterId),
+          invitee_id: String(realInviteeId),
           status: 0,
         },
       });
 
       await tx.notification.create({
         data: {
-          user_id: String(invitee_id),
+          user_id: String(realInviteeId),
           type: 1,
           related_id: invitation.id,
           space_id: Number(space_id),
