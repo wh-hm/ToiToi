@@ -23,7 +23,7 @@ export async function getQuestionChatsWithImages(userId: string, questionId: num
   // 1. 指定された question_id に紐づくチャットを取得
   const qChats = await prisma.questionChats.findMany({
     where: { 
-      user_id: userId, 
+      //user_id: userId, 
       delete_flag: 0, 
       question_id: questionId 
     },

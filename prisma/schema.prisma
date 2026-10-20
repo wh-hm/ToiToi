@@ -27,6 +27,7 @@ profile_image_url String?           @db.VarChar(255)
 
   // リレーション関係
   spaces           Space[]
+  joined_spaces    Space[]          @relation("SpaceMembers")
   loginManagement  LoginManagement?
   goal             Goal?
 
@@ -58,6 +59,7 @@ model Space {
   chats         Chat[]
   tasks            Task[]
   questions        Question[]
+  members      User[]            @relation("SpaceMembers")
 
   //phase2:新規テーブルとのリレーション
   read_statuses SpaceReadStatus[]

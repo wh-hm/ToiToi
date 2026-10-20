@@ -19,19 +19,29 @@ export async function getSpaces(
 ): Promise<Space[]> {
   return await prisma.space.findMany({
     where: {
-      user_id: userId,
       delete_flag: 0,
+      // 自分が作成したスペース OR 招待されて参加しているスペース
+      OR: [
+        { user_id: userId },
+        { members: { some: { id: userId } } } // 👈 users を members に修正しました
+      ],
       ...(isArchived != null && { is_archived: isArchived }),
       ...(spaceType != null && { space_type: spaceType }),
     },
   });
 }
 
-
 //スペースが生きているかどうかの確認
 export async function getSpaceCheck(userId: string, spaceId: number): Promise<Space | null> {
   const space = await prisma.space.findFirst({
-    where: { user_id: userId, id: spaceId },
+    where: { 
+      id: spaceId,
+      // 自分が作成したスペース OR 招待されて参加しているスペース
+      OR: [
+        { user_id: userId },
+        { members: { some: { id: userId } } } 
+      ]
+    },
   });
   if(!space){
     return null;
@@ -39,16 +49,22 @@ export async function getSpaceCheck(userId: string, spaceId: number): Promise<Sp
   return space;
 }
 
-
 //スペース名取得
 export async function getSpaceName(userId: string, spaceId: number): Promise<string> {
   const space = await prisma.space.findFirst({
-    where: { user_id: userId, id: spaceId, delete_flag: 0 },
+    where: { 
+      id: spaceId, 
+      delete_flag: 0,
+      // 自分が作成したスペース OR 招待されて参加しているスペース
+      OR: [
+        { user_id: userId },
+        { members: { some: { id: userId } } }
+      ]
+    },
   });
   if (!space) throw new Error("指定されたスペースが見つかりません。");
   return space.name;
 }
-
 
 // 概要：スペースの登録
 export async function registerSpace(
@@ -191,8 +207,8 @@ export async function deleteSpaceQuestion(spaceId: number, userId: string, tx?: 
 }
 
 /**
- * メソッド名称：deleteArchives
- * 概要：アーカイブ一括削除
+- メソッド名称：deleteArchives
+- 概要：アーカイブ一括削除
  */
 export async function deleteArchives(userId: string, tx?: Tx): Promise<boolean> {
   const db = tx || prisma;

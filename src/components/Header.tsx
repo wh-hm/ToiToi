@@ -12,6 +12,7 @@ import {ChevronDownIcon} from "lucide-react"
 import { fetchWithTimeout } from "@/lib/api";
 import { handleApiResponse } from "@/lib/api-utils";
 import { ToiToiNotification } from "./Toast";
+import { NotificationBell } from "@/components/NotificationBell";
 
 export default function Header() {
   const [data, setData] = useState<any>({ chat: [], task: [], question: [] });
@@ -55,18 +56,14 @@ export default function Header() {
   useEffect(() => { refreshData(); }, [refreshData]);
 
   useEffect(() => {
-    // カスタムイベントを待ち受けて refreshData を実行する関数
     const handleRefreshHeader = () => {
       refreshData();
     };
-    // イベントリスナーを登録
     window.addEventListener("refresh-header", handleRefreshHeader);
-    // クリーンアップ処理：コンポーネントが破棄される時にイベントを解除
     return () => {
       window.removeEventListener("refresh-header", handleRefreshHeader);
     };
   }, [refreshData]);
-
 
   const menuConfig = [
     { key: 'chats', title: 'チャット', items: data.chat, path: 'chat' },
@@ -84,7 +81,7 @@ export default function Header() {
               alt="ToiToi" 
               width={120} 
               height={40} 
-              style={{ width: "auto", height: "auto" }} // これを追加
+              style={{ width: "auto", height: "auto" }} 
               priority 
             />
           </Link>
@@ -118,8 +115,13 @@ export default function Header() {
               </Dropdown>
             </div>
           ))}
-          <Link href="/mypage" className="ml-4 font-medium text-gray-600">マイページ</Link>
+          
+          {/* 💡 PC版: 通知ベルをマイページの左横に設置 */}
+          <div className="ml-2 flex items-center">
+            <NotificationBell />
+          </div>
 
+          <Link href="/mypage" className="ml-4 font-medium text-gray-600">マイページ</Link>
           
           <button 
             onClick={async () => {
@@ -137,14 +139,17 @@ export default function Header() {
         </NavbarContent>
 
         {/* スマホ用ボタン */}
-        <NavbarContent className="lg:hidden" justify="end">
+        <NavbarContent className="lg:hidden gap-2" justify="end">
+          {/* 💡 スマホ版: ハンバーガーメニューの左横に設置 */}
+          <NotificationBell />
+
           <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 text-gray-600">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>
           </button>
         </NavbarContent>
       </Navbar>
 
-      {/* スライドインメニュー */}
+      {/* スライドインメニュー（変更なし） */}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-[100] bg-black/20 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}>
           <div 
@@ -161,7 +166,6 @@ export default function Header() {
             <div className="flex flex-col gap-1 pb-2">
               <Link className="font-bold text-gray-700 ml-2" href="/dashboard" onClick={() => setIsMobileMenuOpen(false)}>ダッシュボード</Link>
             </div>
-
             
             <Accordion selectionMode="multiple" className="p-2">
               {menuConfig.map((cat) => (

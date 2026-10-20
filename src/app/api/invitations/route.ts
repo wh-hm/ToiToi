@@ -109,6 +109,13 @@ export async function POST(request: Request) {
 
     // ⑤ トランザクションで「招待」と「通知」を作成
     const result = await prisma.$transaction(async (tx) => {
+      const space = await tx.space.findUnique({
+        where: { id: Number(space_id) },
+        select: { space_type: true },
+      });
+
+      const actualSpaceType = space ? space.space_type : 0;
+
       const invitation = await tx.invitation.create({
         data: {
           space_id: Number(space_id),
@@ -124,7 +131,7 @@ export async function POST(request: Request) {
           type: 1,
           related_id: invitation.id,
           space_id: Number(space_id),
-          space_type: 0,
+          space_type: actualSpaceType,
           content: '新しいスペースへの招待が届きました',
         },
       });

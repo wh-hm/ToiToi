@@ -20,6 +20,8 @@ export interface ChatMessage {
     delete_flag: number;
     // 必要なら他のフィールドも追加
   } | null;
+  user_id?: string | number;
+  is_read?: number;
 }
 
 export interface ChatInputProps {
@@ -48,6 +50,7 @@ export interface ChatListProps {
   type: string;
   onScrollBottom: (force?: boolean) => void;
   isError: boolean;
+  currentUserId?: string | number;
 }
 
 export interface ChatMessageItemProps {
@@ -66,6 +69,7 @@ export interface ChatMessageItemProps {
   onDownload: (url: string) => void;
   onScrollBottom: (force: boolean) => void;
   type: string;
+  currentUserId?: string | number;
 }
 
 export interface ImageZoomModalProps {

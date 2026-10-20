@@ -45,6 +45,7 @@ export async function GET(
         return NextResponse.json({ message: MESSAGES.E2006 }, { status: 404 });
     }
     const [messages, question] = await Promise.all([
+      //getQuestionChatsWithImages("29f113ad-7ad0-4677-92a8-8e5d638cef8e", questionId),
       getQuestionChatsWithImages(auth.user_id, questionId),
       getQuestion(questionId, auth.user_id)
     ]);

@@ -1,11 +1,13 @@
 import NextAuth, { NextAuthOptions, DefaultSession } from "next-auth";
 import { JWT } from "next-auth/jwt";
 import GoogleProvider from "next-auth/providers/google";
+import { getUserId } from "@/services/UserService";
 
 declare module "next-auth" {
   interface Session {
     user: {
       id: string;
+      dbUserId?: string;
     } & DefaultSession["user"];
   }
 }
@@ -45,11 +47,24 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
       }
+
+      if (token.id && !token.dbUserId) {
+        try {
+          const dbUser = await getUserId(token.id as string);
+          if (dbUser) {
+            token.dbUserId = dbUser.id; // データベースのUUIDをセット
+          }
+        } catch (e) {
+          console.error("ユーザー情報の取得に失敗しました", e);
+        }
+      }
       return token;
     },
+  
     async session({ session, token }: { session: any; token: JWT }) {
       if (session.user) {
         session.user.id = token.id as string;
+        session.user.dbUserId = token.dbUserId as string;
       }
       return session;
     },

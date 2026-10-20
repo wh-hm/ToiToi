@@ -9,9 +9,10 @@ export type Tx = Omit<Prisma.TransactionClient, "$connect" | "$disconnect" | "$o
 // 1. チャット取得＋画像URL付与
 export async function getChatsWithImages(userId: string, spaceId: number) {
   const chats = await prisma.chat.findMany({
-    where: { user_id: userId, delete_flag: 0, space_id: spaceId },
+    where: { delete_flag: 0, space_id: spaceId },
     orderBy: { created_at: 'asc' },
-    include: { image: true }, 
+    include: { image: true,
+     }, 
   });
 
   // 1. image_id (number) の配列を抽出
