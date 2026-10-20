@@ -12,6 +12,7 @@ const ChatList = forwardRef<HTMLDivElement, ChatListProps>(({
   chats, 
   spaceId, 
   isSubmitting, 
+  currentUserId,
   onToggleFavorite, 
   onEdit, 
   onDelete, 
@@ -72,6 +73,7 @@ const ChatList = forwardRef<HTMLDivElement, ChatListProps>(({
               <ChatMessageItem
                 message={chat}
                 spaceId={spaceId}
+                currentUserId={currentUserId}
                 isSubmitting={isSubmitting}
                 isOpen={openItemId === chat.id}
                 onOpenChange={(open) => setOpenItemId(open ? chat.id : null)}

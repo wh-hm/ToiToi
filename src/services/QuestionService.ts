@@ -14,7 +14,10 @@ const sanitizeOptions = {
 
 export async function checkQuestion(userId: string, spaceId: number, questionId: number, tx?: Tx): Promise<boolean> {
   const db = tx || prisma;
-    const result = await db.question.findFirst({ where: { id: questionId, user_id: userId, space_id: spaceId } });
+    const result = await db.question.findFirst({ where: {
+                                                 id: questionId, 
+                                                 //user_id: userId, 
+                                                 space_id: spaceId } });
 
   if (!result || result.delete_flag === 1) {
     return false;
@@ -66,14 +69,16 @@ export async function updateQuestion(
 // 概要：スペースに紐づく有効な質問一覧を取得する
 export async function getQuestions(spaceId: number, userId: string): Promise<Question[]> {
   return await prisma.question.findMany({
-    where: { space_id: spaceId, user_id: userId, delete_flag: 0 },
+    where: { space_id: spaceId,  delete_flag: 0 },
     orderBy: { created_at: 'desc' },
   });
 }
 
 export async function getQuestion(questionId: number, userId: string): Promise<Question | null> {
   return await prisma.question.findFirst({
-    where: { id: questionId, user_id: userId, delete_flag: 0 },
+    where: { id: questionId,
+             //user_id: userId,
+             delete_flag: 0 },
   });
 }
 
@@ -137,15 +142,37 @@ export async function updateQuestionStatus(
  */
 
 export async function getQuestionsCount(userId: string) {
-  const [counts, spaces] = await Promise.all([
-    prisma.question.groupBy({
-      by: ['space_id'],
-      where: { user_id: userId, is_resolved: 0, delete_flag: 0 },
-      _count: { id: true },
-    }),
-    prisma.space.findMany({ where: { user_id: userId, delete_flag: 0 } }),
-  ]);
+  // 1. 自分が作成者、またはメンバーとして参加しているスペースを取得
+  const spaces = await prisma.space.findMany({
+    where: {
+      delete_flag: 0,
+      space_type: 3, // 質問スペース（※必要に応じて space_type 条件を指定）
+      OR: [
+        { user_id: userId },
+        { members: { some: { id: userId } } },
+      ],
+    },
+    select: {
+      id: true,
+      name: true,
+    },
+  });
 
+  const spaceIds = spaces.map(s => s.id);
+  if (spaceIds.length === 0) return [];
+
+  // 2. 該当スペース内の未解決質問数をグループ集計（user_id の絞り込みは解除）
+  const counts = await prisma.question.groupBy({
+    by: ['space_id'],
+    where: {
+      space_id: { in: spaceIds },
+      is_resolved: 0,
+      delete_flag: 0,
+    },
+    _count: { id: true },
+  });
+
+  // 3. マッピングして返す
   return spaces.map(space => ({
     space_id: space.id,
     space_name: space.name,

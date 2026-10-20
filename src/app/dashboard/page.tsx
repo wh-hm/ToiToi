@@ -282,14 +282,15 @@ export default function Dashboard() {
   // ド時およびブラウザの「戻る」で復元された時にAPIを実行
   useEffect(() => {
     fetchSpaces();
-    const handlePageShow = (event: PageTransitionEvent) => {
-      if (event.persisted && status === "authenticated") {
-        fetchSpaces();
-      }
+    const handleUpdate = () => {
+      fetchSpaces();
     };
-    window.addEventListener('pageshow', handlePageShow);
+    
+    window.addEventListener("spacesUpdated", handleUpdate);
+
+    // クリーンアップ関数
     return () => {
-      window.removeEventListener('pageshow', handlePageShow);
+      window.removeEventListener("spacesUpdated", handleUpdate);
     };
   }, []);
 

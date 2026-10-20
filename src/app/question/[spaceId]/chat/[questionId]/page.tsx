@@ -1,5 +1,4 @@
 'use client';
-//修正中
 import { useState, useEffect, useRef, use } from "react";
 import ChatInput from "@/components/chat/ChatInput";
 import ChatList from "@/components/chat/ChatList";
@@ -27,7 +26,10 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
   const scrollRef = useRef<HTMLDivElement>(null);
   const { questionId, spaceId } = use(params);
   const numericspaceId = Number(spaceId);
-  const { status } = useSession();
+  //const { status } = useSession();
+  const { data: session, status } = useSession();
+  //const currentUserId = (session?.user as any)?.id;
+  const currentUserId = (session?.user as any)?.dbUserId;
   const router = useRouter();
   const isInitialLoad = useRef(true);
   const isLikingRef = useRef(false);
@@ -54,7 +56,7 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
       setTimeout(() => setIsCelebrationShow(false), 500);
     }, 3000);
   };
-
+  console.log("現在のセッション情報:", session?.user);
   // useEffect で質問データを取得した際に、初期状態をセットする
   useEffect(() => {
     if (question) {
@@ -462,6 +464,7 @@ const handleUpdate = async (chatId: number) => {
         <ChatList 
           chats={messages}
           spaceId={numericspaceId}
+          currentUserId={currentUserId}
           isSubmitting={isSubmitting}
           ref={scrollRef}
           onEdit={(id) => { setEditingId(id); setEditValue(messages.find((m: any) => m.id === id)?.message || ""); }}
@@ -488,7 +491,6 @@ const handleUpdate = async (chatId: number) => {
           disabled={isSubmitting}
         />
       </div>
-      
     </div>
   );
 }

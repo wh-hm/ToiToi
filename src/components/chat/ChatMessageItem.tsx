@@ -8,7 +8,7 @@ import { ChatMessageItemProps } from "@/types/chat";
 
 export default function ChatMessageItem({ 
   message, spaceId, isOpen, isSubmitting, 
-  onOpenChange, onToggleFavorite, onEdit, onDelete, onBackgroundChange, setEditValue, onNiceFlag, onImageClick, onDownload, onScrollBottom, type
+  onOpenChange, onToggleFavorite, onEdit, onDelete, onBackgroundChange, setEditValue, onNiceFlag, onImageClick, onScrollBottom, type, currentUserId
 }: ChatMessageItemProps) {
   
   const [isHovered, setIsHovered] = useState(false);
@@ -37,9 +37,17 @@ export default function ChatMessageItem({
   };
 
   const hasImage = !!(message.signedImageUrl || (message as any).previewImages || message.imageUrl);
+  const isMine = message.user_id === currentUserId;
+
+  console.log({
+    "メッセージ内容": message.message,
+    "メッセージの送信者ID (message.user_id)": message.user_id,
+    "ログイン中の自分のID (currentUserId)": currentUserId,
+    "一致判定 (isMine)": isMine
+  });
 
   return (
-    <div className="relative flex flex-col items-end w-full">
+    <div className={`relative flex flex-col w-full ${isMine ? "items-end" : "items-start"}`}>
       <Popover 
         placement={placement}
         offset={offsetValue}
@@ -109,24 +117,17 @@ export default function ChatMessageItem({
         </PopoverContent>
       </Popover>
 
-      
-      <div className="flex items-center justify-end w-full">
-        <div className="w-4 h-4  flex-shrink-0 mr-3">
-          {type === "chat" ? (
-            <>
-              {message.favorite_flag === 1 && (
-                <Star className="text-yellow-400 fill-yellow-400"/>
-              )}
-              
-            </>
-          ) : (
-            <>
-              {message.niceFlag === 1 && (
-                <ThumbsUp className="text-yellow-400 fill-yellow-400"/>
-              )}
-            </>
-          )}
-        </div>
+      <div className={`flex items-center w-full ${isMine ? "justify-end" : "justify-start"}`}>
+        {isMine && (
+          <div className="w-4 h-4 flex-shrink-0 mr-3">
+            {type === "chat" ? (
+              message.favorite_flag === 1 && <Star className="text-yellow-400 fill-yellow-400"/>
+            ) : (
+              message.niceFlag === 1 && <ThumbsUp className="text-yellow-400 fill-yellow-400"/>
+            )}
+          </div>
+        )}
+    
         <div 
           ref={targetRef}
           onMouseEnter={() => !isOpen && !isSubmitting && setIsHovered(true)}
@@ -201,8 +202,26 @@ export default function ChatMessageItem({
             );
           })}
         </div>
+        {!isMine && (
+          <div className="w-4 h-4 flex-shrink-0 ml-3">
+            {type === "chat" ? (
+              message.favorite_flag === 1 && <Star className="text-yellow-400 fill-yellow-400"/>
+            ) : (
+              message.niceFlag === 1 && <ThumbsUp className="text-yellow-400 fill-yellow-400"/>
+            )}
+          </div>
+        )}
       </div>
-      <span className="text-[10px] text-gray-400 mt-1">{formatDateTime(message.created_at, message.updated_at)}</span>
+      {/* <span className="text-[10px] text-gray-400 mt-1">{formatDateTime(message.created_at, message.updated_at)}</span> */}
+      <div className={`flex items-end gap-1 mt-1 ${isMine ? "flex-row-reverse" : "flex-row"}`}>
+        <span className="text-[10px] text-gray-400">
+          {formatDateTime(message.created_at, message.updated_at)}
+        </span>
+        {/* 自分へのメッセージかつ、既読判定がTrueの場合のみ表示 */}
+        {isMine && (message.is_read ?? 0) === 1 && (
+          <span className="text-[10px] text-gray-500 mb-[1px]">既読</span>
+        )}
+      </div>
     </div>
   );
 }
