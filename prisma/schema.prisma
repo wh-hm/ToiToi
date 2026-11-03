@@ -9,61 +9,64 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  //url      = env("DATABASE_URL")
 }
 
 // 1. ユーザマスタ (users)
 model User {
-  id              String            @id @db.VarChar(255) // UUID
-  google_id       String            @unique @db.VarChar(255)
-  user_id           String?          @unique @db.VarChar(50) 
-  username        String?            @db.VarChar(50)
-  created_at      DateTime          @default(now()) @db.Timestamptz
-  delete_flag     Int               @default(0)
-  email           String?            @db.VarChar(255) // phase2で必要
-  updated_at      DateTime?          @default(now()) @updatedAt @db.Timestamptz
+  id          String    @id @default(uuid()) @db.VarChar(255) // UUID
+  google_id   String    @unique @db.VarChar(255)
+  user_id     String?   @unique @db.VarChar(50)
+  username    String?   @db.VarChar(50)
+  created_at  DateTime  @default(now()) @db.Timestamptz
+  delete_flag Int       @default(0)
+  email       String?   @unique @db.VarChar(255) // 👈 @uniqueを追加
+  updated_at  DateTime? @default(now()) @updatedAt @db.Timestamptz
 
-  //phase2:プロフィール画像
-profile_image_url String?           @db.VarChar(255)   
+  // phase2:プロフィール画像
+  profile_image_url String? @db.VarChar(255)
 
   // リレーション関係
-  spaces           Space[]
-  joined_spaces    Space[]          @relation("SpaceMembers")
-  loginManagement  LoginManagement?
-  goal             Goal?
+  spaces          Space[]
+  joined_spaces   Space[]          @relation("SpaceMembers")
+  loginManagement LoginManagement?
+  goal            Goal?
 
-  //phase2:新規テーブルとのリレーション
-  read_statuses         SpaceReadStatus[]
-  notifications         Notification[]
-  reminders             Reminder[]
-  sent_invitations      Invitation[]      @relation("SentInvitations")
-  received_invitations  Invitation[]      @relation("ReceivedInvitations")
+  // phase2:新規テーブルとのリレーション
+  read_statuses          SpaceReadStatus[]
+  question_read_statuses QuestionReadStatus[] // 👈 質問既読管理用のリレーションを追加
+  notifications          Notification[]
+  reminders              Reminder[]
+  sent_invitations       Invitation[]         @relation("SentInvitations")
+  received_invitations   Invitation[]         @relation("ReceivedInvitations")
 
   @@map("users")
 }
 
 // 2. スペースマスタ (spaces)
 model Space {
-  id           Int            @id @default(autoincrement()) // SERIAL
-  user_id      String            @db.VarChar(255)
-  name         String            @db.VarChar(255)
-  created_at   DateTime         @default(now()) @db.Timestamptz
-  delete_flag  Int              @default(0)
-  space_type   Int               @default(0)
-  favorite_flag Int?             @default(0)
-  updated_at  DateTime?         @default(now()) @updatedAt @db.Timestamptz
-  is_archived  Int              @default(0)
-  // 外部キーとの紐付け
-  user         User              @relation(fields: [user_id], references: [id])
-  
-  // リレーション関係
-  chats         Chat[]
-  tasks            Task[]
-  questions        Question[]
-  members      User[]            @relation("SpaceMembers")
+  id            Int       @id @default(autoincrement()) // SERIAL
+  user_id       String    @db.VarChar(255)
+  name          String    @db.VarChar(255)
+  created_at    DateTime  @default(now()) @db.Timestamptz
+  delete_flag   Int       @default(0)
+  space_type    Int       @default(0)
+  favorite_flag Int?      @default(0)
+  updated_at    DateTime? @default(now()) @updatedAt @db.Timestamptz
+  is_archived   Int       @default(0)
 
-  //phase2:新規テーブルとのリレーション
+  // 外部キーとの紐付け
+  user User @relation(fields: [user_id], references: [id])
+
+  // リレーション関係
+  chats     Chat[]
+  tasks     Task[]
+  questions Question[]
+  members   User[]     @relation("SpaceMembers")
+
+  // phase2:新規テーブルとのリレーション
   read_statuses SpaceReadStatus[]
-  invitations    Invitation[]
+  invitations   Invitation[]
   notifications Notification[]
 
   @@map("spaces")
@@ -71,21 +74,21 @@ model Space {
 
 // 3. チャットマスタ (chats)
 model Chat {
-  id            Int      @id @default(autoincrement()) // SERIAL
-  space_id      Int      
-  user_id       String   @db.VarChar(255)
+  id            Int       @id @default(autoincrement()) // SERIAL
+  space_id      Int
+  user_id       String    @db.VarChar(255)
   message       String?   @db.VarChar(255)
-  image_id    Int?     // image_url の代わりに image_id を保持
-  created_at    DateTime @default(now()) @db.Timestamptz
+  image_id      Int? // image_url の代わりに image_id を保持
+  created_at    DateTime  @default(now()) @db.Timestamptz
   delete_flag   Int?      @default(0)
   favorite_flag Int?      @default(0)
   stamp         String?   @db.VarChar(255)
   background    Int?      @default(0)
-  updated_at    DateTime?  @default(now()) @updatedAt @db.Timestamptz
+  updated_at    DateTime? @default(now()) @updatedAt @db.Timestamptz
 
   // 外部キーとの紐付け
-  image       Image?   @relation(fields: [image_id], references: [id])
-  space         Space    @relation(fields: [space_id], references: [id])
+  image Image? @relation(fields: [image_id], references: [id])
+  space Space  @relation(fields: [space_id], references: [id])
 
   @@map("chats")
 }
@@ -95,18 +98,19 @@ model Task {
   id          Int       @id @default(autoincrement()) // SERIAL
   user_id     String    @db.VarChar(255)
   title       String    @db.VarChar(255)
-  due_date    DateTime  
+  due_date    DateTime
   status      Int       @default(0)
-  created_at  DateTime?  @default(now()) @db.Timestamptz
-  delete_flag Int?       @default(0)
-  space_id    Int      
+  created_at  DateTime? @default(now()) @db.Timestamptz
+  delete_flag Int?      @default(0)
+  space_id    Int
   tag         Int       @default(0)
   updated_at  DateTime? @default(now()) @updatedAt @db.Timestamptz
   description String?   @db.VarChar(255)
   is_allday   Int       @default(0)
   priority    Int       @default(0)
+
   // 外部キーとの紐付け
-  space       Space     @relation(fields: [space_id], references: [id])
+  space Space @relation(fields: [space_id], references: [id])
 
   @@map("tasks")
 }
@@ -114,10 +118,10 @@ model Task {
 // 5. 質問マスタ (questions)
 model Question {
   id          Int       @id @default(autoincrement()) // SERIAL
-  space_id    Int       
+  space_id    Int
   title       String    @db.VarChar(255)
   is_resolved Int       @default(0)
-  created_at  DateTime?  @default(now()) @db.Timestamptz
+  created_at  DateTime? @default(now()) @db.Timestamptz
   delete_flag Int       @default(0)
   user_id     String    @db.VarChar(255)
   question    String    @db.VarChar(255)
@@ -125,30 +129,31 @@ model Question {
   updated_at  DateTime? @default(now()) @updatedAt @db.Timestamptz
 
   // 外部キーとの紐付け
-  space       Space     @relation(fields: [space_id], references: [id])
-  
+  space Space @relation(fields: [space_id], references: [id])
+
   // リレーション関係
-  questionChats QuestionChats[]
+  questionChats        QuestionChats[]
+  questionReadStatuses QuestionReadStatus[] // 👈 質問既読管理用のリレーションを追加
 
   @@map("questions")
 }
 
 // 6. 質問チャットマスタ (question_chats)
 model QuestionChats {
-  id          Int      @id @default(autoincrement()) // SERIAL
-  question_id Int      
-  user_id     String   @db.VarChar(255)
+  id          Int       @id @default(autoincrement()) // SERIAL
+  question_id Int
+  user_id     String    @db.VarChar(255)
   message     String?   @db.VarChar(255)
-  created_at  DateTime @default(now()) @db.Timestamptz
-  delete_flag Int      @default(0)
-  image_id    Int?     // image_url の代わりに image_id を保持
-  stamp       String?  @db.VarChar(255)
-  updated_at  DateTime?   @default(now()) @updatedAt @db.Timestamptz
-  nice_flag   Int?        @default(0)
+  created_at  DateTime  @default(now()) @db.Timestamptz
+  delete_flag Int       @default(0)
+  image_id    Int? // image_url の代わりに image_id を保持
+  stamp       String?   @db.VarChar(255)
+  updated_at  DateTime? @default(now()) @updatedAt @db.Timestamptz
+  nice_flag   Int?      @default(0)
 
   // 外部キーとの紐付け
-  image       Image?   @relation(fields: [image_id], references: [id])
-  question    Question @relation(fields: [question_id], references: [id])
+  image    Image?   @relation(fields: [image_id], references: [id])
+  question Question @relation(fields: [question_id], references: [id])
 
   @@map("question_chats")
 }
@@ -160,42 +165,40 @@ model LoginManagement {
   total_login_days Int      @default(1)
   current_streak   Int      @default(1)
   delete_flag      Int      @default(0)
-  
 
   // 外部キーとの紐付け
-  user             User     @relation(fields: [user_id], references: [id])
+  user User @relation(fields: [user_id], references: [id])
 
   @@map("login_management")
 }
 
-
 // 8. 目標管理マスタ (goal)
 model Goal {
-  id          String     @id @db.VarChar(255) // ユーザーID (PKかつFK)
-  content     String?    @db.VarChar(255)
-  created_at DateTime    @default(now()) @db.Timestamptz // 変更
-  deleted_at DateTime?   @db.Timestamptz
-  status      Int        @default(0)
-  delete_flag Int?       @default(0)
+  id          String    @id @db.VarChar(255) // ユーザーID (PKかつFK)
+  content     String?   @db.VarChar(255)
+  created_at  DateTime  @default(now()) @db.Timestamptz
+  deleted_at  DateTime? @db.Timestamptz
+  status      Int       @default(0)
+  delete_flag Int?      @default(0)
 
   // 外部キーとの紐付け
-  user        User      @relation(fields: [id], references: [id])
+  user User @relation(fields: [id], references: [id])
 
   @@map("goal")
 }
 
-// 新しく追加する画像メタデータ管理用テーブル
+// 9. 画像メタデータ管理用テーブル (images)
 model Image {
-  id          Int      @id @default(autoincrement())
-  
+  id Int @id @default(autoincrement())
+
   // 保存先 (R2のパス)
-  storage_key String   @db.VarChar(255)
-  
+  storage_key String @db.VarChar(255)
+
   // ファイル情報
-  size_bytes  Int      // ファイルサイズ
-  mime_type   String   @db.VarChar(100)
-  caption     String?  @db.VarChar(255) // キャプション
-  
+  size_bytes Int // ファイルサイズ
+  mime_type  String  @db.VarChar(100)
+  caption    String? @db.VarChar(255) // キャプション
+
   // 管理用
   delete_flag Int      @default(0) // 論理削除対応
   created_at  DateTime @default(now()) @db.Timestamptz
@@ -207,71 +210,85 @@ model Image {
   @@map("images")
 }
 
+// 10. スペース既読管理マスタ (space_read_statuses)
+model SpaceReadStatus {
+  id                Int      @id @default(autoincrement())
+  space_id          Int
+  user_id           String   @db.VarChar(255)
+  last_read_chat_id Int      @default(0)
+  updated_at        DateTime @default(now()) @updatedAt @db.Timestamptz
 
-//phase2:スペース既読管理マスタ
-model SpaceReadStatus{
-  id                  Int         @id @default(autoincrement())
-  space_id            Int
-  user_id             String      @db.VarChar(255)
-  last_read_chat_id   Int         @default(0)
-  updated_at          DateTime    @default(now()) @updatedAt @db.Timestamptz
-
-  space               Space       @relation(fields: [space_id], references: [id])
-  user                User        @relation(fields: [user_id], references: [id])
+  space Space @relation(fields: [space_id], references: [id])
+  user  User  @relation(fields: [user_id], references: [id])
 
   @@unique([space_id, user_id]) // 同一スペース・ユーザーでの重複防止
   @@map("space_read_statuses")
 }
 
-//phase2:招待管理マスタ
-model Invitation{
-  id          Int       @id @default(autoincrement())
-  space_id    Int
-  inviter_id  String    @db.VarChar(255)
-  invitee_id  String    @db.VarChar(255)
-  status      Int       @default(0) // 0:保留, 1:承認, 2:拒否
-  created_at  DateTime  @default(now()) @db.Timestamptz
-  delete_flag Int       @default(0)
+// 11. 質問チャット既読管理マスタ (question_read_statuses) 👈 新規追加
+model QuestionReadStatus {
+  id                         Int      @id @default(autoincrement())
+  question_id                Int
+  user_id                    String   @db.VarChar(255)
+  last_read_question_chat_id Int      @default(0)
+  updated_at                 DateTime @default(now()) @updatedAt @db.Timestamptz
 
-  space       Space     @relation(fields: [space_id], references: [id], onDelete: Cascade)
-  inviter     User      @relation("SentInvitations", fields: [inviter_id], references: [id], onDelete: Cascade)
-  invitee     User      @relation("ReceivedInvitations", fields: [invitee_id], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [question_id], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([question_id, user_id]) // 同一質問・ユーザーでの重複防止
+  @@map("question_read_statuses")
+}
+
+// 12. 招待管理マスタ (invitations)
+model Invitation {
+  id          Int      @id @default(autoincrement())
+  space_id    Int
+  inviter_id  String   @db.VarChar(255)
+  invitee_id  String   @db.VarChar(255)
+  status      Int      @default(0) // 0:保留, 1:承認, 2:拒否
+  created_at  DateTime @default(now()) @db.Timestamptz
+  delete_flag Int      @default(0)
+
+  space   Space @relation(fields: [space_id], references: [id], onDelete: Cascade)
+  inviter User  @relation("SentInvitations", fields: [inviter_id], references: [id], onDelete: Cascade)
+  invitee User  @relation("ReceivedInvitations", fields: [invitee_id], references: [id], onDelete: Cascade)
 
   @@map("invitations")
 }
 
-//phase2:通知管理マスタ
-model Notification{
-  id          Int       @id @default(autoincrement())
-  user_id     String    @db.VarChar(255)
-  type        Int       // 1:招待, 2:リマインド等
-  related_id  Int       @default(0) // スペース内の関連するID（タスクIDや質問チャットIDなど）
+// 13. 通知管理マスタ (notifications)
+model Notification {
+  id          Int      @id @default(autoincrement())
+  user_id     String   @db.VarChar(255)
+  type        Int // 1:招待, 2:リマインド等
+  related_id  Int      @default(0) // スペース内の関連するID（タスクIDや質問チャットIDなど）
   space_id    Int
-  space_type  Int       @default(0) // 1:チャット, 2:タスク, 3:質問
-  content     String?   @db.VarChar(255) // 通知内容
-  is_read     Int       @default(0) // 0:未読, 1:既読
-  created_at  DateTime  @default(now()) @db.Timestamptz
-  delete_flag Int       @default(0)
+  space_type  Int      @default(0) // 1:チャット, 2:タスク, 3:質問
+  content     String?  @db.VarChar(255) // 通知内容
+  is_read     Int      @default(0) // 0:未読, 1:既読
+  created_at  DateTime @default(now()) @db.Timestamptz
+  delete_flag Int      @default(0)
 
-  user        User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  space       Space     @relation(fields: [space_id], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  space Space @relation(fields: [space_id], references: [id], onDelete: Cascade)
 
   @@map("notifications")
 }
 
-//phase2:リマインド管理マスタ
-model Reminder{
-  id          Int       @id @default(autoincrement())
-  user_id     String    @db.VarChar(255)
-  task_id     Int       // 関連ID（対象のタスクID等）※ポリモーフィックのため外部キー制約はなし
-  remind_at   DateTime  @db.Timestamptz
-  is_sent     Int       @default(0) // 0:未送信, 1:送信済
-  space_type  Int       @default(0) // 1:チャット, 2:タスク, 3:質問
-  content     String?   @db.VarChar(255) // リマインド内容
-  created_at  DateTime  @default(now()) @db.Timestamptz
-  delete_flag Int       @default(0)
+// 14. リマインド管理マスタ (reminders)
+model Reminder {
+  id          Int      @id @default(autoincrement())
+  user_id     String   @db.VarChar(255)
+  task_id     Int // 関連ID（対象のタスクID等）
+  remind_at   DateTime @db.Timestamptz
+  is_sent     Int      @default(0) // 0:未送信, 1:送信済
+  space_type  Int      @default(0) // 1:チャット, 2:タスク, 3:質問
+  content     String?  @db.VarChar(255) // リマインド内容
+  created_at  DateTime @default(now()) @db.Timestamptz
+  delete_flag Int      @default(0)
 
-  user        User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@map("reminders")
 }

@@ -37,7 +37,10 @@ export default function ChatMessageItem({
   };
 
   const hasImage = !!(message.signedImageUrl || (message as any).previewImages || message.imageUrl);
-  const isMine = message.user_id === currentUserId;
+  //const isMine = message.user_id === currentUserId;
+  const senderId = message.user_id || (message as any).userId;
+  const isMine = String(senderId) === String(currentUserId);
+  
 
   console.log({
     "メッセージ内容": message.message,
@@ -63,22 +66,26 @@ export default function ChatMessageItem({
         
         <PopoverContent className="w-[200px] p-2 data-[placement=bottom-end]:mt-2 data-[placement=top-end]:mb-2">
           <div className="flex flex-col w-full">
-            {!isOnlyStamp && !hasImage && message.message && (
-              <button 
-                disabled={isSubmitting}
-                onClick={() => { 
-                  onOpenChange(false); 
-                  setEditValue(message.message || ""); 
-                  onEdit(message.id); 
-                }} 
-                className="w-full text-left p-3 text-sm text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              >編集</button>
+            {isMine && (
+              <>
+                {!isOnlyStamp && !hasImage && message.message && (
+                  <button 
+                    disabled={isSubmitting}
+                    onClick={() => { 
+                      onOpenChange(false); 
+                      setEditValue(message.message || ""); 
+                      onEdit(message.id); 
+                    }} 
+                    className="w-full text-left p-3 text-sm text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  >編集</button>
+                )}
+                <button 
+                  disabled={isSubmitting}
+                  onClick={() => { onOpenChange(false); onDelete(message.id, spaceId); }} 
+                  className="w-full text-left p-3 text-sm text-red-500 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >削除</button>
+              </>
             )}
-            <button 
-              disabled={isSubmitting}
-              onClick={() => { onOpenChange(false); onDelete(message.id, spaceId); }} 
-              className="w-full text-left p-3 text-sm text-red-500 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-            >削除</button>
             {type === "chat" && (
               <button 
                 disabled={isSubmitting}

@@ -49,7 +49,26 @@ export async function GET(
       getQuestionChatsWithImages(auth.user_id, questionId),
       getQuestion(questionId, auth.user_id)
     ]);
-    const safeNewChat = JSON.parse(JSON.stringify(messages));
+
+    const otherReadStatuses = await prisma.questionReadStatus.findMany({
+      where: {
+        question_id: questionId, 
+        user_id: { not: auth.user_id },
+      },
+    });
+
+    // 🌟 追加ロジック: 相手がどこまで読んだか（last_read_chat_id）の最大値を取得
+    const maxOtherReadId = otherReadStatuses.length > 0 
+      ? Math.max(...otherReadStatuses.map(s => s.last_read_question_chat_id))
+      : 0;
+
+    // 🌟 追加ロジック: メッセージデータに is_read を付与する
+    const messagesWithReadFlag = messages.map((msg: any) => ({
+      ...msg,
+      // 「自分が送信したメッセージ」かつ「相手の既読ID以下」なら既読(1)とする
+      is_read: (msg.user_id === auth.user_id && msg.id <= maxOtherReadId) ? 1 : 0,
+    }));
+    const safeNewChat = JSON.parse(JSON.stringify(messagesWithReadFlag));
     const safeQuestion = JSON.parse(JSON.stringify(question));
 
     return NextResponse.json({ 
