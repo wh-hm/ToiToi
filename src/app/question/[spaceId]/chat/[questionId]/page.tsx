@@ -26,9 +26,7 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
   const scrollRef = useRef<HTMLDivElement>(null);
   const { questionId, spaceId } = use(params);
   const numericspaceId = Number(spaceId);
-  //const { status } = useSession();
   const { data: session, status } = useSession();
-  //const currentUserId = (session?.user as any)?.id;
   const currentUserId = (session?.user as any)?.dbUserId;
   const router = useRouter();
   const isInitialLoad = useRef(true);
@@ -100,12 +98,22 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
   }, [messages, isLoading]);
 
   useEffect(() => {
-    if (questionId) fetchMessages();
-  }, [questionId]);
+    if (!questionId) return;
 
+    fetchMessages(false);
+
+    // 5秒ごとの自動取得は、裏側でこっそり行う（isPolling = true）
+    const intervalId = setInterval(() => {
+      fetchMessages(true);
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, [questionId]);
  
-  const fetchMessages = async () => {
-  setIsLoading(true);
+const fetchMessages = async (isPolling = false) => {
+  if (!isPolling) {
+      setIsLoading(true);
+    }
   try {
     const { questionId, spaceId } = await params;
     const res = await fetchWithTimeout(`/api/questions/${spaceId}/messages?questionId=${questionId}`);
@@ -123,12 +131,28 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
 
     setMessages(formattedChats);
     setQuestion(data.question);
+
+    if (formattedChats.length > 0 && currentUserId) {
+  const maxChatId = Math.max(...formattedChats.map((c: any) => c.id));
+
+  fetch(`/api/questions/${spaceId}/messages/${questionId}/read`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      userId: currentUserId, 
+      lastReadQuestionChatId: maxChatId,
+    }),
+  }).catch((err) => console.error("既読送信エラー:", err));
+}
+
   } catch (error) {
     console.error("メッセージ取得エラー:", error);
     setIsError(true);
     setIsSubmitting(true);
   } finally {
-    setIsLoading(false);
+    if (!isPolling) {
+        setIsLoading(false);
+    }    
   }
 };
 
@@ -154,7 +178,7 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
     const pendingMessages: ChatMessage[] = [];
 
     if (stampId) {
-      pendingMessages.push({ id: Date.now(), stamp: stampId, isPending: true, created_at: now } as ChatMessage);
+      pendingMessages.push({ id: Date.now(), stamp: stampId, isPending: true, created_at: now, user_id: currentUserId } as ChatMessage);
     } else {
       if (selectedFiles.length > 0) {
         selectedFiles.forEach((file, i) => {
@@ -163,11 +187,12 @@ export default function ChatPage({ params }: { params: Promise<{ questionId: str
             signedImageUrl: URL.createObjectURL(file),
             isPending: true,
             created_at: new Date().toISOString(),
-            image: { caption: inputText }
+            image: { caption: inputText },
+            user_id: currentUserId
           } as ChatMessage);
         });
       } else {
-        pendingMessages.push({ id: Date.now(), message: inputText, isPending: true, created_at: now } as ChatMessage);
+        pendingMessages.push({ id: Date.now(), message: inputText, isPending: true, created_at: now, user_id: currentUserId } as ChatMessage);
       }
     }
     
