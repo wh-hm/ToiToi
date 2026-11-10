@@ -29,7 +29,7 @@ export async function PATCH(
     const [isSpaceAlive, isQuestionAlive, isChatAlive] = await Promise.all([
       getSpaceCheck(auth.user_id, spaceIdNum), // ※関数名が推測ですが合わせる
       checkQuestion(auth.user_id, spaceIdNum, questionIdNum),
-      checkQuestionChat(chatId, questionIdNum, auth.user_id, )
+      checkQuestionChat(chatId, questionIdNum,)
     ]);
         
     // スペースチェックの判定

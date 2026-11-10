@@ -1,3 +1,4 @@
+//src/services/QuestionService.ts
 import { prisma } from "@/lib/prisma";
 import { Question } from "@prisma/client";
 import sanitizeHtml from "sanitize-html"; // サニタイズ用ライブラリ
@@ -128,7 +129,7 @@ export async function updateQuestionStatus(
 ): Promise<Question> {
   const db = tx || prisma;
   const result = await db.question.updateMany({
-    where: { id: questionId, space_id: spaceId, user_id: userId, delete_flag: 0 },
+    where: { id: questionId, space_id: spaceId, delete_flag: 0 },
     data: { is_resolved: isResolved },
   });
 

@@ -18,7 +18,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [editingId, setEditingId] = useState<number | null>(null);
   const [spaceId, setspaceId] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const isInitialLoad = useRef(true);
@@ -175,7 +175,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     const now = new Date().toISOString();
 
     if (stampId) {
-      pendingMessages.push({ id: Date.now(), stamp: stampId, isPending: true, created_at: now } as ChatMessage);
+      pendingMessages.push({ id: Date.now(), stamp: stampId, isPending: true, created_at: now, isMine: true } as unknown as ChatMessage);
     } else {
       if (selectedFiles.length > 0) {
         selectedFiles.forEach((file, i) => {
@@ -184,13 +184,15 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
             signedImageUrl: URL.createObjectURL(file),
             isPending: true,
             created_at: new Date().toISOString(), // 必須項目
+            user_id:session?.user?.id,
             image: {
               caption: inputText
-            }
-          } as ChatMessage);
+            },
+            isMine: true
+          } as unknown as ChatMessage);
         });
       } else {
-        pendingMessages.push({ id: Date.now(), message: inputText, isPending: true, created_at: now } as ChatMessage);
+        pendingMessages.push({ id: Date.now(), message: inputText, isPending: true, created_at: now, isMine: true } as unknown as ChatMessage);
       }
     }
 
@@ -484,6 +486,7 @@ const handleDownload = async (imageUrl: string, chatId: string) => {
           isLoading={isLoading}
           type="chat"
           isError={isError}
+          currentUserId={session?.user?.id}
         />
       </div>
 

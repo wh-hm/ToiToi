@@ -6,11 +6,11 @@ import { formatDateTime } from "@/lib/formData";
 import { ChatMessageItemProps } from "@/types/chat";
 
 
-export default function ChatMessageItem({ 
-  message, spaceId, isOpen, isSubmitting, 
+export default function ChatMessageItem({
+  message, spaceId, isOpen, isSubmitting,
   onOpenChange, onToggleFavorite, onEdit, onDelete, onBackgroundChange, setEditValue, onNiceFlag, onImageClick, onScrollBottom, type, currentUserId
 }: ChatMessageItemProps) {
-  
+
   const [isHovered, setIsHovered] = useState(false);
   const [placement, setPlacement] = useState<"top-end" | "bottom-end">("bottom-end");
   const [isStampError, setIsStampError] = useState(false);
@@ -23,7 +23,7 @@ export default function ChatMessageItem({
 
   const handleContextMenu = (e: React.MouseEvent) => {
     if (isSubmitting) return;
-    
+
     e.preventDefault();
     if (window.getSelection()?.toString()) return;
     if (e.ctrlKey || e.metaKey) return;
@@ -39,19 +39,20 @@ export default function ChatMessageItem({
   const hasImage = !!(message.signedImageUrl || (message as any).previewImages || message.imageUrl);
   //const isMine = message.user_id === currentUserId;
   const senderId = message.user_id || (message as any).userId;
-  const isMine = String(senderId) === String(currentUserId);
-  
+  const isMine = (message as any).isMine !== undefined
+    ? (message as any).isMine
+    : String(senderId) === String(currentUserId);
 
   console.log({
     "メッセージ内容": message.message,
-    "メッセージの送信者ID (message.user_id)": message.user_id,
+    "メッセージの送信者ID (senderId)": senderId,
     "ログイン中の自分のID (currentUserId)": currentUserId,
     "一致判定 (isMine)": isMine
   });
 
   return (
     <div className={`relative flex flex-col w-full ${isMine ? "items-end" : "items-start"}`}>
-      <Popover 
+      <Popover
         placement={placement}
         offset={offsetValue}
         isOpen={isOpen && !isSubmitting}
@@ -63,58 +64,58 @@ export default function ChatMessageItem({
         <PopoverTrigger>
           <div className="w-0 h-0" />
         </PopoverTrigger>
-        
+
         <PopoverContent className="w-[200px] p-2 data-[placement=bottom-end]:mt-2 data-[placement=top-end]:mb-2">
           <div className="flex flex-col w-full">
             {isMine && (
               <>
                 {!isOnlyStamp && !hasImage && message.message && (
-                  <button 
+                  <button
                     disabled={isSubmitting}
-                    onClick={() => { 
-                      onOpenChange(false); 
-                      setEditValue(message.message || ""); 
-                      onEdit(message.id); 
-                    }} 
+                    onClick={() => {
+                      onOpenChange(false);
+                      setEditValue(message.message || "");
+                      onEdit(message.id);
+                    }}
                     className="w-full text-left p-3 text-sm text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                   >編集</button>
                 )}
-                <button 
+                <button
                   disabled={isSubmitting}
-                  onClick={() => { onOpenChange(false); onDelete(message.id, spaceId); }} 
+                  onClick={() => { onOpenChange(false); onDelete(message.id, spaceId); }}
                   className="w-full text-left p-3 text-sm text-red-500 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >削除</button>
               </>
             )}
             {type === "chat" && (
-              <button 
+              <button
                 disabled={isSubmitting}
-                onClick={() => { onOpenChange(false); onToggleFavorite?.(message.id, message.favorite_flag === 1 ? 0 : 1); }} 
+                onClick={() => { onOpenChange(false); onToggleFavorite?.(message.id, message.favorite_flag === 1 ? 0 : 1); }}
                 className="w-full text-left p-3 text-sm text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >{message.favorite_flag === 1 ? "お気に入り解除" : "お気に入り登録"}</button>
             )}
             {type === "question" && (
-              <button 
+              <button
                 disabled={isSubmitting}
-                onClick={() => { onOpenChange(false); onNiceFlag?.(message.id, message.niceFlag === 1 ? 0 : 1); }} 
+                onClick={() => { onOpenChange(false); onNiceFlag?.(message.id, message.niceFlag === 1 ? 0 : 1); }}
                 className="w-full text-left p-3 text-sm text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >{message.niceFlag === 1 ? "いいね解除" : "いいね登録"}</button>
             )}
           </div>
-          
-          {!isOnlyStamp && type === "chat" && (
+
+          {!isOnlyStamp && type === "chat" && isMine && (
             <>
               <div className="w-full h-px bg-gray-100 my-1" />
               <div className="flex flex-col w-full p-2 gap-2">
                 <p className="text-[9px] text-gray-400 uppercase font-bold tracking-wider">背景色を選択</p>
                 <div className="flex gap-2 overflow-x-auto scrollbar-hide py-2 px-1" style={{ scrollbarWidth: 'none' }}>
                   {Object.entries(CHAT_COLOR_PALETTE).map(([index, color]) => (
-                    <button 
-                      key={index} 
+                    <button
+                      key={index}
                       disabled={isSubmitting}
-                      className={`w-7 h-7 flex-shrink-0 rounded-full border disabled:opacity-50 disabled:cursor-not-allowed ${message.background === Number(index) ? "ring-2 ring-blue-400" : ""}`} 
-                      style={{ backgroundColor: color }} 
-                      onClick={() => { onOpenChange(false); onBackgroundChange?.(message.id, Number(index)); }} 
+                      className={`w-7 h-7 flex-shrink-0 rounded-full border disabled:opacity-50 disabled:cursor-not-allowed ${message.background === Number(index) ? "ring-2 ring-blue-400" : ""}`}
+                      style={{ backgroundColor: color }}
+                      onClick={() => { onOpenChange(false); onBackgroundChange?.(message.id, Number(index)); }}
                     />
                   ))}
                 </div>
@@ -128,19 +129,19 @@ export default function ChatMessageItem({
         {isMine && (
           <div className="w-4 h-4 flex-shrink-0 mr-3">
             {type === "chat" ? (
-              message.favorite_flag === 1 && <Star className="text-yellow-400 fill-yellow-400"/>
+              message.favorite_flag === 1 && <Star className="text-yellow-400 fill-yellow-400" />
             ) : (
-              message.niceFlag === 1 && <ThumbsUp className="text-yellow-400 fill-yellow-400"/>
+              message.niceFlag === 1 && <ThumbsUp className="text-yellow-400 fill-yellow-400" />
             )}
           </div>
         )}
-    
-        <div 
+
+        <div
           ref={targetRef}
           onMouseEnter={() => !isOpen && !isSubmitting && setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
           onContextMenu={handleContextMenu}
-          style={{ 
+          style={{
             backgroundColor: isOnlyStamp ? "transparent" : backgroundColor,
             transition: "all 0.2s ease"
           }}
@@ -151,19 +152,19 @@ export default function ChatMessageItem({
           `}
         >
           {message.image?.delete_flag === 1 && (
-            <div 
-                className="w-32 h-32 flex flex-col items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-2 text-center"
-              >
-                <span className="text-gray-700 font-bold text-[11px] leading-tight select-none">
-                  画像が<br />見つかりません
-                </span>
-              </div>
+            <div
+              className="w-32 h-32 flex flex-col items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-2 text-center"
+            >
+              <span className="text-gray-700 font-bold text-[11px] leading-tight select-none">
+                画像が<br />見つかりません
+              </span>
+            </div>
           )
 
           }
           {message.message && (
             <p className="text-lg text-gray-800 whitespace-pre-wrap select-none">{message.message}</p>
-          )}         
+          )}
           {message.stamp ? (
             !isStampError ? (
               <img
@@ -179,14 +180,14 @@ export default function ChatMessageItem({
               </div>
             )
           ) : null}
-          
+
           {((message as any).previewImages || [message.signedImageUrl]).filter(Boolean).map((url: string, index: number) => {
             const isError = errorIndices.includes(index);
             const realStorageKey = (message as any).storageKey || url;
             return !isError ? (
               <img
                 key={`img-item-${index}`}
-                src={url} 
+                src={url}
                 alt="chat image"
                 className="max-w-[200px] h-auto rounded-lg border border-gray-200"
                 onLoad={() => onScrollBottom?.(true)}
@@ -198,8 +199,8 @@ export default function ChatMessageItem({
                 }}
               />
             ) : (
-              <div 
-                key={`img-error-${message.id}-${index}`} 
+              <div
+                key={`img-error-${message.id}-${index}`}
                 className="w-32 h-32 flex flex-col items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-2 text-center"
               >
                 <span className="text-gray-700 font-bold text-[11px] leading-tight select-none">
@@ -212,9 +213,9 @@ export default function ChatMessageItem({
         {!isMine && (
           <div className="w-4 h-4 flex-shrink-0 ml-3">
             {type === "chat" ? (
-              message.favorite_flag === 1 && <Star className="text-yellow-400 fill-yellow-400"/>
+              message.favorite_flag === 1 && <Star className="text-yellow-400 fill-yellow-400" />
             ) : (
-              message.niceFlag === 1 && <ThumbsUp className="text-yellow-400 fill-yellow-400"/>
+              message.niceFlag === 1 && <ThumbsUp className="text-yellow-400 fill-yellow-400" />
             )}
           </div>
         )}

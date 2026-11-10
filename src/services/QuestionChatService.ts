@@ -6,14 +6,21 @@ import { Prisma } from "@prisma/client";
 // Prismaのトランザクション型（dbがどちらでもいいように）
 type Tx = Omit<Prisma.TransactionClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
-export async function checkQuestionChat(chatId: number, questionId: number, userId: string): Promise<boolean> {
-  const chat = await prisma.questionChats.findFirst(
-    { where: { 
-      id: chatId, 
-      question_id: questionId, 
-      user_id: userId 
-      }
-    });
+export async function checkQuestionChat(chatId: number, questionId: number, userId?: string): Promise<boolean> {
+  // 基本の検索条件（メッセージが存在するかどうかだけを確認）
+  const whereClause: any = { 
+    id: chatId, 
+    question_id: questionId 
+  };
+  
+  // userId が渡された場合（編集・削除の権限チェック時など）だけ条件に追加する
+  if (userId) {
+    whereClause.user_id = userId;
+  }
+
+  const chat = await prisma.questionChats.findFirst({ 
+    where: whereClause 
+  });
 
   if (!chat || chat.delete_flag === 1) return false;
   return true;
@@ -146,11 +153,12 @@ export async function deleteQuestionChat(chatId: number, questionId: number, use
  * 6. いいね切り替え
  */
 export async function toggleLike(chatId: number, questionId: number, userId: string) {
-  const chat = await prisma.questionChats.findFirst({ where: { id:chatId, question_id: questionId, delete_flag: 0, user_id: userId } });
+  const chat = await prisma.questionChats.findFirst({ where: { id:chatId, question_id: questionId, delete_flag: 0} });
   if (!chat) throw new Error("対象が見つかりません。");
 
+  // Prisma の update 処理は一意な識別子（ここでは id）のみを指定するのが基本です
   return await prisma.questionChats.update({
-    where: { id: chatId, question_id: questionId, delete_flag: 0, user_id: userId },
+    where: { id: chatId },
     data: { nice_flag: chat.nice_flag === 0 ? 1 : 0 },
   });
 }

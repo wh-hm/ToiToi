@@ -9,58 +9,98 @@ import { getSpaceCheck, getSpaceName } from "@/services/SpaceService";
 
 // 1. GET: チャット一覧取得
 export async function GET(request: NextRequest) {
-    const auth = await getAuthContext();
-    if ('error' in auth) {
-        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
-    }
-    const { searchParams } = new URL(request.url);
-    const spaceId = Number(searchParams.get("spaceId"));
+  const auth = await getAuthContext();
+  if ('error' in auth) {
+    return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+  }
+  const { searchParams } = new URL(request.url);
+  const spaceId = Number(searchParams.get("spaceId"));
 
-    if (!spaceId || isNaN(spaceId)) {
-        return NextResponse.json({ message: MESSAGES.E1001("スペースID") }, { status: 400 });
+  if (!spaceId || isNaN(spaceId)) {
+    return NextResponse.json({ message: MESSAGES.E1001("スペースID") }, { status: 400 });
+  }
+
+  try {
+
+    const isSpaceAlive = await getSpaceCheck(auth.user_id, spaceId);
+
+    if (!isSpaceAlive || isSpaceAlive.delete_flag === 1) {
+      return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
 
-    try {
-    
-        const isSpaceAlive = await getSpaceCheck(auth.user_id, spaceId);
-        
-        if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
-            return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
-        }
-      
-        const [spaceName, chats] = await Promise.all([
-            getSpaceName(auth.user_id, spaceId),
-            getChatsWithImages(auth.user_id, spaceId)
-        ]);
+    const [spaceName, chats] = await Promise.all([
+      getSpaceName(auth.user_id, spaceId),
+      getChatsWithImages(auth.user_id, spaceId)
+    ]);
 
-        if (!spaceName) {
-            return NextResponse.json({ message: MESSAGES.E1010("スペース名") }, { status: 404 });
-        }
-        
-        return NextResponse.json({ 
-            spaceName: spaceName, 
-            chats: chats, 
-            message: MESSAGES.S2001("チャット履歴") 
-        },{ status: 200});
-    } catch (error) {
-        console.error("GET API Error:", error);
-        
-        return NextResponse.json({ message: MESSAGES.E2003("チャット") }, { status: 500 });
+    if (!spaceName) {
+      return NextResponse.json({ message: MESSAGES.E1010("スペース名") }, { status: 404 });
     }
+    // 最新のチャットIDを取得
+    const latestChatId = chats.length > 0 ? Math.max(...chats.map((c: any) => c.id)) : 0;
+    if (latestChatId > 0) {
+      await prisma.spaceReadStatus.upsert({
+        where: {
+          space_id_user_id: {
+            space_id: spaceId,
+            user_id: auth.user_id,
+          },
+        },
+        update: { last_read_chat_id: latestChatId },
+        create: {
+          space_id: spaceId,
+          user_id: auth.user_id,
+          last_read_chat_id: latestChatId,
+        },
+      });
+    }
+
+    //相手ユーザーの既読状況（last_read_chat_id）を取得
+    const otherReadStatuses = await prisma.spaceReadStatus.findMany({
+      where: {
+        space_id: spaceId,
+        user_id: { not: auth.user_id },
+      },
+    });
+
+    const maxOtherReadId = otherReadStatuses.length > 0
+      ? Math.max(...otherReadStatuses.map((s: any) => s.last_read_chat_id))
+      : 0;
+
+    //isMine と is_read フラグを生成して返却
+    const chatsWithFlags = chats.map((msg: any) => {
+      const isMine = msg.user_id === auth.user_id;
+      return {
+        ...msg,
+        isMine,
+        is_read: (isMine && msg.id <= maxOtherReadId) ? 1 : 0,
+      };
+    });
+
+    return NextResponse.json({
+      spaceName: spaceName,
+      chats: chatsWithFlags,
+      message: MESSAGES.S2001("チャット履歴")
+    }, { status: 200 });
+  } catch (error) {
+    console.error("GET API Error:", error);
+
+    return NextResponse.json({ message: MESSAGES.E2003("チャット") }, { status: 500 });
+  }
 }
 
 
 export async function POST(request: NextRequest) {
-  
+
   const auth = await getAuthContext();
   if ('error' in auth) {
-        return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
+    return NextResponse.json({ message: auth.error, code: auth.code }, { status: auth.status },);
   }
   // 1. 変数を用意（配列に変更）
   let imageUrls: string[] | undefined;
 
   try {
-    
+
     const formData = await request.formData();
     const message = formData.get("message") as string;
     const files = formData.getAll("images") as File[];
@@ -69,10 +109,10 @@ export async function POST(request: NextRequest) {
     const caption = formData.get("caption") as string | null; // 追加
 
     const isSpaceAlive = await getSpaceCheck(auth.user_id, spaceId);
-    if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {
-        return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
+    if (!isSpaceAlive || isSpaceAlive.delete_flag === 1) {
+      return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
     }
-    
+
     // 2. バリデーションチェック
     if (!message && files.length === 0 && !stamp) {
       return NextResponse.json({ message: MESSAGES.E1001("チャット内容") }, { status: 400 });
@@ -84,29 +124,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: MESSAGES.E1002("チャット内容", 100) }, { status: 400 });
     }
 
-    if(files.length > 5){
-        return NextResponse.json({ message: MESSAGES.E1006 }, { status: 400 });
+    if (files.length > 5) {
+      return NextResponse.json({ message: MESSAGES.E1006 }, { status: 400 });
     }
 
     console.log("受け取ったファイル数:", files.length);
     // 3. 画像アップロード
     if (files.length > 0) {
-    console.log("ファイル名:", files[0].name);
+      console.log("ファイル名:", files[0].name);
 
       const MAX_FILE_SIZE = 2 * 1024 * 1024;
       // 全ファイルのバリデーション
       for (const [index, file] of files.entries()) {
-        if(file.size === 0){
-          return NextResponse.json({ message: MESSAGES.E1012(index + 1)},{ status: 400 });
+        if (file.size === 0) {
+          return NextResponse.json({ message: MESSAGES.E1012(index + 1) }, { status: 400 });
         }
         if (file.size > MAX_FILE_SIZE || !["image/png", "image/jpeg", "image/jpg"].includes(file.type)) {
           return NextResponse.json({ message: MESSAGES.E1005(index + 1) }, { status: 400 });
         }
       }
-      
+
       imageUrls = await uploadImages(files, auth.user_id, spaceId);
       console.log("uploadImagesの戻り値:", imageUrls);
-     
+
     }
     // 4. DB登録 (ループで1枚ずつ登録)
     const newChat = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -138,32 +178,32 @@ export async function POST(request: NextRequest) {
     console.log("最終確認:", newChat);
     const safeNewChat = JSON.parse(JSON.stringify(newChat));
     // ここで newChat は常に配列として返る。チャットのため成功時のメッセージは送らない
-    return NextResponse.json({ newChat: safeNewChat , message: MESSAGES.S1001("チャット") }, { status: 201 });
+    return NextResponse.json({ newChat: safeNewChat, message: MESSAGES.S1001("チャット") }, { status: 201 });
 
 
   } catch (error) {
-  if (error instanceof Prisma.PrismaClientKnownRequestError) {
-    switch (error.code) {
-      case 'P2002': // 既存データの重複 (Unique constraint)
-        return NextResponse.json({ message: MESSAGES.E4009 }, { status: 409 });
-        
-      case 'P2025': // 削除や更新対象のレコードがいない
-        return NextResponse.json({ message: MESSAGES.E2005("対象データ") }, { status: 404 });
-        
-      case 'P2003': // 外部キー制約 (削除しようとしたが紐づくデータがある等)
-        return NextResponse.json({ message: "このデータは他の機能で使用されているため削除できません。" }, { status: 400 });
-        
-      case 'P2011': // Null制約 (必須項目抜け)
-        return NextResponse.json({ message: MESSAGES.E1001("必須項目") }, { status: 400 });
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      switch (error.code) {
+        case 'P2002': // 既存データの重複 (Unique constraint)
+          return NextResponse.json({ message: MESSAGES.E4009 }, { status: 409 });
 
-      default:
-        console.error("Prisma Error:", error.code, error.message);
-        return NextResponse.json({ message: MESSAGES.E2001("システム") }, { status: 500 });
+        case 'P2025': // 削除や更新対象のレコードがいない
+          return NextResponse.json({ message: MESSAGES.E2005("対象データ") }, { status: 404 });
+
+        case 'P2003': // 外部キー制約 (削除しようとしたが紐づくデータがある等)
+          return NextResponse.json({ message: "このデータは他の機能で使用されているため削除できません。" }, { status: 400 });
+
+        case 'P2011': // Null制約 (必須項目抜け)
+          return NextResponse.json({ message: MESSAGES.E1001("必須項目") }, { status: 400 });
+
+        default:
+          console.error("Prisma Error:", error.code, error.message);
+          return NextResponse.json({ message: MESSAGES.E2001("システム") }, { status: 500 });
+      }
     }
-  }
     // return NextResponse.json({ message: MESSAGES.E2001("チャット") }, { status: 500 });
 
-  // Prisma以外の予期せぬエラー
-  return NextResponse.json({ message: MESSAGES.E2003("通信") }, { status: 500 });
-}
+    // Prisma以外の予期せぬエラー
+    return NextResponse.json({ message: MESSAGES.E2003("通信") }, { status: 500 });
+  }
 }
