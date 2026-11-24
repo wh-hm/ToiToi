@@ -12,6 +12,7 @@ export const MESSAGES = {
     E1010: (field: string) => `${field}が見つかりません。`,
     E1011: "期限には現在以降の日付を指定してください。",
     E1012: (fileNumber: number) => `${fileNumber}枚目のファイルが破損しています。`,
+    E1013: (field: string) => `${field}を選択してください。`,
 
     // 処理失敗系
     E2001: (field: string) => `${field}の登録に失敗しました。時間をおいて再度お試しください。`,

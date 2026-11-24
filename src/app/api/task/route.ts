@@ -3,6 +3,8 @@ import { getTasks, registerTask } from "@/services/TaskService";
 import { getSpaceCheck } from "@/services/SpaceService";
 import { getAuthContext } from "@/lib/auth-guard";
 import { MESSAGES } from "@/constants/messages";
+import { prisma } from "@/lib/prisma";
+import { registerReminder } from "@/services/ReminderService";
 
 const safeRegex = /[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uFF01-\uFF5E]/;
 
@@ -51,15 +53,13 @@ export async function POST(request: NextRequest) {
         console.log("POST body:", body);
 
         const spaceId = body.spaceId || body.space_id;
-        const { title, description, dueDate, tag, isAllday, priority } = body;
+        const { title, description, dueDate, tag, isAllday, priority, reminders } = body;
 
         // --- 単体チェック ---
         if (!title) return NextResponse.json({ message: MESSAGES.E1001("タスク名") }, { status: 400 });
         if (!dueDate) return NextResponse.json({ message: MESSAGES.E1001("期限") }, { status: 400 });
         
-        // 1. 必須チェック (E1001)
-        if (!title || title.trim() === "") return NextResponse.json({ message: MESSAGES.E1001("タスク名") }, { status: 400 });
-        if (!dueDate) return NextResponse.json({ message: MESSAGES.E1001("期限") }, { status: 400 });
+        if (title.trim() === "") return NextResponse.json({ message: MESSAGES.E1001("タスク名") }, { status: 400 });
 
         if (title.length > 20) return NextResponse.json({ message: MESSAGES.E1002("タスク名", 20) }, { status: 400 });
         if (description && description.length > 100) return NextResponse.json({ message: MESSAGES.E1002("詳細", 100) }, { status: 400 });
@@ -84,13 +84,33 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ message: MESSAGES.E1010("スペース") }, { status: 404 });
         }
 
-        // データベース保存（引数もキャメルケースの変数に修正）
-        const newTask = await registerTask(
-            auth.user_id, title, description, dueDate, spaceId, tag || 0, isAllday, priority
-        );
+        // 💡 トランザクション処理の開始
+        const resultTask = await prisma.$transaction(async (tx) => {
+            // 1. タスクの保存（第9引数として tx を渡すように TaskService 側を調整してください）
+            const newTask = await registerTask(
+                auth.user_id, title, description, dueDate, spaceId, tag || 0, isAllday, priority, tx
+            );
+
+            // 2. リマインドの保存
+            if (reminders && Array.isArray(reminders) && reminders.length > 0) {
+                const remindAts = reminders.map(r => new Date(r));
+                const contents = reminders.map(() => `タスク「${title}」の期限が迫っています`);
+                
+                // 詳細設計の registerReminder を呼び出し
+                await registerReminder(
+                    auth.user_id,
+                    newTask.id,
+                    remindAts,
+                    contents,
+                    tx
+                );
+            }
+            return newTask;
+        });
         
-        return NextResponse.json({task: newTask, message: MESSAGES.S1001("タスク")}, { status: 201 });
+        return NextResponse.json({task: resultTask, message: MESSAGES.S1001("タスク")}, { status: 201 });
     } catch (error) {
+        console.error("POSTタスクエラー詳細:", error);
         return NextResponse.json({ message: MESSAGES.E2001("タスク") }, { status: 500 });
     }
 }

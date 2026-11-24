@@ -6,9 +6,9 @@ import Image from "next/image";
 import { 
   Navbar, NavbarBrand, NavbarContent,
   Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
-  Accordion, AccordionItem
+  Accordion, AccordionItem, Tooltip 
 } from "@nextui-org/react";
-import {ChevronDownIcon} from "lucide-react"
+import { ChevronDownIcon, LayoutDashboard, User, LogOut } from "lucide-react"; 
 import { fetchWithTimeout } from "@/lib/api";
 import { handleApiResponse } from "@/lib/api-utils";
 import { ToiToiNotification } from "./Toast";
@@ -21,22 +21,15 @@ export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
 
-  // スクロール監視：メニューを開いている時に外側がスクロールされたら閉じる
   useEffect(() => {
     if (!isMobileMenuOpen) return;
-
     const handleScrollCapture = (e: Event) => {
       const target = e.target as HTMLElement;
-      // メニュー本体のスクロールなら閉じない
       if (drawerRef.current && drawerRef.current.contains(target)) return;
       setIsMobileMenuOpen(false);
     };
-
     document.addEventListener("scroll", handleScrollCapture, true);
-    
-    return () => {
-      document.removeEventListener("scroll", handleScrollCapture, true);
-    };
+    return () => document.removeEventListener("scroll", handleScrollCapture, true);
   }, [isMobileMenuOpen]);
 
   const refreshData = useCallback(async () => {
@@ -56,13 +49,9 @@ export default function Header() {
   useEffect(() => { refreshData(); }, [refreshData]);
 
   useEffect(() => {
-    const handleRefreshHeader = () => {
-      refreshData();
-    };
+    const handleRefreshHeader = () => refreshData();
     window.addEventListener("refresh-header", handleRefreshHeader);
-    return () => {
-      window.removeEventListener("refresh-header", handleRefreshHeader);
-    };
+    return () => window.removeEventListener("refresh-header", handleRefreshHeader);
   }, [refreshData]);
 
   const menuConfig = [
@@ -76,31 +65,27 @@ export default function Header() {
       <Navbar className="w-full h-16 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-sm" maxWidth="full">
         <NavbarBrand className="max-w-[150px]">
           <Link href="/dashboard" className="transition-transform hover:scale-105">
-            <Image 
-              src="/logo.png" 
-              alt="ToiToi" 
-              width={120} 
-              height={40} 
-              style={{ width: "auto", height: "auto" }} 
-              priority 
-            />
+            <Image src="/logo.png" alt="ToiToi" width={120} height={40} style={{ width: "auto", height: "auto" }} priority />
           </Link>
         </NavbarBrand>
 
         {/* PC用ナビ */}
         <NavbarContent className="hidden lg:flex" justify="end">
-          <Link href="/dashboard" className="mr-4 font-medium text-gray-600">ダッシュボード</Link>
+          
+          {/* ダッシュボードアイコン */}
+          <Tooltip content="ダッシュボード" placement="bottom">
+            <Link href="/dashboard" className="mr-4 text-gray-600 hover:text-blue-600 transition-colors">
+              <LayoutDashboard className="w-6 h-6" />
+            </Link>
+          </Tooltip>
+
           {menuConfig.map((cat) => (
             <div key={cat.key} className="relative" onMouseEnter={() => setOpenStates(p => ({...p, [cat.key]: true}))} onMouseLeave={() => setOpenStates(p => ({...p, [cat.key]: false}))}>
               <Dropdown isOpen={openStates[cat.key]}>
                 <DropdownTrigger>
                   <button className="font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 px-2 py-2 rounded-full capitalize flex items-center gap-1">
                     {cat.title} 
-                    <ChevronDownIcon 
-                      className={`w-4 h-4 transition-transform duration-300 ${
-                        openStates[cat.key] ? "rotate-180" : "rotate-0"
-                      }`} 
-                    />
+                    <ChevronDownIcon className={`w-4 h-4 transition-transform duration-300 ${openStates[cat.key] ? "rotate-180" : "rotate-0"}`} />
                   </button>
                 </DropdownTrigger>
                 <DropdownMenu aria-label={cat.title} className="p-3 bg-white rounded-[20px] shadow-xl border border-gray-100 max-h-[50vh] overflow-y-auto scrollbar-hide">
@@ -116,33 +101,39 @@ export default function Header() {
             </div>
           ))}
           
-          {/* 💡 PC版: 通知ベルをマイページの左横に設置 */}
+          {/* 通知ベル */}
           <div className="ml-2 flex items-center">
             <NotificationBell />
           </div>
 
-          <Link href="/mypage" className="ml-4 font-medium text-gray-600">マイページ</Link>
+          {/* マイページアイコン */}
+          <Tooltip content="マイページ" placement="bottom">
+            <Link href="/mypage" className="ml-4 text-gray-600 hover:text-blue-600 transition-colors">
+              <User className="w-6 h-6" />
+            </Link>
+          </Tooltip>
           
-          <button 
-            onClick={async () => {
-              try {
-                await signOut({ callbackUrl: "/" });
-              } catch (error) {
-                console.error("ログアウトに失敗しました:", error);
-                ToiToiNotification.error("ログアウトに失敗しました。通信環境を確認してください。");
-              }
-            }}
-            className="ml-4 font-medium text-red-500 hover:text-red-600 transition-colors"
-          >
-            ログアウト
-          </button>
+          {/* ログアウトアイコン */}
+          <Tooltip content="ログアウト" placement="bottom" color="danger">
+            <button 
+              onClick={async () => {
+                try {
+                  await signOut({ callbackUrl: "/" });
+                } catch (error) {
+                  console.error("ログアウトに失敗しました:", error);
+                  ToiToiNotification.error("ログアウトに失敗しました。通信環境を確認してください。");
+                }
+              }}
+              className="ml-4 text-red-500 hover:text-red-600 transition-colors"
+            >
+              <LogOut className="w-6 h-6" />
+            </button>
+          </Tooltip>
         </NavbarContent>
 
         {/* スマホ用ボタン */}
         <NavbarContent className="lg:hidden gap-2" justify="end">
-          {/* 💡 スマホ版: ハンバーガーメニューの左横に設置 */}
           <NotificationBell />
-
           <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 text-gray-600">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>
           </button>

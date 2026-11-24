@@ -3,7 +3,7 @@ import { getAuthContext } from "@/lib/auth-guard";
 import { toggleFavorite } from "@/services/ChatService";
 import { MESSAGES } from "@/constants/messages";
 import { getSpaceCheck } from "@/services/SpaceService";
-import { getChatCheck } from "@/services/ChatService";
+import { getChatExists } from "@/services/ChatService";
 import { NextRequest } from "next/server";
 
 export async function PATCH(
@@ -27,7 +27,7 @@ export async function PATCH(
     // 2. 存在確認
     const [isSpaceAlive, isChatAlive] = await Promise.all([
       getSpaceCheck(auth.user_id, spaceId),
-      getChatCheck(auth.user_id, spaceId, chatId)
+      getChatExists(spaceId, chatId)
     ]);
 
     if (!isSpaceAlive  || isSpaceAlive.delete_flag === 1) {

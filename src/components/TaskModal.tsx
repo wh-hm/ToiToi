@@ -5,8 +5,8 @@ import { handleApiResponse } from "@/lib/api-utils";
 import { fetchWithTimeout } from "@/lib/api";
 
 export default function TaskModal(props: any): React.JSX.Element {
-  const { task, onClose, onSuccess, spaceId, mode = 'create', type = 'task', onError, onSubmit } = props; 
-  
+  const { task, onClose, onSuccess, spaceId, mode = 'create', type = 'task', onError, onSubmit } = props;
+
   const modalRef = useRef<HTMLDivElement>(null);
 
   const handleBackdropClick = (e: React.MouseEvent) => {
@@ -61,6 +61,14 @@ export default function TaskModal(props: any): React.JSX.Element {
     status: task?.status ?? (task?.is_resolved ?? 0),
     tag: task?.tag || 1,
   });
+  const REMINDER_OPTIONS = [
+    { label: "期限時間ちょうど", minutes: 0 },
+    { label: "10分前", minutes: 10 },
+    { label: "30分前", minutes: 30 },
+    { label: "1時間前", minutes: 60 },
+    { label: "1日前", minutes: 1440 },
+  ];
+  const [selectedReminders, setSelectedReminders] = useState<number[]>([]);
 
   useEffect(() => {
     if (task) {
@@ -101,6 +109,26 @@ export default function TaskModal(props: any): React.JSX.Element {
       }
     }
   }, [formData.isAllday]);
+
+  useEffect(() => {
+    if (task && (isEditMode || isDetailMode)) {
+      if (task.reminders && Array.isArray(task.reminders) && task.due_date) {
+        const dueTimeMs = new Date(task.due_date).getTime();
+        const restoredMinutes = task.reminders
+          .map((r: any) => {
+            const remindTimeMs = new Date(r.remind_at).getTime();
+            return Math.round((dueTimeMs - remindTimeMs) / (60 * 1000));
+          })
+          .filter((mins: number) => REMINDER_OPTIONS.some((opt) => opt.minutes === mins));
+
+        setSelectedReminders(restoredMinutes);
+      } else {
+        setSelectedReminders([]);
+      }
+    } else if (isCreateMode) {
+      setSelectedReminders([]);
+    }
+  }, [task, isEditMode, isDetailMode, isCreateMode]);
 
 
   const handleSubmit = async () => {
@@ -157,6 +185,29 @@ export default function TaskModal(props: any): React.JSX.Element {
     setIsSubmitting(true);
 
     try {
+      const buildRemindersPayload = () => {
+        if (type === "question" || !parsedDate || isNaN(parsedDate.getTime()) || selectedReminders.length === 0) {
+          return [];
+        }
+
+        // 選択された分数だけ前の日時（ISO文字列）を計算
+        const remindIsoStrings = selectedReminders.map((minutes) => {
+          const d = new Date(parsedDate.getTime() - minutes * 60 * 1000);
+          return d.toISOString();
+        });
+
+        if (isCreateMode) {
+          // POST 用: string[]
+          return remindIsoStrings;
+        } else {
+          // PATCH 用: ReminderInput[]
+          return remindIsoStrings.map((iso) => ({
+            remindAt: iso,
+            content: `タスク「${titleText}」の期限が迫っています`,
+          }));
+        }
+      };
+
       const payload = type === "question"
         ? {
           title: titleText,
@@ -175,6 +226,7 @@ export default function TaskModal(props: any): React.JSX.Element {
           status: Number(formData.status),
           description: descText,
           dueDate: parsedDate.toISOString(),
+          reminders: buildRemindersPayload(),
         };
 
       if (onSubmit) {
@@ -194,13 +246,13 @@ export default function TaskModal(props: any): React.JSX.Element {
         body: JSON.stringify(payload),
       });
 
-      if(!res.ok){
+      if (!res.ok) {
         await handleApiResponse(res);
         throw new Error();
       }
-        const data = await res.json();
-        ToiToiNotification.success(data.message);
-        setTimeout(() => onSuccess(Number(formData.status)), 100);
+      const data = await res.json();
+      ToiToiNotification.success(data.message);
+      setTimeout(() => onSuccess(Number(formData.status)), 100);
     } catch (error) {
       console.log("通信エラーが発生しました。");
     } finally {
@@ -209,11 +261,11 @@ export default function TaskModal(props: any): React.JSX.Element {
   };
 
   return (
-    <div 
+    <div
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 m-0"
       onClick={handleBackdropClick}
     >
-      <div 
+      <div
         className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-100 p-6 space-y-5 text-slate-800"
         ref={modalRef}
         onClick={(e) => e.stopPropagation()}
@@ -230,7 +282,7 @@ export default function TaskModal(props: any): React.JSX.Element {
           {/* タイトル入力欄 */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold text-slate-500">
-              {type === "question" ? "質問タイトル (50文字以内・記号不可)" : "タスク名 (20文字以内・記号不可)"} 
+              {type === "question" ? "質問タイトル (50文字以内・記号不可)" : "タスク名 (20文字以内・記号不可)"}
               <span className="text-red-500 ml-1">*</span>
             </label>
             <input
@@ -290,6 +342,41 @@ export default function TaskModal(props: any): React.JSX.Element {
                   disabled={isDetailMode || formData.isAllday === 1}
                   className="w-28 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                 />
+              </div>
+            </div>
+          )}
+
+          {type !== "question" && (
+            <div className="flex flex-col gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
+              <label className="text-xs font-semibold text-slate-500">リマインド通知</label>
+              <div className="flex flex-wrap gap-2">
+                {REMINDER_OPTIONS.map((opt) => {
+                  const isChecked = selectedReminders.includes(opt.minutes);
+                  return (
+                    <label
+                      key={opt.minutes}
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium cursor-pointer transition-colors ${isChecked
+                        ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100"
+                        } ${isDetailMode ? "opacity-60 pointer-events-none" : ""}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        disabled={isDetailMode}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedReminders((prev) => [...prev, opt.minutes]);
+                          } else {
+                            setSelectedReminders((prev) => prev.filter((m) => m !== opt.minutes));
+                          }
+                        }}
+                        className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                      />
+                      {opt.label}
+                    </label>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -450,8 +537,8 @@ export default function TaskModal(props: any): React.JSX.Element {
               className="
                 bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 rounded-xl shadow-sm transition-all text-sm flex items-center gap-1
                 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:shadow-none
-              "           
-             >
+              "
+            >
               {isEditMode ? "更新する" : "作成する"}
             </button>
           )}
@@ -464,7 +551,7 @@ export default function TaskModal(props: any): React.JSX.Element {
           </div>
         )}
 
-        
+
 
       </div>
     </div>

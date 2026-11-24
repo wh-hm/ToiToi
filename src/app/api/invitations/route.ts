@@ -1,154 +1,97 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma'; 
 import { getServerSession } from "next-auth";
-import { authOptions } from '@/app/api/auth/[...nextauth]/route'; // ※authOptionsのパスを合わせてください
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'; 
+import { createInvitations, getInvitations } from "@/services/InvitationService";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    let { space_id, inviter_id, invitee_id } = body;
-
-    // ① ログインセッションを取得
     const session = await getServerSession(authOptions);
-
-    // ② email または google_id / session.id を使って DB から正式な招待元ユーザーレコードを取得
-    let inviterUser = null;
-
-    const userEmail = session?.user?.email;
-    const sessionId = (session?.user as any)?.id;
-
-    if (userEmail) {
-      inviterUser = await prisma.user.findFirst({
-        where: { email: userEmail },
-      });
-    }
-
-    if (!inviterUser && sessionId) {
-      const strSessionId = String(sessionId);
-      inviterUser = await prisma.user.findFirst({
-        where: {
-          OR: [
-            { id: strSessionId },
-            { google_id: strSessionId },
-          ],
-        },
-      });
-    }
-
-    if (!inviterUser && inviter_id) {
-      inviterUser = await prisma.user.findFirst({
-        where: {
-          OR: [
-            { id: String(inviter_id) },
-            { google_id: String(inviter_id) },
-          ],
-        },
-      });
-    }
+    const inviterUser = await resolveCurrentUser(session, body.inviter_id);
 
     if (!inviterUser) {
       return NextResponse.json(
-        { error: '招待元のユーザーが見つかりませんでした。ログインし直してください。' },
-        { status: 400 }
+        { error: "招待元のユーザーが見つかりませんでした。ログインし直してください。" },
+        { status: 401 }
       );
     }
 
-    const realInviterId = inviterUser.id; // 招待元の真のUUID
+    // 仕様書形式 { spaceId, inviterIds } と 旧形式 { space_id, invitee_id } の両方をサポート
+    const targetSpaceId = Number(body.spaceId ?? body.space_id);
+    let inviteeIdList: string[] = [];
 
-    // バリデーション
-    if (!space_id || !realInviterId || !invitee_id) {
-      return NextResponse.json(
-        { error: '必須項目が不足しています。' },
-        { status: 400 }
-      );
+    if (Array.isArray(body.inviterIds)) {
+      inviteeIdList = body.inviterIds.map(String);
+    } else if (Array.isArray(body.inviteeIds)) {
+      inviteeIdList = body.inviteeIds.map(String);
+    } else if (body.invitee_id) {
+      inviteeIdList = [String(body.invitee_id)];
     }
 
-    // ③ 招待先 (invitee) が DB に存在するか確認（user_id または id で検索）
-    const inviteeUser = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { user_id: String(invitee_id) }, // マイページで設定する招待ID
-          { id: String(invitee_id) },      // 主キーUUID
-        ],
-      },
-    });
-
-    if (!inviteeUser) {
-      return NextResponse.json(
-        { error: `指定された招待ID（${invitee_id}）のユーザーが見つかりません。` },
-        { status: 404 }
-      );
+    if (!targetSpaceId || inviteeIdList.length === 0) {
+      return NextResponse.json({ error: "必須項目（spaceId, inviterIds）が不足しています。" }, { status: 400 });
     }
 
-    const realInviteeId = inviteeUser.id; // 招待先の真のUUID
-
-    // 自分自身を招待しようとしている場合はエラー
-    if (realInviterId === realInviteeId) {
-      return NextResponse.json(
-        { error: '自分自身を招待することはできません。' },
-        { status: 400 }
-      );
-    }
-
-    // ④ すでに同じスペースに招待中かチェック
-    const existingInvitation = await prisma.invitation.findFirst({
-      where: {
-        space_id: Number(space_id),
-        invitee_id: String(realInviteeId),
-        status: 0,
-        delete_flag: 0,
-      },
-    });
-
-    if (existingInvitation) {
-      return NextResponse.json(
-        { error: 'このユーザーはすでに招待されています。' },
-        { status: 409 }
-      );
-    }
-
-    // ⑤ トランザクションで「招待」と「通知」を作成
-    const result = await prisma.$transaction(async (tx) => {
-      const space = await tx.space.findUnique({
-        where: { id: Number(space_id) },
-        select: { space_type: true },
-      });
-
-      const actualSpaceType = space ? space.space_type : 0;
-
-      const invitation = await tx.invitation.create({
-        data: {
-          space_id: Number(space_id),
-          inviter_id: String(realInviterId),
-          invitee_id: String(realInviteeId),
-          status: 0,
-        },
-      });
-
-      await tx.notification.create({
-        data: {
-          user_id: String(realInviteeId),
-          type: 1,
-          related_id: invitation.id,
-          space_id: Number(space_id),
-          space_type: actualSpaceType,
-          content: '新しいスペースへの招待が届きました',
-        },
-      });
-
-      return invitation;
-    });
+    const invitations = await createInvitations(targetSpaceId, inviterUser.id, inviteeIdList);
 
     return NextResponse.json(
-      { message: '招待を送信しました', data: result },
+      {
+        invitations,
+        message: "招待を送信しました",
+      },
       { status: 201 }
     );
-
   } catch (error: any) {
-    console.error('招待送信エラー詳細:', error);
-    return NextResponse.json(
-      { error: error.message || 'サーバーエラーが発生しました。' },
-      { status: 500 }
-    );
+    console.error("招待送信エラー詳細:", error);
+    const status = error.message?.includes("見つかりません")
+      ? 404
+      : error.message?.includes("すでに")
+      ? 409
+      : error.message?.includes("自分自身")
+      ? 400
+      : 500;
+    return NextResponse.json({ error: error.message || "サーバーエラーが発生しました。" }, { status });
+  }
+}
+
+async function resolveCurrentUser(session: any, fallbackInviterId?: string) {
+  const userEmail = session?.user?.email;
+  const sessionId = session?.user?.id;
+
+  if (userEmail) {
+    const user = await prisma.user.findFirst({ where: { email: userEmail, delete_flag: 0 } });
+    if (user) return user;
+  }
+  if (sessionId) {
+    const strId = String(sessionId);
+    const user = await prisma.user.findFirst({
+      where: { delete_flag: 0, OR: [{ id: strId }, { google_id: strId }] },
+    });
+    if (user) return user;
+  }
+  if (fallbackInviterId) {
+    const strId = String(fallbackInviterId);
+    const user = await prisma.user.findFirst({
+      where: { delete_flag: 0, OR: [{ id: strId }, { google_id: strId }] },
+    });
+    if (user) return user;
+  }
+  return null;
+}
+
+export async function GET() {
+  try {
+    const session = await getServerSession(authOptions);
+    const currentUser = await resolveCurrentUser(session);
+    if (!currentUser) {
+      return NextResponse.json({ error: "認証されていません" }, { status: 401 });
+    }
+
+    const invitations = await getInvitations(currentUser.id);
+    return NextResponse.json({ invitations }, { status: 200 });
+  } catch (error: any) {
+    console.error("招待一覧取得エラー:", error);
+    return NextResponse.json({ error: error.message || "サーバーエラーが発生しました。" }, { status: 500 });
   }
 }

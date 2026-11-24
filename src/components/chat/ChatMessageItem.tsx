@@ -1,14 +1,12 @@
 import { useState, useRef } from "react";
-import { Popover, PopoverContent, PopoverTrigger } from "@nextui-org/react";
-import { Star, ThumbsUp } from "lucide-react";
-import { CHAT_COLOR_PALETTE } from "@/types/chat";
+import { Popover, PopoverContent, PopoverTrigger, Avatar } from "@nextui-org/react";
+import { Star, ThumbsUp, User } from "lucide-react";
+import { CHAT_COLOR_PALETTE, ChatMessageItemProps } from "@/types/chat";
 import { formatDateTime } from "@/lib/formData";
-import { ChatMessageItemProps } from "@/types/chat";
-
 
 export default function ChatMessageItem({
   message, spaceId, isOpen, isSubmitting,
-  onOpenChange, onToggleFavorite, onEdit, onDelete, onBackgroundChange, setEditValue, onNiceFlag, onImageClick, onScrollBottom, type, currentUserId
+  onOpenChange, onToggleFavorite, onEdit, onDelete, onBackgroundChange, setEditValue, onNiceFlag, onImageClick, onScrollBottom, type, currentUserId, searchQuery
 }: ChatMessageItemProps) {
 
   const [isHovered, setIsHovered] = useState(false);
@@ -37,18 +35,28 @@ export default function ChatMessageItem({
   };
 
   const hasImage = !!(message.signedImageUrl || (message as any).previewImages || message.imageUrl);
-  //const isMine = message.user_id === currentUserId;
   const senderId = message.user_id || (message as any).userId;
   const isMine = (message as any).isMine !== undefined
     ? (message as any).isMine
     : String(senderId) === String(currentUserId);
 
-  console.log({
-    "メッセージ内容": message.message,
-    "メッセージの送信者ID (senderId)": senderId,
-    "ログイン中の自分のID (currentUserId)": currentUserId,
-    "一致判定 (isMine)": isMine
-  });
+  // 検索ワードをハイライト表示するヘルパー
+  const renderHighlightedMessage = (text: string) => {
+    const query = searchQuery?.trim();
+    if (!query) return text;
+
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const parts = text.split(new RegExp(`(${escaped})`, "gi"));
+    return parts.map((part, idx) =>
+      part.toLowerCase() === query.toLowerCase() ? (
+        <mark key={idx} className="bg-yellow-200 text-gray-900 rounded px-0.5">
+          {part}
+        </mark>
+      ) : (
+        part
+      )
+    );
+  };
 
   return (
     <div className={`relative flex flex-col w-full ${isMine ? "items-end" : "items-start"}`}>
@@ -125,110 +133,132 @@ export default function ChatMessageItem({
         </PopoverContent>
       </Popover>
 
-      <div className={`flex items-center w-full ${isMine ? "justify-end" : "justify-start"}`}>
-        {isMine && (
-          <div className="w-4 h-4 flex-shrink-0 mr-3">
-            {type === "chat" ? (
-              message.favorite_flag === 1 && <Star className="text-yellow-400 fill-yellow-400" />
-            ) : (
-              message.niceFlag === 1 && <ThumbsUp className="text-yellow-400 fill-yellow-400" />
-            )}
-          </div>
-        )}
-
-        <div
-          ref={targetRef}
-          onMouseEnter={() => !isOpen && !isSubmitting && setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-          onContextMenu={handleContextMenu}
-          style={{
-            backgroundColor: isOnlyStamp ? "transparent" : backgroundColor,
-            transition: "all 0.2s ease"
-          }}
-          className={`
-            w-fit max-w-[80%] cursor-context-menu transition-transform duration-200 
-            ${isOnlyStamp ? "p-0 pr-2" : "p-3 rounded-2xl border border-gray-200 shadow-sm"}
-            ${(isHovered || isOpen) && !isSubmitting ? "brightness-90" : "brightness-100"}
-          `}
-        >
-          {message.image?.delete_flag === 1 && (
-            <div
-              className="w-32 h-32 flex flex-col items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-2 text-center"
-            >
-              <span className="text-gray-700 font-bold text-[11px] leading-tight select-none">
-                画像が<br />見つかりません
-              </span>
-            </div>
-          )
-
-          }
-          {message.message && (
-            <p className="text-lg text-gray-800 whitespace-pre-wrap select-none">{message.message}</p>
-          )}
-          {message.stamp ? (
-            !isStampError ? (
-              <img
-                src={`/stamps/${message.stamp}.png`}
-                className="w-32 h-32 object-contain aspect-square"
-                onError={() => setIsStampError(true)}
-              />
-            ) : (
-              <div className="w-32 h-32 flex flex-col items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-2 text-center">
-                <span className="text-gray-700 font-bold text-[11px] leading-tight select-none">
-                  スタンプが<br />見つかりません
-                </span>
-              </div>
-            )
-          ) : null}
-
-          {((message as any).previewImages || [message.signedImageUrl]).filter(Boolean).map((url: string, index: number) => {
-            const isError = errorIndices.includes(index);
-            const realStorageKey = (message as any).storageKey || url;
-            return !isError ? (
-              <img
-                key={`img-item-${index}`}
-                src={url}
-                alt="chat image"
-                className="max-w-[200px] h-auto rounded-lg border border-gray-200"
-                onLoad={() => onScrollBottom?.(true)}
-                onClick={() => onImageClick?.(realStorageKey)}
-                onError={() => {
-                  if (!url.startsWith("blob:")) {
-                    setErrorIndices(prev => [...prev, index]);
-                  }
-                }}
-              />
-            ) : (
-              <div
-                key={`img-error-${message.id}-${index}`}
-                className="w-32 h-32 flex flex-col items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-2 text-center"
-              >
-                <span className="text-gray-700 font-bold text-[11px] leading-tight select-none">
-                  画像が<br />見つかりません
-                </span>
-              </div>
-            );
-          })}
-        </div>
+      <div className={`flex items-start w-full gap-2 ${isMine ? "justify-end" : "justify-start"}`}>
+        {/* 相手のプロフィール画像 */}
         {!isMine && (
-          <div className="w-4 h-4 flex-shrink-0 ml-3">
-            {type === "chat" ? (
-              message.favorite_flag === 1 && <Star className="text-yellow-400 fill-yellow-400" />
-            ) : (
-              message.niceFlag === 1 && <ThumbsUp className="text-yellow-400 fill-yellow-400" />
+          <Avatar
+            src={message.user?.profile_image_url || undefined}
+            name={message.user?.username || "?"}
+            fallback={<User className="w-4 h-4 text-gray-500" />}
+            size="sm"
+            className="flex-shrink-0 mt-1"
+          />
+        )}
+
+        <div className={`flex flex-col max-w-[80%] ${isMine ? "items-end" : "items-start"}`}>
+          {/* 相手のユーザー名 */}
+          {!isMine && (
+            <span className="text-xs text-gray-500 mb-1 ml-1 font-medium">
+              {message.user?.username || "ユーザー"}
+            </span>
+          )}
+
+          <div className={`flex items-center ${isMine ? "justify-end" : "justify-start"}`}>
+            {isMine && (
+              <div className="w-4 h-4 flex-shrink-0 mr-3">
+                {type === "chat" ? (
+                  message.favorite_flag === 1 && <Star className="text-yellow-400 fill-yellow-400" />
+                ) : (
+                  message.niceFlag === 1 && <ThumbsUp className="text-yellow-400 fill-yellow-400" />
+                )}
+              </div>
+            )}
+
+            <div
+              ref={targetRef}
+              onMouseEnter={() => !isOpen && !isSubmitting && setIsHovered(true)}
+              onMouseLeave={() => setIsHovered(false)}
+              onContextMenu={handleContextMenu}
+              style={{
+                backgroundColor: isOnlyStamp ? "transparent" : backgroundColor,
+                transition: "all 0.2s ease"
+              }}
+              className={`
+                w-fit cursor-context-menu transition-transform duration-200 
+                ${isOnlyStamp ? "p-0 pr-2" : "p-3 rounded-2xl border border-gray-200 shadow-sm"}
+                ${(isHovered || isOpen) && !isSubmitting ? "brightness-90" : "brightness-100"}
+              `}
+            >
+              {message.image?.delete_flag === 1 && (
+                <div className="w-32 h-32 flex flex-col items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-2 text-center">
+                  <span className="text-gray-700 font-bold text-[11px] leading-tight select-none">
+                    画像が<br />見つかりません
+                  </span>
+                </div>
+              )}
+
+              {message.message && (
+                <p className="text-lg text-gray-800 whitespace-pre-wrap select-none">
+                  {renderHighlightedMessage(message.message)}
+                </p>
+              )}
+
+              {message.stamp ? (
+                !isStampError ? (
+                  <img
+                    src={`/stamps/${message.stamp}.png`}
+                    className="w-32 h-32 object-contain aspect-square"
+                    onError={() => setIsStampError(true)}
+                  />
+                ) : (
+                  <div className="w-32 h-32 flex flex-col items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-2 text-center">
+                    <span className="text-gray-700 font-bold text-[11px] leading-tight select-none">
+                      スタンプが<br />見つかりません
+                    </span>
+                  </div>
+                )
+              ) : null}
+
+              {((message as any).previewImages || [message.signedImageUrl]).filter(Boolean).map((url: string, index: number) => {
+                const isError = errorIndices.includes(index);
+                const realStorageKey = (message as any).storageKey || url;
+                return !isError ? (
+                  <img
+                    key={`img-item-${index}`}
+                    src={url}
+                    alt="chat image"
+                    className="max-w-[200px] h-auto rounded-lg border border-gray-200"
+                    onLoad={() => onScrollBottom?.(true)}
+                    onClick={() => onImageClick?.(realStorageKey)}
+                    onError={() => {
+                      if (!url.startsWith("blob:")) {
+                        setErrorIndices(prev => [...prev, index]);
+                      }
+                    }}
+                  />
+                ) : (
+                  <div
+                    key={`img-error-${message.id}-${index}`}
+                    className="w-32 h-32 flex flex-col items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-2 text-center"
+                  >
+                    <span className="text-gray-700 font-bold text-[11px] leading-tight select-none">
+                      画像が<br />見つかりません
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {!isMine && (
+              <div className="w-4 h-4 flex-shrink-0 ml-3">
+                {type === "chat" ? (
+                  message.favorite_flag === 1 && <Star className="text-yellow-400 fill-yellow-400" />
+                ) : (
+                  message.niceFlag === 1 && <ThumbsUp className="text-yellow-400 fill-yellow-400" />
+                )}
+              </div>
             )}
           </div>
-        )}
-      </div>
-      {/* <span className="text-[10px] text-gray-400 mt-1">{formatDateTime(message.created_at, message.updated_at)}</span> */}
-      <div className={`flex items-end gap-1 mt-1 ${isMine ? "flex-row-reverse" : "flex-row"}`}>
-        <span className="text-[10px] text-gray-400">
-          {formatDateTime(message.created_at, message.updated_at)}
-        </span>
-        {/* 自分へのメッセージかつ、既読判定がTrueの場合のみ表示 */}
-        {isMine && (message.is_read ?? 0) === 1 && (
-          <span className="text-[10px] text-gray-500 mb-[1px]">既読</span>
-        )}
+
+          <div className={`flex items-end gap-1 mt-1 ${isMine ? "flex-row-reverse" : "flex-row"}`}>
+            <span className="text-[10px] text-gray-400">
+              {formatDateTime(message.created_at, message.updated_at)}
+            </span>
+            {isMine && (message.is_read ?? 0) === 1 && (
+              <span className="text-[10px] text-gray-500 mb-[1px]">既読</span>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

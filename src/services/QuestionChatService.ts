@@ -43,13 +43,32 @@ export async function getQuestionChatsWithImages(userId: string, questionId: num
     .map(c => c.image_id)
     .filter((id): id is number => id !== null);
 
-  // 3. IDベースの getImages を呼び出し（S3署名付きURLを取得）
-  const urlMap = imageIds.length > 0 ? await getImages(imageIds) : new Map<number, string>();
+  const userIds = Array.from(
+    new Set(qChats.map(c => c.user_id).filter((id): id is string => typeof id === "string" && id !== ""))
+  );
 
-  // 4. マッピングして返す
+  // 4. S3署名付きURLとユーザー情報を並列取得
+  const [urlMap, users] = await Promise.all([
+    imageIds.length > 0 ? getImages(imageIds) : Promise.resolve(new Map<number, string>()),
+    userIds.length > 0
+      ? prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: {
+            id: true,
+            username: true,
+            profile_image_id: true,
+          },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const userMap = new Map(users.map(u => [u.id, u]));
+
+  // 5. マッピングして返す
   return qChats.map((qChat) => ({
     ...qChat,
-    signedImageUrl: qChat.image_id ? (urlMap.get(qChat.image_id) || null) : null
+    signedImageUrl: qChat.image_id ? (urlMap.get(qChat.image_id) || null) : null,
+    user: qChat.user_id ? (userMap.get(qChat.user_id) || null) : null,
   }));
 }
 
@@ -83,17 +102,30 @@ export async function registerQuestionChat(data: {
     imageId = img?.id;
   }
 
-  return await prismaClient.questionChats.create({
+  const createdChat = await prismaClient.questionChats.create({
     data: {
       question_id: data.questionId,
       user_id: data.userId,
       message: data.message,
       stamp: data.stamp,
       image_id: imageId,
-      // 必要であれば追加カラム
     },
-    include: { image: true }
+    include: { image: true },
   });
+
+  const sender = await prismaClient.user.findUnique({
+    where: { id: data.userId },
+    select: {
+      id: true,
+      username: true,
+      profile_image_id: true,
+    },
+  });
+
+  return {
+    ...createdChat,
+    user: sender,
+  };
 }
 /**
  * 3. チャット編集更新

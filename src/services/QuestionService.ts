@@ -147,10 +147,11 @@ export async function getQuestionsCount(userId: string) {
   const spaces = await prisma.space.findMany({
     where: {
       delete_flag: 0,
-      space_type: 3, // 質問スペース（※必要に応じて space_type 条件を指定）
+      space_type: 3,
       OR: [
         { user_id: userId },
-        { members: { some: { id: userId } } },
+        { groups: { some: { user_id: userId, delete_flag: 0 } } },
+        { invitations: { some: { invitee_id: userId, status: 1, delete_flag: 0 } } },
       ],
     },
     select: {

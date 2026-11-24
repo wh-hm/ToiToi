@@ -11,6 +11,15 @@ const SPACE_TYPE_MAP: Record<number, string> = {
   3: "QUESTION",
 };
 
+// 共通のアクセス条件（作成者 OR グループメンバー OR 招待承認済み）
+const buildSpaceAccessCondition = (userId: string) => ({
+  OR: [
+    { user_id: userId },
+    { groups: { some: { user_id: userId, delete_flag: 0 } } },
+    { invitations: { some: { invitee_id: userId, status: 1, delete_flag: 0 } } },
+  ],
+});
+
 // 概要：ユーザーに紐づく有効なスペース一覧を取得する
 export async function getSpaces(
   userId: string,
@@ -20,46 +29,34 @@ export async function getSpaces(
   return await prisma.space.findMany({
     where: {
       delete_flag: 0,
-      // 自分が作成したスペース OR 招待されて参加しているスペース
-      OR: [
-        { user_id: userId },
-        { members: { some: { id: userId } } } // 👈 users を members に修正しました
-      ],
+      ...buildSpaceAccessCondition(userId),
       ...(isArchived != null && { is_archived: isArchived }),
       ...(spaceType != null && { space_type: spaceType }),
     },
   });
 }
 
-//スペースが生きているかどうかの確認
+// スペースが生きているかどうかの確認
 export async function getSpaceCheck(userId: string, spaceId: number): Promise<Space | null> {
   const space = await prisma.space.findFirst({
-    where: { 
+    where: {
       id: spaceId,
-      // 自分が作成したスペース OR 招待されて参加しているスペース
-      OR: [
-        { user_id: userId },
-        { members: { some: { id: userId } } } 
-      ]
+      ...buildSpaceAccessCondition(userId),
     },
   });
-  if(!space){
+  if (!space) {
     return null;
   }
   return space;
 }
 
-//スペース名取得
+// スペース名取得
 export async function getSpaceName(userId: string, spaceId: number): Promise<string> {
   const space = await prisma.space.findFirst({
-    where: { 
-      id: spaceId, 
+    where: {
+      id: spaceId,
       delete_flag: 0,
-      // 自分が作成したスペース OR 招待されて参加しているスペース
-      OR: [
-        { user_id: userId },
-        { members: { some: { id: userId } } }
-      ]
+      ...buildSpaceAccessCondition(userId),
     },
   });
   if (!space) throw new Error("指定されたスペースが見つかりません。");

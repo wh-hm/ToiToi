@@ -100,14 +100,34 @@ export async function deleteImages(imageIds: number[]): Promise<boolean> {
  * 画像をR2にアップロードして、ファイル名を返す関数
  */
 // StorageService.ts の修正
+export async function uploadProfileImage(image: File, userId: string): Promise<number> {
+  const fileName = `profile_${userId}_${Date.now()}.png`;
+
+  await s3Client.send(new PutObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: fileName,
+    Body: Buffer.from(await image.arrayBuffer()),
+    ContentType: image.type,
+  }));
+
+  const created = await prisma.image.create({
+    data: {
+      storage_key: fileName,
+      size_bytes: image.size,
+      mime_type: image.type,
+    },
+  });
+
+  return created.id;
+}
+
+// チャット用（既存の uploadImages を復元）
 export async function uploadImages(images: File[], userId: string, spaceId: number): Promise<string[]> {
   let currentCount = await getImageCount(userId);
 
-  // 全画像を並列でアップロードするタスクを作成
   const uploadTasks = images.map(async (image, index) => {
     const fileName = `${userId}_${spaceId}_${(currentCount + index + 1).toString().padStart(3, '0')}.png`;
-    
-    // R2アップロード
+
     await s3Client.send(new PutObjectCommand({
       Bucket: BUCKET_NAME,
       Key: fileName,
@@ -115,7 +135,6 @@ export async function uploadImages(images: File[], userId: string, spaceId: numb
       ContentType: image.type,
     }));
 
-    // DB登録もここで済ませる
     await prisma.image.create({
       data: { storage_key: fileName, size_bytes: image.size, mime_type: image.type }
     });
@@ -123,7 +142,6 @@ export async function uploadImages(images: File[], userId: string, spaceId: numb
     return fileName;
   });
 
-  // すべての処理が完了するのを待つ
   return await Promise.all(uploadTasks);
 }
 

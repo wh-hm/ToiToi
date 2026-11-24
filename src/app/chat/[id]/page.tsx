@@ -317,53 +317,33 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     }
   };
 
-const handleToggleFavorite = async (chatId: number) => {
-  const targetChat = chats.find(c => c.id === chatId);
-  if (!targetChat) return;
-
-  // 現在が 1 なら 0 に、そうでなければ 1 にする
-  const nextValue = targetChat.favorite_flag === 1 ? 0 : 1;
-
-  // 1. 現在のステートをバックアップ（エラー時の復元用）
-  const previousMessages = [...chats];
-
-  // 2. 楽観的更新（即座に反映）
-  setChats((prev) => 
-    prev.map((msg) => 
-      msg.id === chatId ? { ...msg, favorite_flag: nextValue } : msg
-    )
-  );
-
-  try {
+const handleToggleFavorite = async (chatId: number, status:number) => {
+  const numericFlag = status ? 1 : 0;
+  try{
     const res = await fetchWithTimeout(`/api/chats/${spaceId}/favorite`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ 
-        favoriteFlag: nextValue,
-        chatId: chatId
-      }),
-    });
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          chatId:chatId,
+          favoriteFlag: numericFlag }),
+      });
 
-    if (!res.ok) {
-      handleApiResponse(res);
-      throw new Error("Failed to update favorite");
-    }
+      if (!res.ok) {
+        handleApiResponse(res);
+        throw new Error("Failed to update favorite");
+      }
 
-    const data = await res.json();
-    
-    // 3. APIの結果を適用（ここで確実にサーバー側の状態と一致させる）
-    if (data.updatedChat) {
-      setChats((prev) => 
-        prev.map((msg) => (msg.id === chatId ? { ...msg, ...data.updatedChat } : msg))
+      // 成功したらローカルのステートを更新
+      setChats((prevChats) =>
+        prevChats.map((chat) =>
+          chat.id === chatId ? { ...chat, favorite_flag: status } : chat
+        )
       );
+    } catch (error) {
+      console.error("Error updating favorite:", error);
     }
-  } catch (e) {
-    console.error(e);
-    ToiToiNotification.error("お気に入りの更新に失敗しました。");
-    // 4. エラー時は元の状態に戻す
-    setChats(previousMessages);
-  }
-};
+  };
+  
   const changeBackground = async (chatId: number, bg: number) => {
     const previousMessages = [...chats];
 

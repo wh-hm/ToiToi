@@ -10,19 +10,18 @@ interface InviteModalProps {
   currentUserId: string;
 }
 
-export default function InviteModal({ isOpen, onClose, spaces, currentUserId }: InviteModalProps) {
+export default function InviteModal({ isOpen, onClose, spaces }: InviteModalProps) {
   const [selectedSpaceId, setSelectedSpaceId] = useState("");
-  const [inviteeId, setInviteeId] = useState("");
+  const [inviteeInput, setInviteeInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
   if (!isOpen) return null;
 
-  // すべてのスペースを1つの配列にまとめる（選択肢用）
+  // 招待対象のスペース（チャット・質問）をまとめる
   const allSpaces = [
-    ...spaces.chat.map(s => ({ ...s, category: 'チャット' })),
-    ...spaces.task.map(s => ({ ...s, category: 'タスク' })),
-    ...spaces.question.map(s => ({ ...s, category: '質問' }))
+    ...spaces.chat.map((s) => ({ ...s, category: "チャット" })),
+    ...spaces.question.map((s) => ({ ...s, category: "質問" })),
   ];
 
   const handleInvite = async (e: React.FormEvent) => {
@@ -30,20 +29,34 @@ export default function InviteModal({ isOpen, onClose, spaces, currentUserId }: 
     setLoading(true);
     setMessage("");
 
+    // カンマまたはスペース区切りで複数ユーザーIDを配列化
+    const inviterIds = inviteeInput
+      .split(/[,、\s]+/)
+      .map((id) => id.trim())
+      .filter(Boolean);
+
+    if (inviterIds.length === 0) {
+      setMessage("エラー: 招待するユーザーIDを入力してください。");
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch("/api/invitations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          space_id: Number(selectedSpaceId),
-          invitee_id: inviteeId,
+          spaceId: Number(selectedSpaceId),
+          inviterIds,
         }),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      alert("招待を送信しました！");
+      alert(data.message || "招待を送信しました！");
+      setInviteeInput("");
+      setSelectedSpaceId("");
       onClose();
     } catch (error: any) {
       setMessage(`エラー: ${error.message}`);
@@ -76,12 +89,14 @@ export default function InviteModal({ isOpen, onClose, spaces, currentUserId }: 
           </div>
 
           <div>
-            <label className="block text-sm font-semibold mb-1">招待するユーザーID</label>
+            <label className="block text-sm font-semibold mb-1">
+              招待するユーザーID（カンマ区切りで複数可）
+            </label>
             <input
               type="text"
-              placeholder="ユーザーIDを入力"
-              value={inviteeId}
-              onChange={(e) => setInviteeId(e.target.value)}
+              placeholder="例: user_abc123, user_xyz789"
+              value={inviteeInput}
+              onChange={(e) => setInviteeInput(e.target.value)}
               className="w-full border rounded-xl p-3"
               required
             />

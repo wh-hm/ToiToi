@@ -5,6 +5,7 @@ import { MESSAGES } from "@/constants/messages";
 import { getUser } from "@/services/UserService";
 import { getSpaces } from "@/services/SpaceService";
 import { getImageCount } from "@/services/StorageService";
+import { getImages } from "@/services/StorageService";
 
 export async function GET() {
   const auth = await getAuthContext();
@@ -26,8 +27,19 @@ export async function GET() {
     if (!user) {
       return NextResponse.json({ message: MESSAGES.E1010("ユーザー") }, { status: 403 });
     }
+
+    // プロフィール画像の署名付きURL取得
+    let profileImageUrl: string | null = null;
+    if (user.profile_image_id) {
+      const urlMap = await getImages([user.profile_image_id]);
+      profileImageUrl = urlMap.get(user.profile_image_id) || null;
+    }
+
     return NextResponse.json({ 
-      user: user, 
+      user: {
+        ...user,
+        profile_image_url: profileImageUrl,
+      }, 
       spaces: result, 
       imageCount: imageCount,
       message: MESSAGES.S2001("アカウント情報")

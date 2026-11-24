@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { updateGoal, registerGoal, deleteGoal} from './GoalService';
 import { updateLoginManagement, deleteLoginManagement, registerLoginManagement } from './LoginManagementService';
 import { deleteSpaces } from './SpaceService';
+import { deleteImages } from './StorageService';
 
 export async function checkUser(userId: string): Promise<boolean> {
   const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -90,6 +91,39 @@ export async function deleteUser(userId: string): Promise<boolean> {
  * メソッド名称：updateUsername
  * 概要：ユーザー名の更新
  */
+export async function updateUser(
+  id: string,
+  data: { profile_image_id?: number | null; username?: string }
+): Promise<User> {
+  const currentUser = await prisma.user.findFirst({
+    where: { id, delete_flag: 0 },
+    select: { profile_image_id: true },
+  });
+
+  const updated = await prisma.user.update({
+    where: { id, delete_flag: 0 },
+    data: {
+      ...(data.profile_image_id !== undefined && { profile_image_id: data.profile_image_id }),
+      ...(data.username !== undefined && { username: data.username }),
+    },
+  });
+
+  // 以前のプロフィール画像があれば削除
+  if (
+    data.profile_image_id !== undefined &&
+    currentUser?.profile_image_id &&
+    currentUser.profile_image_id !== data.profile_image_id
+  ) {
+    try {
+      await deleteImages([currentUser.profile_image_id]);
+    } catch (e) {
+      console.error("旧プロフィール画像の削除失敗:", e);
+    }
+  }
+
+  return updated;
+}
+
 export async function updateUsername(id: string, username: string): Promise<User> {
   return await prisma.user.update({
     where: { id, delete_flag: 0 },

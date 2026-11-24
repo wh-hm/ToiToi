@@ -22,6 +22,11 @@ export interface ChatMessage {
   } | null;
   user_id?: string | number;
   is_read?: number;
+  user?: {
+    id: string;
+    username: string | null;
+    profile_image_url: string | null;
+  } | null;
 }
 
 export interface ChatInputProps {
@@ -51,6 +56,7 @@ export interface ChatListProps {
   onScrollBottom: (force?: boolean) => void;
   isError: boolean;
   currentUserId?: string | number;
+  searchQuery?: string;
 }
 
 export interface ChatMessageItemProps {
@@ -70,6 +76,7 @@ export interface ChatMessageItemProps {
   onScrollBottom: (force: boolean) => void;
   type: string;
   currentUserId?: string | number;
+  searchQuery?: string;
 }
 
 export interface ImageZoomModalProps {

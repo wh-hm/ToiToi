@@ -11,20 +11,54 @@ export async function getChatsWithImages(userId: string, spaceId: number) {
   const chats = await prisma.chat.findMany({
     where: { delete_flag: 0, space_id: spaceId },
     orderBy: { created_at: 'asc' },
-    include: { image: true,
-     }, 
+    include: {
+      image: true,
+    },
   });
 
   // 1. image_id (number) の配列を抽出
   const imageIds = chats
     .map(c => c.image_id)
     .filter((id): id is number => id !== null);
-  // 2. IDベースの getImages を呼び出し
-  const urlMap = imageIds.length > 0 ? await getImages(imageIds) : new Map<number, string>();
-  // 3. マッピングして返す
+  
+  const userIds = Array.from(
+    new Set(chats.map(c => c.user_id).filter((id): id is string => typeof id === "string" && id !== ""))
+  );
+  // 3. 画像URLとユーザー情報を並列取得
+  const users = userIds.length > 0
+    ? await prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: {
+          id: true,
+          username: true,
+          profile_image_id: true,
+        },
+      })
+    : [];
+
+    const profileImageIds = users
+    .map(u => u.profile_image_id)
+    .filter((id): id is number => id !== null);
+
+  const allImageIds = Array.from(new Set([...imageIds, ...profileImageIds]));
+  const urlMap = allImageIds.length > 0 ? await getImages(allImageIds) : new Map<number, string>();
+
+  const userMap = new Map(
+    users.map(u => [
+      u.id,
+      {
+        id: u.id,
+        username: u.username,
+        profile_image_url: u.profile_image_id ? (urlMap.get(u.profile_image_id) || null) : null,
+      },
+    ])
+  );
+
+  // 4. マッピングして返す
   return chats.map((chat) => ({
     ...chat,
-    signedImageUrl: chat.image_id ? (urlMap.get(chat.image_id) || null) : null
+    signedImageUrl: chat.image_id ? (urlMap.get(chat.image_id) || null) : null,
+    user: chat.user_id ? (userMap.get(chat.user_id) || null) : null,
   }));
 }
 
@@ -32,6 +66,13 @@ export async function getChatsWithImages(userId: string, spaceId: number) {
 export const getChatCheck = async (userId: string, spaceId: number, chatId: number): Promise<boolean> => {
   const result = await prisma.chat.findFirst({
     where: { id: chatId, user_id: userId, delete_flag: 0, space_id: spaceId }
+  });
+  return !!result;
+};
+
+export const getChatExists = async (spaceId: number, chatId: number): Promise<boolean> => {
+  const result = await prisma.chat.findFirst({
+    where: { id: chatId, space_id: spaceId, delete_flag: 0 }
   });
   return !!result;
 };
@@ -62,17 +103,43 @@ export async function registerChat(data: {
     }
     imageId = img?.id;
   }
-  return await tx.chat.create({
+  const createdChat = await tx.chat.create({
     data: {
       user_id: data.userId,
       space_id: data.spaceId,
       message: data.message,
       stamp: data.stamp,
-      image_id: imageId, // IDをセット！
+      image_id: imageId,
       delete_flag: 0,
     },
-    include: { image: true }
+    include: { image: true },
   });
+
+  const sender = await tx.user.findUnique({
+    where: { id: data.userId },
+    select: {
+      id: true,
+      username: true,
+      profile_image_id: true,
+    },
+  });
+
+  let senderProfileUrl: string | null = null;
+  if (sender?.profile_image_id) {
+    const profileUrlMap = await getImages([sender.profile_image_id]);
+    senderProfileUrl = profileUrlMap.get(sender.profile_image_id) || null;
+  }
+
+  return {
+    ...createdChat,
+    user: sender
+      ? {
+          id: sender.id,
+          username: sender.username,
+          profile_image_url: senderProfileUrl,
+        }
+      : null,
+  };
 }
 
 // 5. チャット削除（画像削除エラーはキャッチして個別にログ出力）
@@ -115,7 +182,7 @@ export const updateChat = async (chatId: number, spaceId: number, userId: string
 
 export const toggleFavorite = async (chatId: number, spaceId: number, userId: string, newFlag: number): Promise<Chat> => {
   return await prisma.chat.update({
-    where: { id: chatId, space_id: spaceId, user_id: userId },
+    where: { id: chatId},
     data: { favorite_flag: newFlag },
   });
 };

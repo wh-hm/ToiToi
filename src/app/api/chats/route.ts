@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     // 最新のチャットIDを取得
     const latestChatId = chats.length > 0 ? Math.max(...chats.map((c: any) => c.id)) : 0;
     if (latestChatId > 0) {
-      await prisma.spaceReadStatus.upsert({
+      await prisma.chatReadStatus.upsert({
         where: {
           space_id_user_id: {
             space_id: spaceId,
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     }
 
     //相手ユーザーの既読状況（last_read_chat_id）を取得
-    const otherReadStatuses = await prisma.spaceReadStatus.findMany({
+    const otherReadStatuses = await prisma.chatReadStatus.findMany({
       where: {
         space_id: spaceId,
         user_id: { not: auth.user_id },
@@ -150,7 +150,8 @@ export async function POST(request: NextRequest) {
     }
     // 4. DB登録 (ループで1枚ずつ登録)
     const newChat = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // 画像がない場合
+      let results = [];
+
       if (!imageUrls || imageUrls.length === 0) {
         const res = await registerChat({
           userId: auth.user_id,
@@ -158,28 +159,51 @@ export async function POST(request: NextRequest) {
           message: message || undefined,
           stamp: stamp || undefined,
         }, tx);
-        return [res]; // ★単一の結果も必ず配列 [res] にして返す
+        results = [res];
+      } else {
+        for (let i = 0; i < imageUrls.length; i++) {
+          const res = await registerChat({
+            userId: auth.user_id,
+            spaceId: spaceId,
+            message: message || undefined,
+            imageUrl: imageUrls[i],
+            caption: caption || undefined,
+            stamp: i === 0 ? (stamp || undefined) : undefined,
+          }, tx);
+          results.push(res);
+        }
       }
-      // 画像がある場合
-      const results = [];
-      for (let i = 0; i < imageUrls.length; i++) {
-        const res = await registerChat({
-          userId: auth.user_id,
-          spaceId: spaceId,
-          message: message || undefined,
-          imageUrl: imageUrls[i],
-          caption: caption || undefined, // キャプションを渡す
-          stamp: i === 0 ? (stamp || undefined) : undefined,
-        }, tx); // tx を渡す
-        results.push(res);
-      }
-      return results; // これは元から配列
-    });
-    console.log("最終確認:", newChat);
-    const safeNewChat = JSON.parse(JSON.stringify(newChat));
-    // ここで newChat は常に配列として返る。チャットのため成功時のメッセージは送らない
-    return NextResponse.json({ newChat: safeNewChat, message: MESSAGES.S1001("チャット") }, { status: 201 });
 
+      // 自分の既読位置を送信した最新メッセージIDに更新（自分の送信分が未読にならないようにする）
+      const latestSentId = Math.max(...results.map((c: any) => c.id));
+      if (latestSentId > 0) {
+        await tx.chatReadStatus.upsert({
+          where: {
+            space_id_user_id: {
+              space_id: spaceId,
+              user_id: auth.user_id,
+            },
+          },
+          update: { last_read_chat_id: latestSentId },
+          create: {
+            space_id: spaceId,
+            user_id: auth.user_id,
+            last_read_chat_id: latestSentId,
+          },
+        });
+      }
+
+      return results;
+    });
+
+    // GETと形式を揃えて isMine / is_read (0:未読) を付与
+    const safeNewChat = JSON.parse(JSON.stringify(newChat)).map((msg: any) => ({
+      ...msg,
+      isMine: true,
+      is_read: 0,
+    }));
+
+    return NextResponse.json({ newChat: safeNewChat, message: MESSAGES.S1001("チャット") }, { status: 201 });
 
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
